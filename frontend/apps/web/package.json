@@ -24,7 +24,7 @@
     "@cosmos.gl/graph": "3.3.0",
     "@hookform/resolvers": "^5.4.0",
     "@tanstack/react-query": "^5.101.2",
-    "antd": "^6.5.0",
+    "antd": "^6.5.2",
     "apache-arrow": "21.1.0",
     "d3": "^7.9.0",
     "react": "^18.2.0",
