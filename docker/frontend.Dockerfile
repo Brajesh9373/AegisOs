@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Multi-stage build for the aegisOS Vite/React frontend.
 
-FROM node:20-slim AS builder
+FROM node:26-slim AS builder
 WORKDIR /app
 RUN npm install -g pnpm@9.0.0
 
