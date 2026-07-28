@@ -133,20 +133,25 @@ flowchart TB
 
 ## Screenshots
 
-### Knowledge graph — connected source view
+## Knowledge graph
 
-![Knowledge graph connected source view](<legacy/Screenshot 2026-07-05 215719.png>)
+![Knowledge graph](docs/screenshots/k-graph.png)
 
-### Knowledge graph — clustered view
+### Project workspace
 
-![Knowledge graph clustered view](<legacy/Screenshot 2026-07-05 215657.png>)
+![Project workspace](docs/screenshots/Project_workspace.png)
 
-<!-- Add approved captures for the following views under docs/screenshots/:
-- Mission Control dashboard
-- Project workspace and worker hierarchy
-- Administration and connector catalog
-- Agent profile, evaluations, and guardrails
--->
+### Agent profile
+
+![Agent profile](docs/screenshots/Agent_profile.png)
+
+### Create project
+
+![Create project](docs/screenshots/Create_project.png)
+
+### Organisation
+
+![Organisation ](docs/screenshots/Org_workflow.png)
 
 ## Local Development
 
