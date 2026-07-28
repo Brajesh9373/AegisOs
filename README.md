@@ -200,4 +200,4 @@ pnpm dev
 
 ## License
 
-The repository does not currently include a `LICENSE` file. Choose and add the project license before external distribution.
+This project is licensed under the [Apache License 2.0](LICENSE).
