@@ -1,0 +1,24 @@
+{
+  "name": "@aegisos/integration-demo",
+  "version": "0.1.0",
+  "description": "E2E Platform Integration Testing",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@aegisos/contracts": "workspace:*",
+    "@aegisos/runtime-host": "workspace:*",
+    "@aegisos/plugin-loader": "workspace:*",
+    "@aegisos/provider": "workspace:*",
+    "@aegisos/execution-runtime": "workspace:*",
+    "@aegisos/workflow-runtime": "workspace:*",
+    "@aegisos/agent-runtime": "workspace:*",
+    "@aegisos/multi-agent-runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.2"
+  }
+}

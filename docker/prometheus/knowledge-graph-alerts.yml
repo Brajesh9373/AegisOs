@@ -1,0 +1,49 @@
+groups:
+  - name: knowledge-graph-v2
+    rules:
+      - alert: KnowledgeGraphSnapshotWorkerMissing
+        expr: ecms_knowledge_graph_snapshot_active_workers < 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Knowledge graph snapshot worker has no live heartbeat
+      - alert: KnowledgeGraphSnapshotJobsStuck
+        expr: ecms_knowledge_graph_snapshot_pending_jobs > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Knowledge graph snapshot jobs remain unacknowledged
+      - alert: KnowledgeGraphSnapshotStale
+        expr: ecms_knowledge_graph_snapshot_age_seconds > 86400
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: Current knowledge graph snapshot is older than 24 hours
+      - alert: KnowledgeGraphSnapshotBuildFailures
+        expr: increase(ecms_knowledge_graph_snapshot_builds_failed[15m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: Knowledge graph snapshot build attempts are failing
+      - alert: KnowledgeGraphSnapshotRetriesExhausted
+        expr: increase(ecms_knowledge_graph_snapshot_builds_exhausted[30m]) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: A knowledge graph snapshot job exhausted its retry budget
+      - alert: KnowledgeGraphManifestLatencyHigh
+        expr: histogram_quantile(0.95, sum by (le) (rate(ecms_knowledge_graph_manifest_duration_seconds_bucket[10m]))) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Knowledge graph manifest p95 latency exceeds one second
+      - alert: KnowledgeGraphClientLoadFailures
+        expr: increase(ecms_knowledge_graph_client_events_total{event="load_failed"}[15m]) > 5
+        labels:
+          severity: warning
+        annotations:
+          summary: Browsers are repeatedly failing to load the knowledge graph

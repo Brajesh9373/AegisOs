@@ -1,0 +1,24 @@
+# Version control
+.git/
+.github/
+
+# Python caches / envs
+**/__pycache__/
+**/*.py[cod]
+**/.venv/
+**/.uv-cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.pytest_cache/
+**/htmlcov/
+**/.coverage
+**/*.db
+
+# Node
+**/node_modules/
+**/.next/
+**/out/
+
+# Local files
+**/.env
+*.md

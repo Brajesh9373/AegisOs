@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>STT Debug Test</title>
+  <style>
+    * { box-sizing: border-box; font-family: system-ui, sans-serif; }
+    body { max-width: 700px; margin: 40px auto; padding: 20px; background: #f8fafc; }
+    h1 { font-size: 20px; margin-bottom: 4px; }
+    .subtitle { color: #64748b; font-size: 13px; margin-bottom: 24px; }
+    .test-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    .test-card h3 { margin: 0 0 8px; font-size: 14px; }
+    .test-card p { margin: 0 0 12px; font-size: 12px; color: #64748b; }
+    .result { padding: 8px 12px; border-radius: 6px; font-size: 12px; margin-top: 8px; font-family: monospace; white-space: pre-wrap; }
+    .pass { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
+    .fail { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; }
+    .info { background: #eff6ff; border: 1px solid #bfdbfe; color: #2563eb; }
+    button { padding: 8px 16px; border-radius: 6px; border: 1px solid #d1d5db; background: #fff; cursor: pointer; font-size: 13px; margin-right: 8px; }
+    button.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+    button.danger { background: #ef4444; color: #fff; border-color: #ef4444; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    #transcript { width: 100%; min-height: 80px; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; margin-top: 8px; resize: vertical; }
+    .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+    .dot-red { background: #ef4444; }
+    .dot-green { background: #22c55e; }
+    .dot-yellow { background: #eab308; }
+    .dot-gray { background: #9ca3af; }
+    #log { background: #1e293b; color: #e2e8f0; padding: 12px; border-radius: 8px; font-size: 11px; font-family: monospace; max-height: 300px; overflow-y: auto; line-height: 1.6; }
+    .banner { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; }
+    .banner-warn { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+    .banner-ok { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
+  </style>
+</head>
+<body>
+
+<h1>🎙️ Browser STT Debug Test</h1>
+<p class="subtitle">Tests the Web Speech API in isolation — no backend, no Docker, no React.</p>
+
+<div id="protocolBanner" class="banner banner-warn" style="display:none">
+  ⚠️ This page is loaded via <strong>file://</strong> protocol. Chrome blocks Web Speech API on file:// URLs.<br>
+  To test properly, serve it via HTTP: <code>python -m http.server 9999</code> then open <code>http://localhost:9999/stt-test.html</code>
+</div>
+
+<!-- Test 1: Browser Support -->
+<div class="test-card">
+  <h3>Test 1: Browser Support</h3>
+  <p>Check if SpeechRecognition API exists in this browser.</p>
+  <button onclick="testBrowserSupport()">Run Test</button>
+  <div id="result1"></div>
+</div>
+
+<!-- Test 2: HTTPS / Secure Context -->
+<div class="test-card">
+  <h3>Test 2: Secure Context (HTTPS or localhost)</h3>
+  <p>Web Speech API requires a secure context.</p>
+  <button onclick="testSecureContext()">Run Test</button>
+  <div id="result2"></div>
+</div>
+
+<!-- Test 3: Network Connectivity -->
+<div class="test-card">
+  <h3>Test 3: Google Connectivity</h3>
+  <p>Check if this browser can reach Google's speech servers.</p>
+  <button onclick="testGoogleConnectivity()">Run Test</button>
+  <div id="result3"></div>
+</div>
+
+<!-- Test 4: Mic Access -->
+<div class="test-card">
+  <h3>Test 4: Microphone Access</h3>
+  <p>Test if the browser can access the microphone.</p>
+  <button onclick="testMicAccess()">Run Test</button>
+  <div id="result4"></div>
+</div>
+
+<!-- Test 5: Full STT Test -->
+<div class="test-card">
+  <h3>Test 5: Full Speech Recognition</h3>
+  <p>Click Start, say something, then click Stop. Watch the log for errors.</p>
+  <button id="startBtn" class="primary" onclick="startSTT()">▶ Start Listening</button>
+  <button id="stopBtn" class="danger" onclick="stopSTT()" disabled>■ Stop</button>
+  <textarea id="transcript" placeholder="Transcribed text will appear here..." readonly></textarea>
+  <div id="result5"></div>
+</div>
+
+<!-- Event Log -->
+<div class="test-card">
+  <h3>📋 Event Log</h3>
+  <div id="log"></div>
+</div>
+
+<script>
+  const logEl = document.getElementById('log');
+  function log(msg, type) {
+    type = type || 'info';
+    const time = new Date().toLocaleTimeString();
+    const prefix = type === 'error' ? '❌' : type === 'pass' ? '✅' : type === 'warn' ? '⚠️' : 'ℹ️';
+    logEl.textContent += '[' + time + '] ' + prefix + ' ' + msg + '\n';
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function result(id, text, cls) {
+    document.getElementById(id).innerHTML = '<div class="result ' + cls + '">' + text + '</div>';
+  }
+
+  // Show protocol warning
+  if (window.location.protocol === 'file:') {
+    document.getElementById('protocolBanner').style.display = 'block';
+  }
+
+  function testBrowserSupport() {
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SR) {
+      var vendor = window.SpeechRecognition ? 'Standard' : 'webkit (Chrome/Edge)';
+      result('result1', '✅ SpeechRecognition found — ' + vendor, 'pass');
+      log('SpeechRecognition API found: ' + vendor, 'pass');
+    } else {
+      result('result1', '❌ SpeechRecognition NOT found. Use Chrome or Edge.', 'fail');
+      log('SpeechRecognition API NOT found', 'error');
+    }
+  }
+
+  function testSecureContext() {
+    var isSecure = window.isSecureContext;
+    var protocol = window.location.protocol;
+    var hostname = window.location.hostname || '(empty)';
+    if (protocol === 'file:') {
+      result('result2', '⚠️ file:// protocol — isSecureContext=' + isSecure + '\nChrome reports secure but Web Speech API may still block file://\nServe via HTTP: python -m http.server 9999', 'info');
+      log('file:// protocol — may block STT even though isSecureContext=' + isSecure, 'warn');
+    } else if (isSecure) {
+      result('result2', '✅ Secure context — ' + protocol + '//' + hostname, 'pass');
+      log('Secure context: ' + protocol + '//' + hostname, 'pass');
+    } else {
+      result('result2', '❌ NOT secure — ' + protocol + '//' + hostname, 'fail');
+      log('NOT secure: ' + protocol + '//' + hostname, 'error');
+    }
+  }
+
+  async function testGoogleConnectivity() {
+    result('result3', '<span class="status-dot dot-yellow"></span>Testing...', 'info');
+    try {
+      var t0 = Date.now();
+      await fetch('https://www.google.com/favicon.ico', { mode: 'no-cors', cache: 'no-store' });
+      var ms = Date.now() - t0;
+      result('result3', '✅ Google reachable (' + ms + 'ms). Internet is fine.', 'pass');
+      log('Google reachable in ' + ms + 'ms', 'pass');
+    } catch (e) {
+      result('result3', '❌ Cannot reach google.com — no internet or blocked.', 'fail');
+      log('Cannot reach google.com: ' + e.message, 'error');
+    }
+  }
+
+  async function testMicAccess() {
+    try {
+      var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      var label = stream.getAudioTracks()[0] ? stream.getAudioTracks()[0].label : 'unknown';
+      result('result4', '✅ Microphone: "' + label + '"', 'pass');
+      log('Mic granted: "' + label + '"', 'pass');
+      stream.getTracks().forEach(function(t) { t.stop(); });
+    } catch (e) {
+      result('result4', '❌ Mic error: ' + e.message, 'fail');
+      log('Mic error: ' + e.name + ' — ' + e.message, 'error');
+    }
+  }
+
+  var recognition = null;
+
+  function startSTT() {
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { result('result5', '❌ Not available', 'fail'); return; }
+
+    recognition = new SR();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    document.getElementById('transcript').value = '';
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('stopBtn').disabled = false;
+    result('result5', '<span class="status-dot dot-yellow"></span>Listening...', 'info');
+
+    log('--- STT Start ---');
+    log('Protocol: ' + window.location.protocol + ', Host: ' + (window.location.hostname || 'empty'));
+
+    recognition.onstart = function() {
+      log('onstart — recognition active', 'pass');
+      result('result5', '<span class="status-dot dot-green"></span>Listening — speak now...', 'info');
+    };
+
+    recognition.onresult = function(event) {
+      var finalText = '';
+      for (var i = event.resultIndex; i < event.results.length; i++) {
+        var t = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalText += t;
+          log('FINAL: "' + t + '" conf=' + (event.results[i][0].confidence || '?').toFixed(2), 'pass');
+        } else {
+          log('interim: "' + t + '"', 'info');
+        }
+      }
+      if (finalText) document.getElementById('transcript').value += finalText;
+    };
+
+    recognition.onend = function() {
+      log('onend — stopped');
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
+      result('result5', '<span class="status-dot dot-gray"></span>Stopped', 'info');
+    };
+
+    recognition.onerror = function(event) {
+      log('onerror: "' + event.error + '" msg="' + event.message + '"', 'error');
+      log('  Protocol: ' + window.location.protocol + ' | Online: ' + navigator.onLine + ' | Secure: ' + window.isSecureContext, 'warn');
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
+
+      if (event.error === 'network') {
+        result('result5', '❌ NETWORK ERROR\n\n' +
+          'Protocol: ' + window.location.protocol + '\n' +
+          'Online: ' + navigator.onLine + '\n' +
+          'SecureContext: ' + window.isSecureContext + '\n\n' +
+          'This means Chrome cannot reach its cloud speech service.\n\n' +
+          'FIX: Open this page via http://localhost (not file://)\n' +
+          '  cd D:\\Navadhan\\ecms\\docker\n' +
+          '  python -m http.server 9999\n' +
+          '  Then open http://localhost:9999/stt-test.html\n\n' +
+          'Or test directly at http://localhost:3000/projects/new → Audio button', 'fail');
+      }
+    };
+
+    try {
+      recognition.start();
+      log('start() called OK');
+    } catch (e) {
+      log('start() threw: ' + e.message, 'error');
+      result('result5', '❌ start() error: ' + e.message, 'fail');
+    }
+  }
+
+  function stopSTT() {
+    if (recognition) { log('stop called'); recognition.stop(); }
+  }
+
+  window.addEventListener('load', function() {
+    log('Page loaded');
+    log('Protocol: ' + window.location.protocol + ' | Host: ' + (window.location.hostname || 'empty'));
+    log('Online: ' + navigator.onLine + ' | Secure: ' + window.isSecureContext);
+    log('Browser: ' + navigator.userAgent.substring(0, 80));
+    if (window.location.protocol === 'file:') {
+      log('⚠️ file:// detected — STT will likely fail with "network" error', 'warn');
+      log('FIX: python -m http.server 9999 → http://localhost:9999/stt-test.html', 'warn');
+    }
+  });
+</script>
+</body>
+</html>

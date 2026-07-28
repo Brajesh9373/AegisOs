@@ -1,0 +1,39 @@
+namespace: ecms
+
+backend:
+  image: ecms-backend:latest
+  replicas: 2
+  port: 8000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+frontend:
+  image: ecms-frontend:latest
+  replicas: 2
+  port: 3000
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: "500m"
+      memory: 256Mi
+
+ingress:
+  enabled: true
+  className: nginx
+  host: ecms.local
+
+config:
+  ECMS_ENVIRONMENT: production
+  ECMS_LOG_LEVEL: INFO

@@ -1,0 +1,20 @@
+[Unit]
+Description=ECMS GitHub Webhook Listener
+After=network.target docker.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/ecms
+Environment=WEBHOOK_SECRET=ecms-webhook-secret-change-me
+Environment=GITHUB_TOKEN=your-github-token-here
+ExecStart=/usr/bin/python3 /home/ubuntu/ecms/scripts/webhook_listener.py
+Restart=always
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

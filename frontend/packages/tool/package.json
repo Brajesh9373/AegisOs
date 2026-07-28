@@ -1,0 +1,25 @@
+{
+  "name": "@aegisos/tool",
+  "version": "0.1.0",
+  "description": "aegisOS Tool Engine Foundation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src/ --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aegisos/contracts": "workspace:*",
+    "@aegisos/shared": "workspace:*",
+    "@aegisos/types": "workspace:*",
+    "@aegisos/config": "workspace:*",
+    "@aegisos/runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.2",
+    "vitest": "^1.3.1"
+  }
+}

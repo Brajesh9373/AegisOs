@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ecms
+  labels:
+    app.kubernetes.io/name: ecms
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ecms-backend-config
+  namespace: ecms
+data:
+  ECMS_ENVIRONMENT: "production"
+  ECMS_LOG_LEVEL: "INFO"

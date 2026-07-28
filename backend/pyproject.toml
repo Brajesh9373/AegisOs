@@ -1,0 +1,146 @@
+[project]
+name = "ecms-backend"
+version = "0.1.0"
+description = "Enterprise Cognitive Memory System — foundation backend platform"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+authors = [{ name = "ECMS Engineering" }]
+keywords = ["ecms", "cognitive", "knowledge-graph", "enterprise", "platform"]
+
+# Dependencies grow stage-by-stage (SECTION 88: avoid unnecessary dependencies).
+# Foundation stages 1–4 require only the infrastructure primitives below; heavier
+# runtime dependencies (SQLAlchemy, aiokafka, OpenTelemetry, auth, storage, GraphQL)
+# are added in the stages that introduce them.
+dependencies = [
+    "fastapi>=0.116.0",
+    "uvicorn[standard]>=0.35.0",
+    "pydantic>=2.11.0",
+    "pydantic-settings>=2.10.0",
+    "structlog>=25.1.0",
+    "typer>=0.15.0",
+    "pyyaml>=6.0.2",
+    "httpx>=0.28.0",
+    "pyjwt>=2.10.0",
+    "bcrypt>=4.2.0",
+    "python-multipart>=0.0.20",
+    "python-multipart>=0.0.20",
+    "prometheus-client>=0.21.0",
+    "opentelemetry-api>=1.29.0",
+    "opentelemetry-sdk>=1.29.0",
+    "strawberry-graphql>=0.240.0",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30.0",
+    "alembic>=1.14.0",
+    "redis>=5.2.0",
+    "boto3>=1.35.0",
+    "cryptography>=44.0.0",
+    "falkordb>=1.1.0",
+    "pymysql>=1.1.1",
+    "mem0ai>=0.1.0",
+    "qdrant-client>=1.12.0",
+    "openai>=1.0.0",
+    "scikit-learn>=1.5.0",
+    "python-telegram-bot>=21.0",
+    "fastembed>=0.5.0",
+    "pyarrow>=19.0.0",
+]
+
+[project.scripts]
+ecms = "ecms.cli.app:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.0",
+    "pytest-asyncio>=1.0.0",
+    "pytest-cov>=6.0.0",
+    "pytest-benchmark>=5.1.0",
+    "ruff>=0.9.0",
+    "mypy>=1.14.0",
+    "types-PyYAML>=6.0.12",
+    "aiosqlite>=0.20.0",
+    "fakeredis>=2.26.0",
+    "boto3-stubs[s3]>=1.35.0",
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.5.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ecms"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["ecms", "tests"]
+extend-exclude = ["__pycache__"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "PTH", "RUF", "ASYNC", "S", "N", "D"]
+# D203/D213 conflict with D211/D212 (Google convention); COM812 conflicts with formatter.
+ignore = ["D203", "D213", "COM812"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "D"]
+"**/tests/**" = ["S101", "S105", "S106", "D"]
+"**/interfaces/**" = ["D102"]
+"ecms/plugins/infrastructure/base.py" = ["B027"]
+"ecms/tools/infrastructure/base.py" = ["B027"]
+"ecms/providers/infrastructure/base.py" = ["B027"]
+"ecms/infrastructure/secrets/provider.py" = ["D102"]
+"ecms/infrastructure/cache/cache.py" = ["D102"]
+"ecms/infrastructure/storage/object_store.py" = ["D102"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["ecms"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Header",
+    "fastapi.Security",
+]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["ecms"]
+namespace_packages = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true
+disallow_untyped_defs = true
+show_error_codes = true
+exclude = ["ecms/persistence/migrations/"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+addopts = "-q --cov=ecms --cov-report=term-missing --benchmark-disable"
+pythonpath = ["."]
+testpaths = ["tests", "ecms"]
+filterwarnings = [
+    "ignore:Using .httpx. with .starlette.testclient. is deprecated:Warning",
+]
+
+[tool.coverage.run]
+source = ["ecms"]
+branch = true
+omit = [
+    "ecms/*/tests/*",
+    "ecms/*/interfaces/*",
+    "ecms/infrastructure/storage/s3.py",
+    "ecms/persistence/migrations/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]

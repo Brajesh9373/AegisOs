@@ -1,0 +1,9 @@
+# Tests and configuration
+tests/
+jest.config.js
+tsconfig.json
+.eslintrc.js
+.prettierrc
+
+# Source files (only publish dist)
+src/

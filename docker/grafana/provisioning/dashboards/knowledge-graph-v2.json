@@ -1,0 +1,86 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Active snapshot workers",
+      "targets": [{"expr": "ecms_knowledge_graph_snapshot_active_workers"}],
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0}
+    },
+    {
+      "type": "stat",
+      "title": "Pending jobs",
+      "targets": [{"expr": "ecms_knowledge_graph_snapshot_pending_jobs"}],
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0}
+    },
+    {
+      "type": "stat",
+      "title": "Snapshot age",
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "targets": [{"expr": "ecms_knowledge_graph_snapshot_age_seconds"}],
+      "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0}
+    },
+    {
+      "type": "stat",
+      "title": "Snapshot size",
+      "fieldConfig": {"defaults": {"unit": "bytes"}},
+      "targets": [{"expr": "ecms_knowledge_graph_snapshot_bytes"}],
+      "gridPos": {"h": 6, "w": 6, "x": 18, "y": 0}
+    },
+    {
+      "type": "timeseries",
+      "title": "Graph capacity",
+      "targets": [
+        {"expr": "ecms_knowledge_graph_snapshot_points", "legendFormat": "nodes"},
+        {"expr": "ecms_knowledge_graph_snapshot_links", "legendFormat": "edges"}
+      ],
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 6}
+    },
+    {
+      "type": "timeseries",
+      "title": "Snapshot build outcomes",
+      "targets": [
+        {"expr": "ecms_knowledge_graph_snapshot_builds_completed", "legendFormat": "completed"},
+        {"expr": "ecms_knowledge_graph_snapshot_builds_failed", "legendFormat": "failed"},
+        {"expr": "ecms_knowledge_graph_snapshot_build_retries", "legendFormat": "retries"},
+        {"expr": "ecms_knowledge_graph_snapshot_builds_exhausted", "legendFormat": "exhausted"}
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 15}
+    },
+    {
+      "type": "timeseries",
+      "title": "Manifest and browser load p95",
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(ecms_knowledge_graph_manifest_duration_seconds_bucket[10m])))",
+          "legendFormat": "manifest p95"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(ecms_knowledge_graph_client_load_duration_seconds_bucket[10m])))",
+          "legendFormat": "browser load p95"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 15}
+    },
+    {
+      "type": "timeseries",
+      "title": "Browser renderer outcomes",
+      "targets": [
+        {
+          "expr": "sum by (renderer, event) (increase(ecms_knowledge_graph_client_events_total[15m]))",
+          "legendFormat": "{{renderer}} {{event}}"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 23}
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["ecms", "knowledge-graph"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "title": "Knowledge Graph V2",
+  "uid": "ecms-knowledge-graph-v2",
+  "version": 1
+}

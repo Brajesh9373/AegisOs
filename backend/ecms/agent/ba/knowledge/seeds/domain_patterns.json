@@ -1,0 +1,42 @@
+[
+  {
+    "content": "Healthcare projects always need: HIPAA BAA before any data access, PHI data flow mapping, minimum necessary access principle, audit trails for all PHI access, and a breach response plan. Never assume the client has these — explicitly verify and document.",
+    "domain": "healthcare",
+    "tags": ["HIPAA", "PHI", "BAA", "healthcare", "audit"]
+  },
+  {
+    "content": "EHR (Electronic Health Record) integrations have two standard protocols: HL7v2 (legacy, pipe-delimited, widely deployed) and FHIR (modern, RESTful JSON, growing adoption). Always ask which version the client uses, whether they have an integration engine (Mirth, Rhapsody), and what the API rate limits are.",
+    "domain": "healthcare",
+    "tags": ["EHR", "HL7", "FHIR", "integration", "healthcare"]
+  },
+  {
+    "content": "Financial services projects must address: SOX compliance for financial reporting, PCI-DSS for card data, AML/KYC for customer onboarding, real-time fraud detection requirements, and regulatory reporting timelines. The compliance burden is 30-40% of the project scope — budget accordingly.",
+    "domain": "fintech",
+    "tags": ["fintech", "SOX", "PCI-DSS", "AML", "KYC", "compliance"]
+  },
+  {
+    "content": "Manufacturing/OT projects have unique constraints: OT systems cannot be taken offline for updates, air-gapped networks are common, industrial protocols (OPC-UA, Modbus) have no auth built in, and safety systems (SIS) have SIL ratings that constrain changes. Always probe the IT/OT convergence boundary.",
+    "domain": "manufacturing",
+    "tags": ["manufacturing", "OT", "IT-OT", "OPC-UA", "industrial"]
+  },
+  {
+    "content": "E-commerce projects must address: inventory sync accuracy (overselling kills trust), payment gateway failover, CDN for global performance, search relevance, cart abandonment flows, and peak load handling (flash sales, Black Friday). Always ask about the current peak traffic and the growth target.",
+    "domain": "ecommerce",
+    "tags": ["ecommerce", "inventory", "payment", "CDN", "peak-load"]
+  },
+  {
+    "content": "SaaS platform migrations require careful tenant isolation analysis. Ask: Is it single-tenant or multi-tenant? How is data isolated? What's the blast radius of a migration failure? Can tenants be migrated independently? What's the SLA per tenant during migration?",
+    "domain": "saas",
+    "tags": ["SaaS", "multi-tenant", "migration", "isolation", "SLA"]
+  },
+  {
+    "content": "Telecommunications projects have unique scale requirements: billions of CDRs (Call Detail Records), real-time stream processing, network topology complexity, and regulatory requirements for lawful intercept. Budget for data volume that's 10-100x what the client initially states.",
+    "domain": "telecom",
+    "tags": ["telecom", "CDR", "stream-processing", "scale", "lawful-intercept"]
+  },
+  {
+    "content": "Government/public sector projects have procurement constraints (RFP/RFQ cycles), security clearance requirements, FedRAMP/IL4+ for cloud, accessibility mandates (Section 508), and lengthy approval cycles. Timelines are 2-3x private sector — plan accordingly.",
+    "domain": "government",
+    "tags": ["government", "FedRAMP", "procurement", "Section508", "clearance"]
+  }
+]

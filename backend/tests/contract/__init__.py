@@ -1,0 +1,1 @@
+"""Cross-cutting contract tests."""

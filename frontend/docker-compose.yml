@@ -1,0 +1,45 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: aegisOS-api
+    ports:
+      - '3001:3001'
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3001
+      DATABASE_URL: postgresql://ecms:ecms@postgres:5432/ecms
+    extra_hosts:
+      - 'postgres:host-gateway'
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3001/api/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: aegisOS-web
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - '5173:5173'
+    environment:
+      NODE_ENV: production
+      VITE_API_URL: http://api:3001
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:5173']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
