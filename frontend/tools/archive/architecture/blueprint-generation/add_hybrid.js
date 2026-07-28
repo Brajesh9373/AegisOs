@@ -1,0 +1,10 @@
+const fs = require('fs');
+const file = 'd:/experiments/aegisOS/.aegis/core/aegisOS-Platform-Blueprint-v2.3.md';
+let txt = fs.readFileSync(file, 'utf8');
+
+const hybridWorkforce = `##  Hybrid Workforce\r\n\r\nThe platform acknowledges that true enterprise implementation is rarely isolated. aegisOS orchestrates a unified **Hybrid Workforce**, natively blending human and machine actors into a single cohesive operating model.\r\n\r\nA Hybrid Workforce consists of:\r\n- **Human Employees**: Internal staff providing strategic direction and subjective oversight.\r\n- **Digital Employees**: Autonomous AI Agents executing structural tasks and logical reasoning.\r\n- **External Vendors**: Third-party human contractors participating in the implementation.\r\n- **Automation Systems**: Deterministic, non-AI legacy scripts and CI/CD pipelines.\r\n- **Partners**: External system integrators or consultants aligned to the Business Goal.\r\n\r\n###  Hybrid Collaboration Model\r\nDigital Teams and Human Teams collaborate symmetrically via the centralized Implementation Graph. This collaboration is strictly mediated through structural mechanics:\r\n- **Approval Gates**: Digital Employees pause autonomous execution when encountering high-risk state changes, forwarding cryptographic payloads to Human Employees or Partners for explicit sign-off.\r\n- **Escalations**: When a Digital Employee encounters unresolvable ambiguity or errors beyond its recovery thresholds, context is yielded up the hierarchy, escalating the execution state to a Human Employee for intervention.\r\n- **Task Assignment**: Workflows are not exclusively AI-bound. The Implementation Graph can actively assign discrete, physical, or highly subjective tasks directly to Human Employees or External Vendors, waiting for asynchronous completion before resuming downstream Digital Employee execution.\r\n\r\n`;
+
+txt = txt.replace(/(##\s+Digital Workforce[\s\S]*?)(?=##\s+Business Outcomes)/, `$1\r\n${hybridWorkforce}`);
+
+fs.writeFileSync(file, txt);
+console.log('Hybrid Workforce added.');

@@ -1,0 +1,51 @@
+services:
+  falkordb:
+    image: falkordb/falkordb:latest
+    ports:
+      - "6379:6379"
+      - "3000:3000"
+    volumes:
+      - falkordb_data:/data
+    environment:
+      FALKORDB_ARGS: "--requirepass ${FALKORDB_PASSWORD:-admin}"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      - falkordb
+      - redis
+    environment:
+      FALKORDB_HOST: falkordb
+      FALKORDB_PORT: 6379
+      FALKORDB_DATABASE: ecms
+      FALKORDB_PASSWORD: ${FALKORDB_PASSWORD:-admin}
+      REDIS_URL: redis://redis:6379/0
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      LLM_SMALL_MODEL: ${LLM_SMALL_MODEL:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-1024}
+      GRAPHITI_LLM_CLIENT: ${GRAPHITI_LLM_CLIENT:-openai}
+      GRAPHITI_EMBEDDER: ${GRAPHITI_EMBEDDER:-openai}
+      GRAPHITI_RESPONSE_FORMAT: ${GRAPHITI_RESPONSE_FORMAT:-json_object}
+      AUTH_ENABLED: ${AUTH_ENABLED:-false}
+      API_KEY: ${API_KEY:-ecms-secret-key}
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+    command: uvicorn ecms.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  falkordb_data:
+  redis_data:

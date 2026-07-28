@@ -1,0 +1,29 @@
+site_name: Enterprise Cognitive Memory System
+site_description: ECMS platform documentation — architecture, backend, memory system
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+
+docs_dir: docs
+site_dir: site
+
+nav:
+  - Home: index.md
+  - Architecture: architecture.md
+  - Backend Architecture: backend-architecture.md
+  - Memory Architecture: memory.md
+  - Memory Implementation: memory-implementation.md
+  - Integration Guide: integration-guide.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format

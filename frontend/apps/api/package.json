@@ -1,0 +1,31 @@
+{
+  "name": "@aegisos/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "lint": "eslint src/ --ext .ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "@aegisos/agent": "workspace:*",
+    "@aegisos/database": "workspace:*",
+    "@aegisos/execution-runtime": "workspace:*",
+    "@aegisos/human-queue": "workspace:*",
+    "@aegisos/provider-openai": "workspace:*",
+    "@aegisos/security": "workspace:*",
+    "@aegisos/shared": "workspace:*",
+    "@aegisos/workflow": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17",
+    "tsx": "^4.7.1",
+    "typescript": "^5.4.2"
+  }
+}

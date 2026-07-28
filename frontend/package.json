@@ -1,0 +1,71 @@
+{
+  "name": "@aegis/monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "aegisOS Enterprise AI Workforce Operating System",
+  "author": "aegisOS",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "scripts": {
+    "clean": "turbo run clean",
+    "clean:all": "turbo run clean && rm -rf node_modules pnpm-lock.yaml",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,md,json,yaml}\"",
+    "lint": "turbo run lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "turbo run test:e2e",
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "db:up": "docker-compose up -d",
+    "db:down": "docker-compose down",
+    "validate:deps": "turbo run validate:deps",
+    "validate:circular": "madge --circular --extensions ts ./packages ./apps",
+    "validate:exports": "knip",
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build && npm run validate:circular && npm run validate:exports",
+    "verify:repo": "npm run verify",
+    "format:check:package": "prettier --check \"packages/runtime/**/*.{ts,tsx,md,json,yaml}\"",
+    "lint:package": "turbo run lint --filter=@aegis/runtime",
+    "typecheck:package": "pnpm --filter @aegis/runtime run typecheck",
+    "test:package": "vitest run packages/runtime",
+    "build:package": "turbo run build --filter=@aegis/runtime",
+    "validate:circular:package": "madge --circular --extensions ts ./packages/runtime",
+    "validate:exports:package": "knip --workspace packages/runtime",
+    "verify:package": "npm run format:check:package && npm run lint:package && npm run typecheck:package && npm run test:package && npm run build:package && npm run validate:circular:package && npm run validate:exports:package",
+    "prepare": "husky install",
+    "ci:validate": "npm run verify",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "npm run build && changeset publish",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "@changesets/cli": "2.27.1",
+    "@commitlint/cli": "18.6.1",
+    "@commitlint/config-conventional": "18.6.2",
+    "@types/node": "20.11.24",
+    "@typescript-eslint/eslint-plugin": "^8.62.1",
+    "@typescript-eslint/parser": "^8.62.1",
+    "@vitest/coverage-v8": "1.3.1",
+    "eslint": "8.57.0",
+    "husky": "9.0.11",
+    "knip": "5.0.0",
+    "lint-staged": "15.2.2",
+    "madge": "6.1.0",
+    "playwright": "^1.42.1",
+    "prettier": "3.2.5",
+    "turbo": "1.12.4",
+    "typescript": "5.4.2",
+    "vitest": "1.3.1"
+  }
+}

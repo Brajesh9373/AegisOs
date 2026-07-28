@@ -1,0 +1,541 @@
+# Full ECMS platform stack (SECTION 17/106).
+# Usage: docker compose -f docker/docker-compose.yml up --build
+#
+# To use pre-built images from Docker Hub instead of building locally:
+#   1. Comment out the 'build:' sections below
+#   2. Uncomment the 'image:' lines above them
+#   3. Run: docker compose -f docker/docker-compose.yml up -d
+
+name: ecms
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ecms
+      POSTGRES_PASSWORD: ecms
+      POSTGRES_DB: ecms
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ecms-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ecms-network
+
+  kafka:
+    image: apache/kafka:3.8.0
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - ecms-network
+
+  falkordb:
+    image: falkordb/falkordb:latest
+    command: ["--timeout", "120000", "--max-queued-queries", "500", "--resultset-size", "100000"]
+    ports:
+      - "6380:6379"
+      - "3001:3000"
+    volumes:
+      - falkordb_data:/data
+    cpus: ${ECMS_FALKORDB_CPU_LIMIT:-1.0}
+    mem_limit: ${ECMS_FALKORDB_MEMORY_LIMIT:-2g}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ecms-network
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    networks:
+      - ecms-network
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ecms
+      MINIO_ROOT_PASSWORD: ecms-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ecms-network
+
+  minio-init:
+    image: minio/mc:latest
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        for i in 1 2 3 4 5 6 7 8 9 10; do
+          mc alias set local http://minio:9000 ecms ecms-secret && \
+          mc mb --ignore-existing local/ecms-knowledge-graph && exit 0
+          echo "minio-init: attempt $i failed, retrying in 3s..."
+          sleep 3
+        done
+        echo "minio-init: all attempts failed"
+        exit 1
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: on-failure
+    networks:
+      - ecms-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/knowledge-graph-alerts.yml:/etc/prometheus/knowledge-graph-alerts.yml:ro
+      - ./prometheus/connector-ingestion-alerts.yml:/etc/prometheus/connector-ingestion-alerts.yml:ro
+    networks:
+      - ecms-network
+
+  loki:
+    image: grafana/loki:latest
+    command: ["-config.file=/etc/loki/loki-config.yml"]
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+    networks:
+      - ecms-network
+
+  tempo:
+    image: grafana/tempo:latest
+    command: ["-config.file=/etc/tempo/tempo.yml"]
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+    volumes:
+      - ./tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+    networks:
+      - ecms-network
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+    ports:
+      - "3300:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    networks:
+      - ecms-network
+
+  backend:
+    # Pre-built: image: brajesh07/ecms-backend:latest
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - memory_data:/app/memory
+      - repos_data:/app/data/repos
+    environment:
+      ECMS_ENVIRONMENT: production
+      ECMS_LOG_LEVEL: INFO
+      ECMS_CORS_ALLOW_ORIGINS: "http://localhost:3000,http://localhost:5173,http://localhost:5174,http://frontend"
+      ECMS_DATABASE_URL: postgresql+asyncpg://ecms:ecms@postgres:5432/ecms
+      ECMS_REDIS_URL: redis://redis:6379/0
+      ECMS_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ECMS_FALKORDB_URL: redis://falkordb:6379
+      ECMS_S3_ENDPOINT_URL: http://minio:9000
+      ECMS_S3_PUBLIC_ENDPOINT_URL: http://localhost:3000
+      ECMS_S3_BUCKET: ecms-knowledge-graph
+      ECMS_S3_ACCESS_KEY: ecms
+      ECMS_S3_SECRET_KEY: ecms-secret
+      ECMS_CONNECTOR_INGESTION_ENABLED: ${ECMS_CONNECTOR_INGESTION_ENABLED:-true}
+      # Parallel fan-out is intentionally dormant until the coordinator,
+      # extractor, graph-writer, and fan-in path pass qualification.
+      ECMS_CONNECTOR_PARALLEL_INGESTION_ENABLED: ${ECMS_CONNECTOR_PARALLEL_INGESTION_ENABLED:-false}
+      ECMS_CONNECTOR_EXTRACTION_WORKER_COUNT: ${ECMS_CONNECTOR_EXTRACTION_WORKER_COUNT:-4}
+      ECMS_CONNECTOR_GRAPH_WRITER_CONCURRENCY: ${ECMS_CONNECTOR_GRAPH_WRITER_CONCURRENCY:-1}
+      ECMS_CONNECTOR_INGESTION_PARTITION_TARGET_FILES: ${ECMS_CONNECTOR_INGESTION_PARTITION_TARGET_FILES:-100}
+      ECMS_CONNECTOR_INGESTION_MAX_ACTIVE_PARTITIONS_PER_ORG: ${ECMS_CONNECTOR_INGESTION_MAX_ACTIVE_PARTITIONS_PER_ORG:-8}
+      ECMS_CONNECTOR_INGESTION_MAX_STAGED_BYTES_PER_ORG: ${ECMS_CONNECTOR_INGESTION_MAX_STAGED_BYTES_PER_ORG:-10737418240}
+      ECMS_KNOWLEDGE_GRAPH_RENDERER: cosmos
+      ECMS_OTEL_ENDPOINT: http://tempo:4317
+      ECMS_MEM0_ENABLED: "true"
+      ECMS_MEM0_QDRANT_HOST: qdrant
+      ECMS_MEM0_QDRANT_PORT: "6333"
+      ECMS_MEM0_QDRANT_PATH: /app/data/mem0_qdrant
+      ECMS_MEM0_HOME_PATH: /app/data/mem0_home
+      ECMS_LLM_MODEL: xiaomi/mimo-v2.5-pro
+      ECMS_EMBEDDING_MODEL: text-embedding-3-small
+      ECMS_EMBEDDING_DIM: "1536"
+      TELEGRAM_BOT_TOKEN: "REDACTED_TELEGRAM_TOKEN"
+      TELEGRAM_MANAGER_CHAT_ID: "REDACTED_CHAT_ID"
+      COMMAND_CODE_API_KEY: REDACTED_COMMAND_CODE_KEY
+      ECMS_OPENAI_API_KEY: REDACTED_OPENAI_KEY
+      ECMS_OPENAI_BASE_URL: https://api.commandcode.ai/provider/v1
+      ECMS_CATEGORIZE_MODEL: xiaomi/mimo-v2.5-pro
+      ECMS_CATEGORIZE_API_KEY: REDACTED_OPENAI_KEY
+      ECMS_CATEGORIZE_BASE_URL: https://api.commandcode.ai/provider/v1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    networks:
+      - ecms-network
+
+  knowledge-snapshot-worker:
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    command: ["python", "-m", "ecms.visualization.snapshot_worker"]
+    environment:
+      ECMS_KNOWLEDGE_GRAPH_BUILD_START_DELAY_SECONDS: ${ECMS_KNOWLEDGE_GRAPH_BUILD_START_DELAY_SECONDS:-0}
+      ECMS_ENVIRONMENT: ${ECMS_ENVIRONMENT:-production}
+      ECMS_LOG_LEVEL: INFO
+      ECMS_DATABASE_URL: postgresql+asyncpg://ecms:ecms@postgres:5432/ecms
+      ECMS_REDIS_URL: redis://redis:6379/0
+      ECMS_FALKORDB_URL: redis://falkordb:6379
+      ECMS_S3_ENDPOINT_URL: http://minio:9000
+      ECMS_S3_PUBLIC_ENDPOINT_URL: http://localhost:3000
+      ECMS_S3_BUCKET: ecms-knowledge-graph
+      ECMS_S3_ACCESS_KEY: ecms
+      ECMS_S3_SECRET_KEY: ecms-secret
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+    networks:
+      - ecms-network
+
+  connector-ingestion-init:
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    user: root
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "mkdir -p /workspace/connector-ingestions && chown -R 1000:1000 /workspace/connector-ingestions"
+    volumes:
+      - connector_ingestion_data:/workspace/connector-ingestions
+    restart: "no"
+
+  connector-ingestion-worker:
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    command: ["python", "-m", "ecms.connectors.ingestion.parent_dispatcher"]
+    volumes:
+      - connector_ingestion_data:/workspace/connector-ingestions
+    environment:
+      ECMS_ENVIRONMENT: production
+      ECMS_LOG_LEVEL: INFO
+      ECMS_DATABASE_URL: postgresql+asyncpg://ecms:ecms@postgres:5432/ecms
+      ECMS_REDIS_URL: redis://redis:6379/0
+      ECMS_FALKORDB_URL: redis://falkordb:6379
+      ECMS_S3_ENDPOINT_URL: http://minio:9000
+      ECMS_S3_PUBLIC_ENDPOINT_URL: http://localhost:3000
+      ECMS_S3_BUCKET: ecms-knowledge-graph
+      ECMS_S3_ACCESS_KEY: ecms
+      ECMS_S3_SECRET_KEY: ecms-secret
+      ECMS_CONNECTOR_INGESTION_WORKSPACE: /workspace/connector-ingestions
+      ECMS_CONNECTOR_INGESTION_ENABLED: ${ECMS_CONNECTOR_INGESTION_ENABLED:-true}
+      ECMS_CONNECTOR_PARALLEL_INGESTION_ENABLED: ${ECMS_CONNECTOR_PARALLEL_INGESTION_ENABLED:-false}
+      ECMS_CONNECTOR_EXTRACTION_WORKER_COUNT: ${ECMS_CONNECTOR_EXTRACTION_WORKER_COUNT:-4}
+      ECMS_CONNECTOR_GRAPH_WRITER_CONCURRENCY: ${ECMS_CONNECTOR_GRAPH_WRITER_CONCURRENCY:-1}
+      ECMS_CONNECTOR_INGESTION_PARTITION_TARGET_FILES: ${ECMS_CONNECTOR_INGESTION_PARTITION_TARGET_FILES:-100}
+      ECMS_CONNECTOR_INGESTION_MAX_ACTIVE_PARTITIONS_PER_ORG: ${ECMS_CONNECTOR_INGESTION_MAX_ACTIVE_PARTITIONS_PER_ORG:-8}
+      ECMS_CONNECTOR_INGESTION_MAX_STAGED_BYTES_PER_ORG: ${ECMS_CONNECTOR_INGESTION_MAX_STAGED_BYTES_PER_ORG:-10737418240}
+      ECMS_CONNECTOR_INGESTION_MAX_BATCH_ENCODED_BYTES: ${ECMS_CONNECTOR_INGESTION_MAX_BATCH_ENCODED_BYTES:-4194304}
+      ECMS_CONNECTOR_WORKER_ROLE: parent
+      ECMS_CONNECTOR_INGESTION_CHUNK_SIZE: ${ECMS_CONNECTOR_INGESTION_CHUNK_SIZE:-10}
+      ECMS_CONNECTOR_INGESTION_WRITE_YIELD_SECONDS: ${ECMS_CONNECTOR_INGESTION_WRITE_YIELD_SECONDS:-0.1}
+      ECMS_CONNECTOR_INGESTION_MAX_FILES: ${ECMS_CONNECTOR_INGESTION_MAX_FILES:-250000}
+      ECMS_CONNECTOR_INGESTION_MAX_FILE_BYTES: ${ECMS_CONNECTOR_INGESTION_MAX_FILE_BYTES:-2097152}
+      ECMS_CONNECTOR_INGESTION_MAX_TOTAL_BYTES: ${ECMS_CONNECTOR_INGESTION_MAX_TOTAL_BYTES:-2147483648}
+      ECMS_CONNECTOR_GIT_CLONE_DEPTH: ${ECMS_CONNECTOR_GIT_CLONE_DEPTH:-50}
+      ECMS_CONNECTOR_GIT_CLONE_TIMEOUT_SECONDS: ${ECMS_CONNECTOR_GIT_CLONE_TIMEOUT_SECONDS:-600}
+      ECMS_CONNECTOR_GIT_FETCH_TIMEOUT_SECONDS: ${ECMS_CONNECTOR_GIT_FETCH_TIMEOUT_SECONDS:-300}
+    depends_on:
+      connector-ingestion-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "ecms.connectors.ingestion.parallel_health"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 30s
+    cpus: ${ECMS_CONNECTOR_INGESTION_CPU_LIMIT:-0.75}
+    mem_limit: ${ECMS_CONNECTOR_INGESTION_MEMORY_LIMIT:-2g}
+    restart: unless-stopped
+    stop_grace_period: 30s
+    networks:
+      - ecms-network
+
+  connector-ingestion-extractor:
+    profiles: ["parallel-ingestion"]
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    command: ["python", "-m", "ecms.connectors.ingestion.extraction_process"]
+    volumes:
+      - connector_ingestion_data:/workspace/connector-ingestions:ro
+    environment:
+      ECMS_ENVIRONMENT: production
+      ECMS_LOG_LEVEL: INFO
+      ECMS_DATABASE_URL: postgresql+asyncpg://ecms:ecms@postgres:5432/ecms
+      ECMS_REDIS_URL: redis://redis:6379/0
+      ECMS_S3_ENDPOINT_URL: http://minio:9000
+      ECMS_S3_BUCKET: ecms-knowledge-graph
+      ECMS_S3_ACCESS_KEY: ecms
+      ECMS_S3_SECRET_KEY: ecms-secret
+      ECMS_CONNECTOR_INGESTION_WORKSPACE: /workspace/connector-ingestions
+      ECMS_CONNECTOR_PARALLEL_INGESTION_ENABLED: ${ECMS_CONNECTOR_PARALLEL_INGESTION_ENABLED:-false}
+      ECMS_CONNECTOR_INGESTION_CHUNK_SIZE: ${ECMS_CONNECTOR_INGESTION_CHUNK_SIZE:-10}
+      ECMS_CONNECTOR_INGESTION_MAX_BATCH_ENCODED_BYTES: ${ECMS_CONNECTOR_INGESTION_MAX_BATCH_ENCODED_BYTES:-4194304}
+      ECMS_CONNECTOR_INGESTION_MAX_STAGED_BYTES_PER_ORG: ${ECMS_CONNECTOR_INGESTION_MAX_STAGED_BYTES_PER_ORG:-10737418240}
+      ECMS_CONNECTOR_WORKER_ROLE: extractor
+    depends_on:
+      connector-ingestion-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "ecms.connectors.ingestion.parallel_health"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 30s
+    cpus: ${ECMS_CONNECTOR_EXTRACTION_CPU_LIMIT:-0.75}
+    mem_limit: ${ECMS_CONNECTOR_EXTRACTION_MEMORY_LIMIT:-2g}
+    restart: unless-stopped
+    stop_grace_period: 30s
+    networks:
+      - ecms-network
+
+  connector-ingestion-graph-writer:
+    profiles: ["parallel-ingestion"]
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    command: ["python", "-m", "ecms.connectors.ingestion.graph_writer_process"]
+    environment:
+      ECMS_ENVIRONMENT: production
+      ECMS_LOG_LEVEL: INFO
+      ECMS_DATABASE_URL: postgresql+asyncpg://ecms:ecms@postgres:5432/ecms
+      ECMS_REDIS_URL: redis://redis:6379/0
+      ECMS_FALKORDB_URL: redis://falkordb:6379
+      ECMS_S3_ENDPOINT_URL: http://minio:9000
+      ECMS_S3_BUCKET: ecms-knowledge-graph
+      ECMS_S3_ACCESS_KEY: ecms
+      ECMS_S3_SECRET_KEY: ecms-secret
+      ECMS_CONNECTOR_PARALLEL_INGESTION_ENABLED: ${ECMS_CONNECTOR_PARALLEL_INGESTION_ENABLED:-false}
+      ECMS_CONNECTOR_GRAPH_WRITER_CONCURRENCY: ${ECMS_CONNECTOR_GRAPH_WRITER_CONCURRENCY:-1}
+      ECMS_CONNECTOR_WORKER_ROLE: graph-writer
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      falkordb:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "ecms.connectors.ingestion.parallel_health"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 30s
+    cpus: ${ECMS_CONNECTOR_GRAPH_WRITER_CPU_LIMIT:-0.5}
+    mem_limit: ${ECMS_CONNECTOR_GRAPH_WRITER_MEMORY_LIMIT:-1g}
+    restart: unless-stopped
+    stop_grace_period: 60s
+    networks:
+      - ecms-network
+
+  worker-knowledge:
+    # Pre-built: image: brajesh07/ecms-worker:latest
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    command: ["python", "-m", "ecms.cli.app", "worker", "knowledge"]
+    environment:
+      ECMS_ENVIRONMENT: production
+      ECMS_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ECMS_DATABASE_URL: postgresql+asyncpg://ecms:ecms@postgres:5432/ecms
+    depends_on:
+      kafka:
+        condition: service_started
+      backend:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    networks:
+      - ecms-network
+
+  telegram-bot:
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    entrypoint: ["/app/.venv/bin/python", "-m", "ecms.telegram"]
+    environment:
+      PYTHONPATH: "/app/legacy/src:/app"
+      ECMS_ENVIRONMENT: production
+      ECMS_DATABASE_URL: postgresql+asyncpg://ecms:ecms@postgres:5432/ecms
+      TELEGRAM_BOT_TOKEN: "REDACTED_TELEGRAM_TOKEN"
+      TELEGRAM_MANAGER_CHAT_ID: "REDACTED_CHAT_ID"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    networks:
+      - ecms-network
+    restart: unless-stopped
+
+  worker-reflection:
+    # Pre-built: image: brajesh07/ecms-worker:latest
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    command: ["python", "-m", "ecms.cli.app", "worker", "reflection"]
+    environment:
+      ECMS_ENVIRONMENT: production
+      ECMS_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ECMS_DATABASE_URL: postgresql+asyncpg://ecms:ecms@postgres:5432/ecms
+    depends_on:
+      kafka:
+        condition: service_started
+      backend:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    networks:
+      - ecms-network
+
+  worker-promotion:
+    # Pre-built: image: brajesh07/ecms-worker:latest
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    command: ["python", "-m", "ecms.cli.app", "worker", "promotion"]
+    environment:
+      ECMS_ENVIRONMENT: production
+      ECMS_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ECMS_DATABASE_URL: postgresql+asyncpg://ecms:ecms@postgres:5432/ecms
+    depends_on:
+      kafka:
+        condition: service_started
+      backend:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    networks:
+      - ecms-network
+
+  frontend:
+    # Pre-built: image: brajesh07/ecms-frontend:latest
+    build:
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - ecms-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  kafka_data:
+  falkordb_data:
+  qdrant_data:
+  minio_data:
+  memory_data:
+  repos_data:
+  connector_ingestion_data:
+  commandcode_data:
+
+networks:
+  ecms-network:
+    driver: bridge

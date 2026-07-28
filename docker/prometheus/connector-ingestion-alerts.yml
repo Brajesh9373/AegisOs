@@ -1,0 +1,106 @@
+groups:
+  - name: connector-ingestion
+    rules:
+      - alert: ConnectorIngestionWorkerMissing
+        expr: ecms_connector_ingestion_active_workers < 1 or absent(ecms_connector_ingestion_active_workers)
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: No connector ingestion worker is reporting a healthy lease
+          runbook: docs/connector-ingestion-operations.md
+      - alert: ConnectorIngestionQueueOldestJobStale
+        expr: ecms_connector_ingestion_oldest_queued_seconds > 900
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: A connector ingestion has remained queued for more than 15 minutes
+          runbook: docs/connector-ingestion-operations.md
+      - alert: ConnectorIngestionLeaseExpired
+        expr: ecms_connector_ingestion_expired_leases > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Connector ingestion jobs have expired worker leases
+          runbook: docs/connector-ingestion-operations.md
+      - alert: ConnectorIngestionFailuresElevated
+        expr: increase(ecms_connector_ingestion_jobs_failed[30m]) > 3
+        labels:
+          severity: warning
+        annotations:
+          summary: Connector ingestion failures are elevated
+          runbook: docs/connector-ingestion-operations.md
+      - alert: ConnectorIngestionWorkerSaturated
+        expr: ecms_connector_ingestion_running_jobs >= ecms_connector_ingestion_worker_capacity
+        for: 20m
+        labels:
+          severity: warning
+        annotations:
+          summary: Connector ingestion workers have been saturated for 20 minutes
+          runbook: docs/connector-ingestion-operations.md
+      - alert: ConnectorIngestionGraphBackpressure
+        expr: ecms_connector_ingestion_graph_write_seconds_last > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Connector graph-write p95 latency exceeds five seconds
+          runbook: docs/connector-ingestion-operations.md
+      - alert: ConnectorParallelExtractorMissing
+        expr: ecms_connector_ingestion_partitions_pending > 0 and ecms_connector_ingestion_parallel_extraction_workers < 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Partitioned ingestion is queued without a healthy extractor
+          runbook: docs/connector-ingestion-operations.md
+      - alert: ConnectorParallelExtractionStalled
+        expr: ecms_connector_ingestion_partitions_active > 0 and ecms_connector_ingestion_partition_expired_leases > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Parallel extraction has expired partition leases
+          runbook: docs/connector-ingestion-operations.md
+      - alert: ConnectorParallelGraphWriterMissing
+        expr: ecms_connector_ingestion_stage_batches_staged > 0 and ecms_connector_ingestion_parallel_graph_writers_active < 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Staged graph batches are waiting without an active graph writer
+          runbook: docs/connector-ingestion-operations.md
+      - alert: ConnectorParallelGraphWriteStalled
+        expr: ecms_connector_ingestion_stage_batch_expired_leases > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Parallel graph writing has expired durable batch leases
+          runbook: docs/connector-ingestion-operations.md
+      - alert: ConnectorParallelPartitionFailures
+        expr: ecms_connector_ingestion_partitions_failed > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: One or more connector ingestion partitions failed
+          runbook: docs/connector-ingestion-operations.md
+      - alert: ConnectorParallelBatchFailures
+        expr: ecms_connector_ingestion_stage_batches_failed > 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: One or more staged graph batches failed
+          runbook: docs/connector-ingestion-operations.md
+      - alert: ConnectorParallelStagingPressure
+        expr: ecms_connector_ingestion_staged_bytes > 8589934592
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Connector staged output exceeds the safe initial 8 GiB threshold
+          runbook: docs/connector-ingestion-operations.md

@@ -1,0 +1,31 @@
+{
+  "name": "@aegisos/agent-runtime",
+  "version": "0.1.0",
+  "description": "aegisOS Agent Runtime Engine",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src/ --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aegisos/contracts": "workspace:*",
+    "@aegisos/shared": "workspace:*",
+    "@aegisos/types": "workspace:*",
+    "@aegisos/config": "workspace:*",
+    "@aegisos/runtime": "workspace:*",
+    "@aegisos/agent": "workspace:*",
+    "@aegisos/skill": "workspace:*",
+    "@aegisos/tool": "workspace:*",
+    "@aegisos/knowledge": "workspace:*",
+    "@aegisos/memory": "workspace:*",
+    "@aegisos/execution-runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.2",
+    "vitest": "^1.3.1"
+  }
+}

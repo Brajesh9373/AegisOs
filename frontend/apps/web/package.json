@@ -1,0 +1,50 @@
+{
+  "name": "@aegisos/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "lint": "eslint src/ --ext .ts,.tsx",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run src/components/knowledgeGraph"
+  },
+  "dependencies": {
+    "@aegisos/connector-center": "workspace:*",
+    "@aegisos/connector-framework": "workspace:^",
+    "@aegisos/digital-employee-workspace": "workspace:*",
+    "@aegisos/implementation-studio": "workspace:*",
+    "@aegisos/knowledge-studio": "workspace:*",
+    "@aegisos/manager-dashboard": "workspace:*",
+    "@aegisos/provider": "workspace:^",
+    "@aegisos/provider-openai": "workspace:^",
+    "@aegisos/security": "workspace:*",
+    "@ant-design/icons": "^6.3.2",
+    "@cosmos.gl/graph": "3.3.0",
+    "@hookform/resolvers": "^5.4.0",
+    "@tanstack/react-query": "^5.101.2",
+    "antd": "^6.5.0",
+    "apache-arrow": "21.1.0",
+    "d3": "^7.9.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-hook-form": "^7.81.0",
+    "react-markdown": "^9.0.1",
+    "react-router-dom": "^6.22.3",
+    "reactflow": "^11.11.4",
+    "recharts": "^3.9.2",
+    "remark-breaks": "^4.0.0",
+    "remark-gfm": "^4.0.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/d3": "^7.4.3",
+    "@types/react": "^18.2.66",
+    "@types/react-dom": "^18.2.22",
+    "@vitejs/plugin-react": "^4.2.1",
+    "eslint": "^8.0.0",
+    "typescript": "^5.2.2",
+    "vite": "^5.2.0"
+  }
+}

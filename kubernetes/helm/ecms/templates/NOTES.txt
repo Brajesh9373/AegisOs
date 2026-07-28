@@ -1,0 +1,7 @@
+ECMS {{ .Chart.AppVersion }} has been deployed to namespace "{{ .Values.namespace }}".
+
+Backend service:  ecms-backend.{{ .Values.namespace }}.svc.cluster.local
+Frontend service: ecms-frontend.{{ .Values.namespace }}.svc.cluster.local
+{{- if .Values.ingress.enabled }}
+Ingress host:     {{ .Values.ingress.host }}
+{{- end }}

@@ -1,0 +1,32 @@
+[
+  {
+    "content": "GDPR (General Data Protection Regulation): Applies to any project handling EU personal data. Key requirements: lawful basis for processing, data minimization, right to erasure ('right to be forgotten'), data portability, 72-hour breach notification, Data Protection Impact Assessment (DPIA) for high-risk processing, and appointment of a DPO if required.",
+    "domain": "compliance",
+    "tags": ["GDPR", "EU", "privacy", "data-protection", "erasure"]
+  },
+  {
+    "content": "HIPAA (Health Insurance Portability and Accountability Act): Required for any project handling US healthcare data (PHI). Key requirements: Business Associate Agreement (BAA) with every vendor, encryption at rest and in transit, access controls with audit trails, minimum necessary standard, breach notification within 60 days, and 6-year retention of compliance records.",
+    "domain": "healthcare",
+    "tags": ["HIPAA", "healthcare", "PHI", "BAA", "encryption"]
+  },
+  {
+    "content": "SOX (Sarbanes-Oxley Act): Applies to any project touching financial reporting systems for publicly traded companies. Key requirements: internal controls over financial reporting (ICFR), audit trails for all financial data changes, segregation of duties, access controls, and annual attestation by management and external auditors.",
+    "domain": "fintech",
+    "tags": ["SOX", "financial-reporting", "audit-trail", "internal-controls"]
+  },
+  {
+    "content": "SOC 2 Type II: Required for SaaS/service providers handling customer data. Five Trust Service Criteria: Security (required), Availability, Processing Integrity, Confidentiality, Privacy (optional). Key requirements: access controls, encryption, monitoring, incident response, change management, and a 6-12 month audit period.",
+    "domain": "compliance",
+    "tags": ["SOC2", "security", "availability", "audit", "SaaS"]
+  },
+  {
+    "content": "PCI-DSS (Payment Card Industry Data Security Standard): Required for any project handling credit card data. Key requirements: cardholder data environment (CDE) segmentation, encryption of card data at rest and in transit, quarterly vulnerability scans, annual penetration testing, and strict access controls. Minimize scope by tokenizing where possible.",
+    "domain": "fintech",
+    "tags": ["PCI-DSS", "payment", "credit-card", "encryption", "CDE"]
+  },
+  {
+    "content": "Data residency requirements vary by country and must be checked per-project. Common patterns: EU (GDPR — data can stay in EEA or countries with adequacy decisions), Russia (personal data must be stored in Russia), China (PIPL — data localization with cross-border transfer assessment), India (DPDP Act — critical personal data must stay in India). Always confirm with legal.",
+    "domain": "compliance",
+    "tags": ["data-residency", "sovereignty", "GDPR", "PIPL", "localization"]
+  }
+]

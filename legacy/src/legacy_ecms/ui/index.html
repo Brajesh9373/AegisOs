@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ECMS Console</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script src="https://d3js.org/d3.v7.min.js" defer></script>
+  </head>
+  <body>
+    <main class="shell">
+      <aside class="rail">
+        <div class="brand">
+          <span class="brand-mark">E</span>
+          <div>
+            <p>ECMS</p>
+            <span>Enterprise Brain Console</span>
+          </div>
+        </div>
+
+        <nav class="nav" aria-label="Console sections">
+          <button class="nav-item active" data-target="overview">Overview</button>
+          <button class="nav-item" data-target="git">Git Sync</button>
+          <button class="nav-item" data-target="mysql">MySQL Sync</button>
+          <button class="nav-item" data-target="graph">K-Graph</button>
+          <button class="nav-item" data-target="uko">UKO Ingest</button>
+          <button class="nav-item" data-target="memory">Memory</button>
+          <button class="nav-item" data-target="query">Ask</button>
+        </nav>
+
+        <section class="status-card">
+          <p class="eyebrow">Runtime</p>
+          <div class="status-line">
+            <span id="serviceStatus" class="dot pending"></span>
+            <strong id="serviceLabel">Checking</strong>
+          </div>
+          <div class="status-line">
+            <span id="graphStatus" class="dot pending"></span>
+            <strong id="graphLabel">Graph pending</strong>
+          </div>
+          <button id="refreshHealth" class="ghost-button" type="button">Refresh health</button>
+        </section>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Knowledge Operations</p>
+            <h1>Ingest, persist, and query your organizational memory.</h1>
+          </div>
+          <div class="api-key-box">
+            <label for="apiKey">API key</label>
+            <input id="apiKey" type="password" autocomplete="off" placeholder="Optional if auth is off" />
+          </div>
+        </header>
+
+        <section id="overview" class="panel active">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Overview</p>
+              <h2>Provider readiness</h2>
+            </div>
+            <button id="loadProviders" class="primary-button" type="button">Load providers</button>
+          </div>
+          <div id="providerGrid" class="provider-grid"></div>
+          <div class="split">
+            <article class="callout">
+              <p class="eyebrow">Working Config</p>
+              <h3>Compatible LLM mode</h3>
+              <p>Use <code>openai_compatible_chat</code>, <code>response_format=none</code>, and <code>hash</code> embeddings for your current provider.</p>
+            </article>
+            <article class="callout">
+              <p class="eyebrow">Persistence</p>
+              <h3>FalkorDB + Graphiti</h3>
+              <p>Turn on persist in each sync form to create Graphiti episodes and write the graph into FalkorDB.</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="git" class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Git Provider</p>
+              <h2>Sync GitHub or Bitbucket</h2>
+            </div>
+          </div>
+          <form id="gitForm" class="form-grid">
+            <label class="wide">Repository URL
+              <input name="repo_url" required placeholder="https://github.com/org/repo or https://bitbucket.org/org/repo/src/master/" />
+            </label>
+            <label>Platform
+              <select name="platform">
+                <option value="">Auto detect</option>
+                <option value="github">GitHub</option>
+                <option value="bitbucket">Bitbucket</option>
+              </select>
+            </label>
+            <label>Branch
+              <input name="branch" placeholder="master, main, feature/x" />
+            </label>
+            <label>Username
+              <input name="username" autocomplete="username" placeholder="Optional" />
+            </label>
+            <label>Access token
+              <input name="access_token" type="password" autocomplete="off" required placeholder="Repo token" />
+            </label>
+            <label class="toggle">
+              <input name="persist" type="checkbox" checked />
+              <span>Persist into Graphiti/FalkorDB</span>
+            </label>
+            <button class="primary-button wide" type="submit">Sync repository</button>
+          </form>
+        </section>
+
+        <section id="mysql" class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">MySQL Provider</p>
+              <h2>Sync schema knowledge</h2>
+            </div>
+          </div>
+          <form id="mysqlForm" class="form-grid">
+            <label>Host
+              <input name="host" required value="localhost" />
+            </label>
+            <label>Port
+              <input name="port" type="number" min="1" max="65535" value="3306" required />
+            </label>
+            <label>User
+              <input name="user" autocomplete="username" required />
+            </label>
+            <label>Password
+              <input name="password" type="password" autocomplete="off" required />
+            </label>
+            <label>Database
+              <input name="database" required />
+            </label>
+            <label>Timeout
+              <input name="connect_timeout" type="number" min="1" value="10" />
+            </label>
+            <label class="toggle wide">
+              <input name="persist" type="checkbox" checked />
+              <span>Persist into Graphiti/FalkorDB</span>
+            </label>
+            <button class="primary-button wide" type="submit">Sync database</button>
+          </form>
+        </section>
+
+        <section id="graph" class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Knowledge Graph</p>
+              <h2>Visualize entity relationships</h2>
+            </div>
+            <span>
+              <button id="loadGraph" class="primary-button" type="button">Refresh graph</button>
+            </span>
+          </div>
+          <div class="graph-toolbar">
+            <span id="graphStats" class="graph-stats">No data loaded</span>
+            <input id="graphSearch" class="graph-search" placeholder="Filter by file, source, concept..." />
+            <label class="toggle compact">Pause
+              <input id="graphPause" type="checkbox" />
+            </label>
+          </div>
+          <div id="graphContainer" class="graph-container"></div>
+        </section>
+
+        <section id="uko" class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Universal Knowledge Object</p>
+              <h2>Manual artifact ingest</h2>
+            </div>
+          </div>
+          <form id="ukoForm" class="form-grid">
+            <label>Name
+              <input name="name" required value="manual_auth.py" />
+            </label>
+            <label>Type
+              <select name="type">
+                <option value="file">file</option>
+                <option value="document">document</option>
+                <option value="table">table</option>
+                <option value="message">message</option>
+              </select>
+            </label>
+            <label>Source
+              <input name="source" value="manual" required />
+            </label>
+            <label>Source ID
+              <input name="source_id" value="manual_auth.py" required />
+            </label>
+            <label class="wide">Content
+              <textarea name="content" rows="8">def authenticate_user(token):
+    return token</textarea>
+            </label>
+            <label class="toggle wide">
+              <input name="persist" type="checkbox" checked />
+              <span>Persist into Graphiti/FalkorDB</span>
+            </label>
+            <button class="primary-button wide" type="submit">Ingest UKO</button>
+          </form>
+        </section>
+
+        <section id="memory" class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Memory Notes</p>
+              <h2>Write and search session notes</h2>
+            </div>
+          </div>
+          <form id="memoryForm" class="form-grid">
+            <label>Topic
+              <input name="topic" required value="Authentication" />
+            </label>
+            <label class="wide">Content
+              <textarea name="content" rows="5">JWT token login belongs to the payment service.</textarea>
+            </label>
+            <button class="primary-button wide" type="submit">Write memory</button>
+          </form>
+          <form id="memorySearchForm" class="inline-form">
+            <input name="q" placeholder="Search notes, e.g. JWT payment" />
+            <button class="ghost-button" type="submit">Search notes</button>
+          </form>
+        </section>
+
+        <section id="query" class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Agent Context</p>
+              <h2>Ask the brain</h2>
+            </div>
+          </div>
+          <form id="queryForm" class="form-grid">
+            <label class="wide">Question
+              <textarea name="question" rows="5">How does authentication work?</textarea>
+            </label>
+            <label>Session ID
+              <input name="session_id" placeholder="Optional" />
+            </label>
+            <button class="primary-button wide" type="submit">Ask</button>
+          </form>
+        </section>
+      </section>
+
+      <aside class="result-pane">
+        <div class="result-header">
+          <div>
+            <p class="eyebrow">Result Stream</p>
+            <h2>API output</h2>
+          </div>
+          <button id="clearOutput" class="ghost-button" type="button">Clear</button>
+        </div>
+        <pre id="output">{ "ready": true }</pre>
+      </aside>
+    </main>
+
+    <script src="/assets/app.js" defer></script>
+  </body>
+</html>

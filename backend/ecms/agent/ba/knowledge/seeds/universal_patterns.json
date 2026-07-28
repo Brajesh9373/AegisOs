@@ -1,0 +1,122 @@
+[
+  {
+    "content": "Always probe rollback strategy before discussing cutover. If a client hasn't thought about rollback, they haven't thought about failure. Ask: What's the rollback trigger? How long to roll back? What's the data reconciliation plan after rollback?",
+    "tags": ["rollback", "cutover", "risk", "migration"]
+  },
+  {
+    "content": "When a client says 'real-time sync', never accept it at face value. Drill into: acceptable latency (ms? seconds? minutes?), conflict resolution strategy (last-write-wins? merge? manual?), failure behavior (queue? drop? alert?), and whether they mean event-driven or polling.",
+    "tags": ["real-time", "sync", "integration", "requirements"]
+  },
+  {
+    "content": "Every data migration has three phases that must all be planned: pre-migration (validation, checksums, snapshots), migration (batching, error handling, progress tracking), and post-migration (reconciliation, dual-run period, decommission). Never skip post-migration reconciliation.",
+    "tags": ["data-migration", "reconciliation", "planning", "migration"]
+  },
+  {
+    "content": "The #1 cause of migration project failure is underestimating data quality issues in the source system. Always ask: When was the last data audit? Are there known data quality issues? What's the PII classification? Are there orphaned records or referential integrity violations?",
+    "tags": ["data-quality", "migration", "risk", "audit"]
+  },
+  {
+    "content": "For any integration project, define the failure mode FIRST, not last. Ask: What happens when the downstream system is unavailable? What happens when a message fails to deliver? Is there a dead-letter queue? What's the retry policy? What's the alerting threshold?",
+    "tags": ["integration", "failure-mode", "resilience", "architecture"]
+  },
+  {
+    "content": "Stakeholder analysis is not optional. Before finalizing requirements, identify: Who signs off? Who uses the system daily? Who maintains it? Who's affected but not in the room? Unidentified stakeholders are the #1 source of late-stage requirement changes.",
+    "tags": ["stakeholders", "sign-off", "requirements", "governance"]
+  },
+  {
+    "content": "Non-functional requirements are where projects fail. Always quantify: latency targets (p50, p95, p99), throughput (transactions/sec), availability (99.9%? 99.99%?), data volume (current + 3-year growth), concurrent users, and disaster recovery RTO/RPO.",
+    "tags": ["non-functional", "latency", "availability", "performance"]
+  },
+  {
+    "content": "Testing in production-like environments is non-negotiable for migrations. Ask: Is there a staging environment that mirrors production? Can we do a dry run with real data? What's the data masking strategy for non-production environments? Who signs off on test results?",
+    "tags": ["testing", "staging", "migration", "dry-run"]
+  },
+  {
+    "content": "When scoping a project, always define what is OUT of scope as explicitly as what's IN. Ambiguous scope boundaries are the primary driver of scope creep. Write: 'In scope: X. Out of scope: Y. Assumptions: Z.' Get sign-off on all three.",
+    "tags": ["scope", "scope-creep", "requirements", "sign-off"]
+  },
+  {
+    "content": "Every project needs a data retention and archival strategy. Ask: How long is data retained? What's the archival policy? Are there regulatory requirements (GDPR right-to-deletion, HIPAA 6-year retention)? What happens to data after decommission?",
+    "tags": ["data-retention", "compliance", "GDPR", "archival"]
+  },
+  {
+    "content": "Parallel running (dual-write or shadow traffic) is the safest cutover strategy for any system replacement. The old system stays live while the new one runs alongside. Only decommission after reconciliation confirms parity. Never do a hard cutover without a parallel run period.",
+    "tags": ["cutover", "parallel-run", "migration", "safety"]
+  },
+  {
+    "content": "Access control and RBAC must be defined before implementation, not after. Ask: Who needs what roles? What's the approval workflow for access requests? Is there an audit trail? How are service accounts managed? What's the principle of least privilege?",
+    "tags": ["access-control", "RBAC", "security", "governance"]
+  },
+  {
+    "content": "For any project involving PII, map the data flow end-to-end before writing code. Where does PII enter? Where is it stored? Where does it transit? Who has access? What's the encryption at rest and in transit? What's the breach notification process?",
+    "tags": ["PII", "data-flow", "privacy", "compliance", "security"]
+  },
+  {
+    "content": "Knowledge transfer is not a one-time event at project end. Plan it as a continuous process: pair programming during implementation, runbooks written during (not after) build, and a formal handover period with the support team shadowing the build team.",
+    "tags": ["knowledge-transfer", "handover", "runbooks", "support"]
+  },
+  {
+    "content": "When a client says 'just lift and shift', probe deeper. A true lift-and-shift is rare — most 'lift and shift' projects involve hidden re-architecture. Ask: Are there custom configurations? Database-specific features in use? Hardcoded dependencies? Performance characteristics that won't transfer?",
+    "tags": ["lift-and-shift", "migration", "re-architecture", "risk"]
+  },
+  {
+    "content": "Budget and timeline estimates should include a contingency buffer of 20-30% for known unknowns. If the client pushes back on buffer, explain: the buffer is not padding — it's insurance against the discovery work that happens during implementation. Every project discovers something unexpected.",
+    "tags": ["budget", "timeline", "contingency", "estimation"]
+  },
+  {
+    "content": "Monitoring and alerting must be designed during requirements, not bolted on after go-live. Ask: What metrics matter? What thresholds trigger alerts? Who gets paged? What's the escalation path? What's the on-call rotation? What dashboards does management need?",
+    "tags": ["monitoring", "alerting", "observability", "operations"]
+  },
+  {
+    "content": "For any API integration, document the contract before implementation. Define: request/response schemas, error codes and handling, rate limits, authentication method, versioning strategy, and deprecation policy. A contract-first approach prevents integration surprises.",
+    "tags": ["API", "integration", "contract", "architecture"]
+  },
+  {
+    "content": "Change management is not just training. It includes: stakeholder communication plan, user acceptance testing with real users, go/no-go criteria, rollback communication, and post-go-live feedback loops. The best technical implementation fails without user adoption.",
+    "tags": ["change-management", "adoption", "training", "UAT"]
+  },
+  {
+    "content": "When evaluating build vs. buy, total cost of ownership over 3-5 years matters more than initial cost. Include: licensing, maintenance, upgrades, integration costs, vendor lock-in risk, and the opportunity cost of building what already exists.",
+    "tags": ["build-vs-buy", "TCO", "architecture", "decision"]
+  },
+  {
+    "content": "Security requirements must be gathered from the CISO/Security team, not just the project sponsor. Schedule a dedicated security requirements session. Cover: authentication, authorization, encryption, vulnerability scanning, penetration testing, and incident response.",
+    "tags": ["security", "CISO", "requirements", "penetration-testing"]
+  },
+  {
+    "content": "For any project touching production data, ask about the data classification scheme. Is data classified as Public, Internal, Confidential, or Restricted? Each classification has different handling requirements for storage, transit, access, and disposal.",
+    "tags": ["data-classification", "security", "compliance", "data-handling"]
+  },
+  {
+    "content": "Performance testing is not optional for any user-facing system. Ask: What's the expected concurrent user load? What's the peak load scenario? What's the acceptable response time under load? Is there a performance test environment that mirrors production?",
+    "tags": ["performance-testing", "load-testing", "non-functional", "scalability"]
+  },
+  {
+    "content": "When a project involves multiple vendors or teams, define the RACI matrix early. Who is Responsible, Accountable, Consulted, Informed for each deliverable? Ambiguous ownership is the #1 cause of integration gaps in multi-vendor projects.",
+    "tags": ["RACI", "ownership", "multi-vendor", "governance"]
+  },
+  {
+    "content": "Disaster recovery planning must happen during requirements, not after go-live. Ask: What's the RTO (Recovery Time Objective)? What's the RPO (Recovery Point Objective)? Is there an active-passive or active-active failover? When was the last DR drill?",
+    "tags": ["disaster-recovery", "RTO", "RPO", "business-continuity"]
+  },
+  {
+    "content": "For cloud migrations, always ask about data residency and sovereignty requirements. Where can data physically reside? Are there cross-border transfer restrictions? Does the client have a cloud exit strategy? What's the vendor lock-in tolerance?",
+    "tags": ["cloud", "data-residency", "sovereignty", "vendor-lock-in"]
+  },
+  {
+    "content": "Technical debt must be explicitly acknowledged in requirements. Ask: What technical debt exists in the current system? What debt are we willing to accept in the new system? What's the paydown plan? Ignoring technical debt leads to systems that degrade faster than they're built.",
+    "tags": ["technical-debt", "architecture", "maintenance", "sustainability"]
+  },
+  {
+    "content": "For any project with a mobile component, always ask about offline capability. What happens when connectivity is lost? What data needs to be available offline? How is conflict resolution handled when reconnecting? What's the sync strategy?",
+    "tags": ["mobile", "offline", "sync", "connectivity"]
+  },
+  {
+    "content": "Accessibility is a requirement, not a nice-to-have. Ask: What WCAG level is required (A, AA, AAA)? Are there users with specific accessibility needs? Is there a legal accessibility obligation in the target market? Test with actual assistive technologies.",
+    "tags": ["accessibility", "WCAG", "compliance", "inclusive-design"]
+  },
+  {
+    "content": "When a client provides a 'requirements document', treat it as a starting point, not the final answer. Documents capture what someone thought was important at a point in time. A veteran BA reads the document, then interrogates everything it doesn't say.",
+    "tags": ["requirements", "elicitation", "document-analysis", "BA-methodology"]
+  }
+]

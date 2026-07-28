@@ -1,0 +1,42 @@
+[
+  {
+    "content": "Database migration projects with more than 100 tables should never attempt a big-bang cutover. Use phased migration: migrate schema-by-schema or function-by-function, with reconciliation at each phase. The migration tool (Liquibase, Flyway, custom) must support rollback per phase.",
+    "tags": ["database-migration", "phased", "rollback", "reconciliation"]
+  },
+  {
+    "content": "Real-time sync between two systems is architecturally 10x harder than batch sync. Before committing to real-time, ask: Is batch (hourly/daily) actually sufficient? What's the business cost of 1-hour latency? If real-time is truly needed, use event-driven architecture (Kafka, Pub/Sub) with idempotent consumers and a dead-letter queue.",
+    "tags": ["real-time", "sync", "event-driven", "Kafka", "idempotent"]
+  },
+  {
+    "content": "450+ table sync between heterogeneous databases is not a tool problem — it's an architecture problem. Pattern: CDC (Change Data Capture) from source → transformation layer → destination. Tools: Debezium for CDC, Kafka Connect for transport, custom transforms for schema mapping. Never try to sync application-to-application.",
+    "tags": ["CDC", "Debezium", "Kafka-Connect", "database-sync", "heterogeneous"]
+  },
+  {
+    "content": "Microservices migration from a monolith should follow the Strangler Fig pattern: new functionality goes into services, existing functionality is extracted incrementally. Never rewrite from scratch. The monolith stays live until all traffic is routed through the new services. Budget 2-3 years for a serious decomposition.",
+    "tags": ["microservices", "strangler-fig", "monolith", "decomposition"]
+  },
+  {
+    "content": "For any system replacement, the critical question is: what custom business logic exists in the old system that isn't documented? This is the #1 surprise in migrations. Discovery method: run a code audit looking for stored procedures, triggers, scheduled jobs, and hardcoded business rules. Budget 20% of migration effort for undocumented logic discovery.",
+    "tags": ["custom-logic", "undocumented", "stored-procedures", "migration", "discovery"]
+  },
+  {
+    "content": "API-first architecture is the safest integration pattern. Define OpenAPI specs before implementation, use contract testing (Pact, Spring Cloud Contract), version all APIs, and implement backwards-compatible changes only. Breaking changes require a new version and a deprecation period.",
+    "tags": ["API-first", "OpenAPI", "contract-testing", "versioning", "integration"]
+  },
+  {
+    "content": "For high-availability requirements (99.9%+), the architecture must be active-active across at least two availability zones. This doubles infrastructure cost but eliminates single-region failure. Ask the client: Is the cost of downtime greater than the cost of active-active? Most enterprise clients underestimate downtime cost.",
+    "tags": ["high-availability", "active-active", "multi-AZ", "architecture", "downtime"]
+  },
+  {
+    "content": "Data lake vs data warehouse is not either/or. Pattern: raw data lands in the data lake (cheap storage, schema-on-read), then curated datasets are loaded into the data warehouse (structured, schema-on-write, fast queries). The lake is the source of truth; the warehouse is the serving layer.",
+    "tags": ["data-lake", "data-warehouse", "architecture", "analytics"]
+  },
+  {
+    "content": "For greenfield projects, start with a monolith and extract services only when there's a clear need (team scaling, independent deployability, different scaling requirements). Premature microservices add 3-5x operational complexity with no benefit until the team and scale justify it.",
+    "tags": ["greenfield", "monolith-first", "microservices", "architecture"]
+  },
+  {
+    "content": "Event sourcing is powerful but complex. Use it only when: audit trail is a hard requirement, temporal queries (state at time T) are needed, or event replay is valuable. For most CRUD applications, traditional state-based persistence is simpler and sufficient. Event sourcing adds 2-3x development effort.",
+    "tags": ["event-sourcing", "CQRS", "audit-trail", "architecture"]
+  }
+]
