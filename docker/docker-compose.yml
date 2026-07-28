@@ -225,13 +225,13 @@ services:
       ECMS_LLM_MODEL: xiaomi/mimo-v2.5-pro
       ECMS_EMBEDDING_MODEL: text-embedding-3-small
       ECMS_EMBEDDING_DIM: "1536"
-      TELEGRAM_BOT_TOKEN: "REDACTED_TELEGRAM_TOKEN"
-      TELEGRAM_MANAGER_CHAT_ID: "REDACTED_CHAT_ID"
-      COMMAND_CODE_API_KEY: REDACTED_COMMAND_CODE_KEY
-      ECMS_OPENAI_API_KEY: REDACTED_OPENAI_KEY
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_MANAGER_CHAT_ID: ${TELEGRAM_MANAGER_CHAT_ID}
+      COMMAND_CODE_API_KEY: ${COMMAND_CODE_API_KEY}
+      ECMS_OPENAI_API_KEY: ${ECMS_OPENAI_API_KEY}
       ECMS_OPENAI_BASE_URL: https://api.commandcode.ai/provider/v1
       ECMS_CATEGORIZE_MODEL: xiaomi/mimo-v2.5-pro
-      ECMS_CATEGORIZE_API_KEY: REDACTED_OPENAI_KEY
+      ECMS_CATEGORIZE_API_KEY: ${ECMS_CATEGORIZE_API_KEY}
       ECMS_CATEGORIZE_BASE_URL: https://api.commandcode.ai/provider/v1
     depends_on:
       postgres:
@@ -458,8 +458,8 @@ services:
       PYTHONPATH: "/app/legacy/src:/app"
       ECMS_ENVIRONMENT: production
       ECMS_DATABASE_URL: postgresql+asyncpg://ecms:ecms@postgres:5432/ecms
-      TELEGRAM_BOT_TOKEN: "REDACTED_TELEGRAM_TOKEN"
-      TELEGRAM_MANAGER_CHAT_ID: "REDACTED_CHAT_ID"
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_MANAGER_CHAT_ID: ${TELEGRAM_MANAGER_CHAT_ID}
     depends_on:
       postgres:
         condition: service_healthy
