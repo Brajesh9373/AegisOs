@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Multi-stage build for the ECMS backend gateway + legacy providers (SECTION 17/106).
 
-FROM python:3.12-slim AS builder
+FROM python:3.14-slim AS builder
 ENV UV_LINK_MODE=copy \
     PYTHONDONTWRITEBYTECODE=1
 RUN pip install --no-cache-dir uv
@@ -11,7 +11,7 @@ RUN uv sync --no-dev --frozen --no-install-project
 RUN .venv/bin/pip install --no-cache-dir python-multipart || pip install --target /app/.venv/lib/python3.12/site-packages python-multipart
 RUN uv pip install --no-cache-dir fastembed python-telegram-bot
 
-FROM python:3.12-slim AS runtime
+FROM python:3.14-slim AS runtime
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app/legacy/src:/app \
