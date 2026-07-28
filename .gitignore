@@ -56,6 +56,11 @@ Thumbs.db
 
 # ---- Local tooling ----
 .tools/
+.planning/
+.commandcode/
+.design/
+.codegraph/
+commandcode/
 
 # ---- Docs site ----
 site/
