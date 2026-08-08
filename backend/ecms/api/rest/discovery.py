@@ -22,6 +22,8 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from ecms.persistence.database.rest_session import db_session
+from ecms.shared.context import bind_context
+from ecms.infrastructure.telemetry.tracing import traced_span
 
 logger = logging.getLogger("ecms.discovery")
 
@@ -295,42 +297,26 @@ async def ingest(session_id: str, body: IngestBody, request: Request):
 
 @router.post("/{session_id}/analyze")
 async def analyze(session_id: str, request: Request):
-    await _get_current_user(request)
-    sess = await _load_session(session_id)
-    source = sess.get("source_text") or ""
-    if not source:
-        _error("NO-INPUT", "No source text ingested yet", 400)
-
-    from ecms.agent.ba.agent import understand, clarify, retrieve_knowledge
-
-    # Retrieve relevant knowledge for this project (RAG).
-    knowledge_context = await retrieve_knowledge(source)
-
-    # Stage: UNDERSTANDING
-    await _transition(session_id, "UNDERSTANDING")
-    recap = await understand(source, knowledge_context=knowledge_context)
-    await _append_message(session_id, "assistant", recap)
-
-    # Stage: CLARIFYING
-    await _transition(session_id, "CLARIFYING")
-    clarification = await clarify(source, knowledge_context=knowledge_context)
-    questions = clarification["content"]
-    await _append_message(
-        session_id,
-        "assistant",
-        questions,
-        category=clarification["category"],
-        category_label=clarification["category_label"],
-    )
-
-    return {
-        "session_id": session_id,
-        "stage": "CLARIFYING",
-        "recap": recap,
-        "questions": questions,
-        "category": clarification["category"],
-        "category_label": clarification["category_label"],
-    }
+    user = await _get_current_user(request)
+    bind_context(session_id=session_id, user_id=user.get("id"))
+    with traced_span("discovery.analyze"):
+        from ecms.api.rest.discovery_service import DiscoveryService
+        svc = DiscoveryService()
+        try:
+            return await svc.analyze(session_id)
+        except HTTPException:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            from ecms.shared.context import get_correlation_id
+            try:
+                trace_id = get_correlation_id()
+            except Exception:
+                trace_id = f"req-{session_id[:8]}"
+            logger.exception("[discovery.analyze] failed session=%s trace=%s: %s: %s", session_id, trace_id, type(exc).__name__, exc)
+            raise HTTPException(status_code=500, detail={
+                "success": False,
+                "error": {"code": "ANALYZE-FAILED", "message": str(exc), "traceId": trace_id},
+            })
 
 
 # ---------------------------------------------------------------------------
@@ -343,67 +329,67 @@ class ChatBody(BaseModel):
 
 @router.post("/{session_id}/chat")
 async def chat(session_id: str, body: ChatBody, request: Request):
-    await _get_current_user(request)
-    sess = await _load_session(session_id)
-    if sess["stage"] != "CLARIFYING":
-        _error("WRONG-STAGE", f"Expected CLARIFYING, got {sess['stage']}", 400)
+    user = await _get_current_user(request)
+    bind_context(session_id=session_id, user_id=user.get("id"))
+    with traced_span("discovery.chat"):
+        sess = await _load_session(session_id)
+        if sess["stage"] != "CLARIFYING":
+            _error("WRONG-STAGE", f"Expected CLARIFYING, got {sess['stage']}", 400)
 
-    # Store user message.
-    conversation = await _append_message(session_id, "user", body.message)
+        conversation = await _append_message(session_id, "user", body.message)
 
-    if _is_finalize_intent(body.message):
-        reply = (
-            "Understood. I have enough to move forward. Set the meeting cadence, "
-            "then generate the requirements package for review."
+        if _is_finalize_intent(body.message):
+            reply = (
+                "Understood. I have enough to move forward. Set the meeting cadence, "
+                "then generate the requirements package for review."
+            )
+            await _append_message(session_id, "assistant", reply)
+            return {
+                "session_id": session_id,
+                "stage": "CLARIFYING",
+                "reply": reply,
+                "show_finalize": True,
+            }
+
+        source = sess.get("source_text") or ""
+        from ecms.agent.ba.agent import chat_reply, retrieve_knowledge
+
+        knowledge_context = await retrieve_knowledge(source, conversation)
+
+        try:
+            clarification = await chat_reply(
+                source,
+                conversation,
+                body.message,
+                knowledge_context=knowledge_context,
+            )
+            reply = clarification["content"]
+        except Exception as exc:
+            logger.warning("[discovery.chat] LLM call failed: %s", exc)
+            reply = (
+                "Thank you for that information. I've noted your response. "
+                "When you're ready, click **Generate Requirements** and I'll produce "
+                "the structured requirements package."
+            )
+            clarification = None
+
+        await _append_message(
+            session_id,
+            "assistant",
+            reply,
+            category=clarification["category"] if clarification else None,
+            category_label=clarification["category_label"] if clarification else None,
         )
-        await _append_message(session_id, "assistant", reply)
-        return {
+
+        response = {
             "session_id": session_id,
             "stage": "CLARIFYING",
             "reply": reply,
-            "show_finalize": True,
         }
-
-    # Generate a contextual reply via LLM.
-    source = sess.get("source_text") or ""
-    from ecms.agent.ba.agent import chat_reply, retrieve_knowledge
-
-    knowledge_context = await retrieve_knowledge(source, conversation)
-
-    try:
-        clarification = await chat_reply(
-            source,
-            conversation,
-            body.message,
-            knowledge_context=knowledge_context,
-        )
-        reply = clarification["content"]
-    except Exception as exc:
-        logger.warning("[discovery.chat] LLM call failed: %s", exc)
-        reply = (
-            "Thank you for that information. I've noted your response. "
-            "When you're ready, click **Generate Requirements** and I'll produce "
-            "the structured requirements package."
-        )
-        clarification = None
-
-    await _append_message(
-        session_id,
-        "assistant",
-        reply,
-        category=clarification["category"] if clarification else None,
-        category_label=clarification["category_label"] if clarification else None,
-    )
-
-    response = {
-        "session_id": session_id,
-        "stage": "CLARIFYING",
-        "reply": reply,
-    }
-    if clarification:
-        response["category"] = clarification["category"]
-        response["category_label"] = clarification["category_label"]
-    return response
+        if clarification:
+            response["category"] = clarification["category"]
+            response["category_label"] = clarification["category_label"]
+        return response
 
 
 # ---------------------------------------------------------------------------
@@ -416,36 +402,72 @@ class FinalizeBody(BaseModel):
     preferred_time: str | None = None
 
 
-@router.post("/{session_id}/finalize")
-async def finalize(session_id: str, body: FinalizeBody, request: Request):
+@router.get("/{session_id}/finalize-status")
+async def finalize_status(session_id: str, request: Request):
     await _get_current_user(request)
     sess = await _load_session(session_id)
-    if sess["stage"] not in ("CLARIFYING", "FINALIZING"):
-        _error("WRONG-STAGE", f"Cannot finalize from {sess['stage']}", 400)
+    stage = sess.get("stage") or ""
+    transcript = sess.get("transcript") or ""
+    progress = {}
+    if isinstance(transcript, str) and transcript:
+        try:
+            import json as _json
+            progress = _json.loads(transcript) if transcript.startswith("{") else {}
+        except Exception:
+            progress = {}
+    elif isinstance(transcript, dict):
+        progress = transcript
+    return {
+        "session_id": session_id,
+        "stage": stage,
+        "finalize_stage": progress.get("finalize_stage") if stage == "FINALIZING" else ("done" if stage == "FINALIZED" else None),
+        "finalize_attempt": progress.get("attempt"),
+        "updated_at": sess.get("updated_at"),
+    }
 
-    source = sess.get("source_text") or ""
-    conversation = sess.get("messages") or []
 
-    from ecms.agent.ba.agent import finalize as ba_finalize, retrieve_knowledge
+@router.post("/{session_id}/finalize")
+async def finalize(session_id: str, body: FinalizeBody, request: Request):
+    user = await _get_current_user(request)
+    bind_context(session_id=session_id, user_id=user.get("id"))
+    with traced_span("discovery.finalize"):
+        sess = await _load_session(session_id)
+        if sess["stage"] not in ("CLARIFYING", "FINALIZING"):
+            _error("WRONG-STAGE", f"Cannot finalize from {sess['stage']}", 400)
 
-    knowledge_context = await retrieve_knowledge(source, conversation)
+        source = sess.get("source_text") or ""
+        conversation = sess.get("messages") or []
 
-    # Stage: FINALIZING
-    await _transition(session_id, "FINALIZING")
-    try:
-        result = await ba_finalize(source, conversation, knowledge_context=knowledge_context)
-    except Exception as exc:
-        # Roll back to CLARIFYING so the user can retry
-        async with db_session() as session:
-            from sqlalchemy import text
-            await session.execute(text(
-                "UPDATE discovery_sessions SET stage='CLARIFYING', updated_at=:t WHERE id=:id"
-            ), {"t": _now(), "id": session_id})
-        _error("FINALIZE-FAILED", str(exc), 500)
+        from ecms.agent.ba.agent import finalize as ba_finalize, retrieve_knowledge
+
+        knowledge_context = await retrieve_knowledge(source, conversation)
+
+        await _transition(session_id, "FINALIZING")
+        try:
+            async with db_session() as session:
+                from sqlalchemy import text
+                await session.execute(text(
+                    "UPDATE discovery_sessions SET transcript=:t, updated_at=:u WHERE id=:id"
+                ), {"t": json.dumps({"finalize_stage": "calling_llm", "attempt": 1}), "u": _now(), "id": session_id})
+            result = await ba_finalize(source, conversation, knowledge_context=knowledge_context)
+            async with db_session() as session:
+                from sqlalchemy import text
+                await session.execute(text(
+                    "UPDATE discovery_sessions SET transcript=:t, updated_at=:u WHERE id=:id"
+                ), {"t": json.dumps({"finalize_stage": "validating"}), "u": _now(), "id": session_id})
+        except Exception as exc:
+            logger.exception("[discovery.finalize] failed session=%s: %s: %s", session_id, type(exc).__name__, exc)
+            async with db_session() as session:
+                from sqlalchemy import text
+                await session.execute(text(
+                    "UPDATE discovery_sessions SET stage='CLARIFYING', transcript=:t, updated_at=:u WHERE id=:id"
+                ), {"t": json.dumps({"finalize_stage": "failed"}), "u": _now(), "id": session_id})
+            code = "FINALIZE-TIMEOUT" if "timeout" in str(exc).lower() or "Timeout" in type(exc).__name__ else "FINALIZE-FAILED"
+            status = 504 if code == "FINALIZE-TIMEOUT" else 500
+            _error(code, str(exc), status)
 
     req_dict = result.to_frontend()
 
-    # Persist.
     now = _now()
     async with db_session() as session:
         from sqlalchemy import text
@@ -453,48 +475,36 @@ async def finalize(session_id: str, body: FinalizeBody, request: Request):
             "UPDATE discovery_sessions SET requirements=:req, stage='FINALIZED', updated_at=:t WHERE id=:id"
         ), {"req": json.dumps(req_dict), "t": now, "id": session_id})
 
-        # Fan out into 0020 tables if a project_id exists.
         pid = sess.get("project_id")
         if pid:
-            # Store full JSONB on the project.
             await session.execute(text(
                 "UPDATE business_projects SET requirements=:req WHERE id=:pid"
             ), {"req": json.dumps(req_dict), "pid": pid})
-
-            # Functional requirements.
             for r in req_dict.get("functionalReqs", []):
                 await session.execute(text(
                     "INSERT INTO project_requirements "
                     "(id, project_id, text, type, status, source, version, created_at, updated_at) "
                     "VALUES (:id, :pid, :text, 'functional', 'confirmed', 'ba_agent', 1, :t, :t)"
                 ), {"id": _uuid(), "pid": pid, "text": r, "t": now})
-
-            # Risks.
             for r in req_dict.get("risks", []):
                 await session.execute(text(
                     "INSERT INTO project_risks "
                     "(id, project_id, risk, impact, mitigation, status, version, created_at) "
                     "VALUES (:id, :pid, :risk, 'medium', '', 'open', 1, :t)"
                 ), {"id": _uuid(), "pid": pid, "risk": r, "t": now})
-
-            # Skills as requirements.
             for s in req_dict.get("skills", []):
                 await session.execute(text(
                     "INSERT INTO project_requirements "
                     "(id, project_id, text, type, status, source, version, created_at, updated_at) "
                     "VALUES (:id, :pid, :text, 'skill', 'confirmed', 'ba_agent', 1, :t, :t)"
                 ), {"id": _uuid(), "pid": pid, "text": s, "t": now})
-
-            # Connectors as requirements.
             for c in req_dict.get("connectors", []):
                 await session.execute(text(
                     "INSERT INTO project_requirements "
                     "(id, project_id, text, type, status, source, version, created_at, updated_at) "
                     "VALUES (:id, :pid, :text, 'connector', 'confirmed', 'ba_agent', 1, :t, :t)"
                 ), {"id": _uuid(), "pid": pid, "text": c, "t": now})
-
             await _ensure_requirement_documents(session, pid)
-
             from ecms.api.rest.platform import (
                 _ensure_project_meetings,
                 _row_to_dict as _platform_row,
@@ -575,7 +585,7 @@ async def _save_ba_transcript_doc(session, project_id: str, messages: list[dict]
         lines.append("")
 
     md_content = "\n".join(lines)
-    now = datetime.now(timezone.utc)
+    now = _now()
 
     await session.execute(text(
         "INSERT INTO artifacts (id, projectid, name, type, content, uri, storagepath, agentid, createdat, versionhistory) "
@@ -667,96 +677,92 @@ async def _ensure_requirement_documents(session, project_id: str) -> None:
 
 @router.post("/{session_id}/link-project")
 async def link_project(session_id: str, body: dict, request: Request):
-    await _get_current_user(request)
-    sess = await _load_session(session_id)
-    project_id = body.get("project_id")
-    if not project_id:
-        return _error("missing_project_id", "project_id is required", 400)
+    user = await _get_current_user(request)
+    bind_context(session_id=session_id, user_id=user.get("id"))
+    with traced_span("discovery.link_project"):
+        sess = await _load_session(session_id)
+        if sess.get("stage") != "FINALIZED":
+            raise HTTPException(status_code=400, detail={"error": "WRONG-STAGE", "message": f"Cannot link from {sess.get('stage')}"})
+        project_id = body.get("project_id")
+        if not project_id:
+            return _error("missing_project_id", "project_id is required", 400)
 
-    reqs = sess.get("requirements")
-    now = _now()
-    uid = _uuid()
+        reqs = sess.get("requirements")
+        now = _now()
+        uid = _uuid()
 
-    async with db_session() as session:
-        from sqlalchemy import text
-        await session.execute(text(
-            "UPDATE discovery_sessions SET project_id = :pid, updated_at = :t WHERE id = :id"
-        ), {"pid": project_id, "t": now, "id": session_id})
-
-        if reqs and isinstance(reqs, dict):
-            await session.execute(text(
-                "UPDATE business_projects SET requirements = :req, updatedat = :t WHERE id = :pid"
-            ), {"req": json.dumps(reqs), "t": now, "pid": project_id})
-
-        # Fan out requirements to project tables if the session has any.
-        if reqs and isinstance(reqs, dict):
-            pid = project_id
-
-            # Functional requirements
-            for i, r in enumerate(reqs.get("functionalReqs", [])):
+        try:
+            async with db_session() as session:
+                from sqlalchemy import text
                 await session.execute(text(
-                    "INSERT INTO project_requirements "
-                    "(id, project_id, text, type, status, source, version, created_at, updated_at) "
-                    "VALUES (:id, :pid, :text, 'functional', 'proposed', 'ba_agent', '1', :t, :t) "
-                    "ON CONFLICT DO NOTHING"
-                ), {"id": f"{uid}-fr-{i}", "pid": pid, "text": r, "t": now})
+                    "UPDATE discovery_sessions SET project_id = :pid, updated_at = :t WHERE id = :id"
+                ), {"pid": project_id, "t": now, "id": session_id})
 
-            # Skills
-            for i, s in enumerate(reqs.get("skills", [])):
-                await session.execute(text(
-                    "INSERT INTO project_requirements "
-                    "(id, project_id, text, type, status, source, version, created_at, updated_at) "
-                    "VALUES (:id, :pid, :text, 'skill', 'proposed', 'ba_agent', '1', :t, :t) "
-                    "ON CONFLICT DO NOTHING"
-                ), {"id": f"{uid}-sk-{i}", "pid": pid, "text": s, "t": now})
+                if reqs and isinstance(reqs, dict):
+                    await session.execute(text(
+                        "UPDATE business_projects SET requirements = :req, updatedat = :t WHERE id = :pid"
+                    ), {"req": json.dumps(reqs), "t": now, "pid": project_id})
 
-            # Connectors
-            for i, c in enumerate(reqs.get("connectors", [])):
-                await session.execute(text(
-                    "INSERT INTO project_requirements "
-                    "(id, project_id, text, type, status, source, version, created_at, updated_at) "
-                    "VALUES (:id, :pid, :text, 'connector', 'proposed', 'ba_agent', '1', :t, :t) "
-                    "ON CONFLICT DO NOTHING"
-                ), {"id": f"{uid}-cn-{i}", "pid": pid, "text": c, "t": now})
+                if reqs and isinstance(reqs, dict):
+                    pid = project_id
+                    for i, r in enumerate(reqs.get("functionalReqs", [])):
+                        await session.execute(text(
+                            "INSERT INTO project_requirements "
+                            "(id, project_id, text, type, status, source, version, created_at, updated_at) "
+                            "VALUES (:id, :pid, :text, 'functional', 'proposed', 'ba_agent', '1', :t, :t) "
+                            "ON CONFLICT DO NOTHING"
+                        ), {"id": f"{uid}-fr-{i}", "pid": pid, "text": r, "t": now})
+                    for i, s in enumerate(reqs.get("skills", [])):
+                        await session.execute(text(
+                            "INSERT INTO project_requirements "
+                            "(id, project_id, text, type, status, source, version, created_at, updated_at) "
+                            "VALUES (:id, :pid, :text, 'skill', 'proposed', 'ba_agent', '1', :t, :t) "
+                            "ON CONFLICT DO NOTHING"
+                        ), {"id": f"{uid}-sk-{i}", "pid": pid, "text": s, "t": now})
+                    for i, c in enumerate(reqs.get("connectors", [])):
+                        await session.execute(text(
+                            "INSERT INTO project_requirements "
+                            "(id, project_id, text, type, status, source, version, created_at, updated_at) "
+                            "VALUES (:id, :pid, :text, 'connector', 'proposed', 'ba_agent', '1', :t, :t) "
+                            "ON CONFLICT DO NOTHING"
+                        ), {"id": f"{uid}-cn-{i}", "pid": pid, "text": c, "t": now})
+                    for i, r in enumerate(reqs.get("risks", [])):
+                        await session.execute(text(
+                            "INSERT INTO project_risks "
+                            "(id, project_id, risk, impact, mitigation, status, version, created_at) "
+                            "VALUES (:id, :pid, :risk, 'Medium', 'TBD', 'open', '1', :t) "
+                            "ON CONFLICT DO NOTHING"
+                        ), {"id": f"{uid}-rk-{i}", "pid": pid, "risk": r, "t": now})
 
-            # Risks
-            for i, r in enumerate(reqs.get("risks", [])):
-                await session.execute(text(
-                    "INSERT INTO project_risks "
-                    "(id, project_id, risk, impact, mitigation, status, version, created_at) "
-                    "VALUES (:id, :pid, :risk, 'Medium', 'TBD', 'open', '1', :t) "
-                    "ON CONFLICT DO NOTHING"
-                ), {"id": f"{uid}-rk-{i}", "pid": pid, "risk": r, "t": now})
+                await _save_ba_transcript_doc(session, project_id, sess.get("messages") or [])
 
-        # Mirror the BA discovery transcript into a real workspace session so it
-        # shows up as a chat tab in the project workspace (the chat panel lists
-        # sessions from the `sessions` table keyed by workspace_id = project_id).
-        await _save_ba_transcript_doc(session, project_id, sess.get("messages") or [])
+                if reqs and isinstance(reqs, dict):
+                    from ecms.api.rest.platform import (
+                        _ensure_project_meetings,
+                        _row_to_dict as _platform_row,
+                    )
+                    project_row = (await session.execute(text(
+                        "SELECT * FROM business_projects WHERE id = :pid"
+                    ), {"pid": project_id})).first()
+                    project = _platform_row(project_row) if project_row else {}
+                    if project:
+                        await _ensure_project_meetings(session, project)
+                    await _ensure_requirement_documents(session, project_id)
+        except HTTPException:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("[discovery.link_project] failed session=%s project=%s: %s: %s", session_id, project_id, type(exc).__name__, exc)
+            raise HTTPException(status_code=500, detail={
+                "success": False,
+                "error": {"code": "LINK-PROJECT-FAILED", "message": str(exc), "traceId": f"req-{session_id[:8]}"},
+            })
 
-        # Seed the first meeting from the BA discovery so the Meetings tab is
-        # populated with real project data from the moment of creation.
-        if reqs and isinstance(reqs, dict):
-            from ecms.api.rest.platform import (
-                _ensure_project_meetings,
-                _row_to_dict as _platform_row,
-            )
-            project_row = (await session.execute(text(
-                "SELECT * FROM business_projects WHERE id = :pid"
-            ), {"pid": project_id})).first()
-            project = _platform_row(project_row) if project_row else {}
-            if project:
-                await _ensure_project_meetings(session, project)
-            await _ensure_requirement_documents(session, project_id)
+        if sess.get("stage") == "FINALIZED" and reqs and isinstance(reqs, dict):
+            conversation = sess.get("messages") or []
+            await _set_team_status(project_id, "generating")
+            asyncio.create_task(_run_team_design(project_id, reqs, conversation))
 
-    # Trigger team design server-side so it no longer depends on a second
-    # (frontend) call that may be silently dropped. Only fire when we actually
-    # have finalized requirements to design a team from.
-    if sess.get("stage") == "FINALIZED" and reqs and isinstance(reqs, dict):
-        conversation = sess.get("messages") or []
-        await _set_team_status(project_id, "generating")
-        asyncio.create_task(_run_team_design(project_id, reqs, conversation))
-
-    return {"status": "linked", "session_id": session_id, "project_id": project_id}
+        return {"status": "linked", "session_id": session_id, "project_id": project_id}
 
 
 # ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Typography, Table, Tag, Button, Space, Tooltip, ConfigProvider, theme, Popconfirm, message } from 'antd';
+import { Typography, Table, Tag, Button, Space, Tooltip, ConfigProvider, theme, Popconfirm, message, Tabs } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircleOutlined, GlobalOutlined, FileTextOutlined, ControlOutlined, ExclamationCircleOutlined, DeleteOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, GlobalOutlined, FileTextOutlined, ControlOutlined, ExclamationCircleOutlined, DeleteOutlined, EditOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import { PageContainer } from '../components/ui/PageContainer';
 import { Panel } from '../components/ui/Panel';
 import { ApiClient } from '../api/client';
@@ -14,6 +14,15 @@ export function ProjectsList() {
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('all');
+
+  const parseDraft = (p: any): any | null => {
+    try {
+      const raw = p.description || '';
+      const j = JSON.parse(raw);
+      return j?.draft || null;
+    } catch { return null; }
+  };
 
   const loadProjects = () => {
     setLoading(true);
@@ -22,11 +31,15 @@ export function ProjectsList() {
         setProjects((rows || []).map((project: any) => ({
           id: project.id,
           name: project.name,
-          health: project.status === 'Completed' ? 'Green' : project.status ? 'Yellow' : '',
+          status: project.status || 'Planning',
+          health: project.status === 'Draft' ? 'Draft' : project.status === 'Completed' ? 'Green' : project.status ? 'Yellow' : '',
           progress: project.progress != null ? `${project.progress}%` : '',
           owner: project.ownername || project.ownerName || project.owner || project.owneremail || project.ownerEmail || (project.ownerid ? 'Project Owner' : 'Current User'),
           lastActivity: project.updatedat || project.createdat || '',
           sustainability: null,
+          rawStatus: project.status,
+          draft: parseDraft(project),
+          description: project.description,
         })));
       })
       .catch(ApiClient.handleError)
@@ -48,6 +61,14 @@ export function ProjectsList() {
     } finally {
       setDeletingProjectId(null);
     }
+  };
+
+  const handleContinueDraft = (project: any) => {
+    navigate(`/projects/new?draft=${project.id}`);
+  };
+
+  const handleEditDraft = (project: any) => {
+    navigate(`/projects/new?draft=${project.id}&edit=1`);
   };
 
   const columns = [
@@ -118,7 +139,15 @@ export function ProjectsList() {
     { 
       title: 'Actions', 
       key: 'actions', 
-      render: (_: any, r: any) => (
+      render: (_: any, r: any) => r.rawStatus === 'Draft' ? (
+        <Space size="small">
+          <Button size="small" icon={<PlayCircleOutlined />} type="primary" onClick={() => handleContinueDraft(r)}>Continue</Button>
+          <Button size="small" icon={<EditOutlined />} onClick={() => handleEditDraft(r)}>Edit</Button>
+          <Popconfirm title="Delete draft?" okText="Delete" okButtonProps={{ danger: true, loading: deletingProjectId === r.id }} onConfirm={() => handleDeleteProject(r.id)}>
+            <Button danger size="small" icon={<DeleteOutlined />} loading={deletingProjectId === r.id}>Delete</Button>
+          </Popconfirm>
+        </Space>
+      ) : (
         <Space size="small">
           <Button size="small" icon={<FileTextOutlined />} style={{ borderColor: '#E5E7EB', color: '#111827' }}>Report</Button>
           <Button type="primary" size="small" icon={<ControlOutlined />} onClick={() => navigate(`/projects/${r.id}/workspace`)} style={{ background: '#2563EB', fontWeight: 500 }}>Workspace</Button>
@@ -137,21 +166,59 @@ export function ProjectsList() {
     }
   ];
 
+  const drafts = projects.filter(p => p.rawStatus === 'Draft');
+  const nonDrafts = projects.filter(p => p.rawStatus !== 'Draft');
+  const filteredProjects = activeTab === 'drafts' ? drafts : activeTab === 'active' ? nonDrafts : projects;
+  const draftCount = drafts.length;
+
   return (
     <PageContainer maxWidth={1400}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24, alignItems: 'center' }}>
         <Title level={3} style={{ margin: 0, fontWeight: 600, color: '#111827' }}>Project Registry</Title>
         <Button type="primary" style={{ background: '#2563EB', fontWeight: 500 }} onClick={() => navigate('/projects/new')}>Create Project</Button>
       </div>
-      
-      <Panel bodyStyle={{ padding: 0 }}>
+
+      <Tabs activeKey={activeTab} onChange={setActiveTab} style={{ marginBottom: 16 }} items={[
+        { key: 'all', label: `All Projects (${projects.length})` },
+        { key: 'drafts', label: `Drafts (${draftCount})` },
+        { key: 'active', label: `Active (${nonDrafts.length})` },
+      ]} />
+
+      {activeTab === 'all' && drafts.length > 0 && (
+        <Panel
+          style={{ marginBottom: 16, borderColor: '#FDE68A', background: '#FFFBEB' }}
+          bodyStyle={{ padding: 0 }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #FDE68A' }}>
+            <Space><FileTextOutlined style={{ color: '#D97706' }} /><Text strong>Drafts</Text><Tag color="gold">{draftCount} unfinished</Tag></Space>
+            <Button size="small" onClick={() => setActiveTab('drafts')}>View all drafts</Button>
+          </div>
+          <Table
+            dataSource={drafts.slice(0, 3)}
+            columns={columns}
+            loading={loading}
+            pagination={false}
+            rowKey="id"
+            size="small"
+          />
+          {draftCount > 3 && <div style={{ padding: '8px 16px', textAlign: 'center' }}><Button type="link" size="small" onClick={() => setActiveTab('drafts')}>Show all {draftCount} drafts →</Button></div>}
+        </Panel>
+      )}
+
+      <Panel
+        bodyStyle={{ padding: 0 }}
+      >
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid #E5E7EB', fontWeight: 600 }}>
+          {activeTab === 'drafts' ? <Space><FileTextOutlined style={{ color: '#D97706' }} /><Text strong>Draft Projects</Text><Tag color="gold">{draftCount}</Tag></Space> : activeTab === 'active' ? <Text strong>Active Projects</Text> : <Text strong>All Projects</Text>}
+        </div>
         <Table 
-          dataSource={projects}
+          dataSource={filteredProjects}
           columns={columns}
           loading={loading}
           pagination={false}
           rowKey="id" 
           style={{ width: '100%' }}
+          rowClassName={(r: any) => r.rawStatus === 'Draft' ? 'row-draft' : ''}
         />
       </Panel>
     </PageContainer>

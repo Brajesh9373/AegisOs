@@ -4,6 +4,8 @@ Each function is a single structured generation against the resolved BA model
 (temperature 0). `finalize` uses function-calling for guaranteed structure plus
 a validate/repair loop: if the emitted object fails the fixed-taxonomy schema,
 the agent re-asks once with the validation error before giving up.
+
+All LLM calls go through BaLlmClient (timeout, retry, circuit breaker).
 """
 
 from __future__ import annotations
@@ -11,13 +13,11 @@ from __future__ import annotations
 import json
 import logging
 
-from openai import AsyncOpenAI
 from pydantic import ValidationError
 
-from ecms.agent.ba.model import resolve_ba_model
+from ecms.agent.ba.llm_client import get_ba_llm_client
 from ecms.agent.ba.prompts import (
     ASSESS_TOOL,
-    BA_SYSTEM,
     CLARIFICATION_CATEGORIES,
     CLARIFICATION_TOOL,
     FINALIZE_TOOL,
@@ -53,13 +53,7 @@ def _parse_clarification(response) -> dict[str, str]:
 
 
 async def retrieve_knowledge(source_text: str, conversation: list[dict] | None = None) -> str:
-    """Retrieve relevant knowledge for a project. Returns empty string on failure.
-
-    This is the main entry point for RAG: the discovery router calls this before
-    any BA stage, and passes the result to the stage function's knowledge_context
-    parameter. Graceful degradation — if retrieval fails, returns "" and the BA
-    works identically to before (no regression).
-    """
+    """Retrieve relevant knowledge for a project. Returns empty string on failure."""
     try:
         from ecms.agent.ba.knowledge.retrieval import retrieve_for_project
         return await retrieve_for_project(source_text, conversation)
@@ -68,27 +62,10 @@ async def retrieve_knowledge(source_text: str, conversation: list[dict] | None =
         return ""
 
 
-def _resolve_base_url(base_url: str | None) -> str | None:
-    """Mirror AgentLoop: append /v1 if missing."""
-    if base_url and not base_url.rstrip("/").endswith("/v1"):
-        return base_url.rstrip("/") + "/v1"
-    return base_url
-
-
-async def _client() -> tuple[AsyncOpenAI, str]:
-    cfg = await resolve_ba_model()
-    client = AsyncOpenAI(
-        api_key=cfg["api_key"],
-        base_url=_resolve_base_url(cfg["base_url"]),
-    )
-    return client, cfg["model"]
-
-
 async def understand(source_text: str, knowledge_context: str = "") -> str:
     """Stage 1 — the 'What I understood' recap message (Markdown)."""
-    client, model = await _client()
-    resp = await client.chat.completions.create(
-        model=model,
+    llm = await get_ba_llm_client()
+    resp = await llm.chat(
         messages=[
             {"role": "system", "content": build_system_prompt(knowledge_context)},
             {"role": "user", "content": build_understand_prompt(source_text)},
@@ -101,9 +78,8 @@ async def understand(source_text: str, knowledge_context: str = "") -> str:
 
 async def clarify(source_text: str, knowledge_context: str = "") -> dict[str, str]:
     """Stage 2 — one structured, category-specific question batch."""
-    client, model = await _client()
-    resp = await client.chat.completions.create(
-        model=model,
+    llm = await get_ba_llm_client()
+    resp = await llm.chat(
         messages=[
             {"role": "system", "content": build_system_prompt(knowledge_context)},
             {"role": "user", "content": build_clarify_prompt(source_text)},
@@ -117,25 +93,22 @@ async def clarify(source_text: str, knowledge_context: str = "") -> dict[str, st
 
 
 async def assess_coverage(source_text: str, conversation: list[dict], knowledge_context: str = "") -> dict:
-    """Score every requirement dimension across the full conversation.
-
-    Returns a dict with per-dimension status (unaddressed/partial/sufficient),
-    the concrete open follow-up questions, and whether critical coverage is
-    reached. Statelessly re-reads the whole transcript each turn, so no
-    persistence of the coverage map is required.
-    """
-    client, model = await _client()
-    resp = await client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": build_system_prompt(knowledge_context)},
-            {"role": "user", "content": build_assess_prompt(source_text, conversation)},
-        ],
-        tools=[ASSESS_TOOL],
-        tool_choice={"type": "function", "function": {"name": "assess_coverage"}},
-        temperature=0.0,
-        max_tokens=2000,
-    )
+    """Score every requirement dimension across the full conversation."""
+    llm = await get_ba_llm_client()
+    try:
+        resp = await llm.chat(
+            messages=[
+                {"role": "system", "content": build_system_prompt(knowledge_context)},
+                {"role": "user", "content": build_assess_prompt(source_text, conversation)},
+            ],
+            tools=[ASSESS_TOOL],
+            tool_choice={"type": "function", "function": {"name": "assess_coverage"}},
+            temperature=0.0,
+            max_tokens=2000,
+        )
+    except Exception as exc:
+        logger.warning("[ba.assess_coverage] LLM call failed, returning empty coverage: %s", exc)
+        return {"dimensions": [], "critical_ready": False, "open_questions": []}
     tool_calls = resp.choices[0].message.tool_calls or []
     if not tool_calls:
         return {"dimensions": [], "critical_ready": False, "open_questions": []}
@@ -151,18 +124,10 @@ async def chat_reply(
     user_message: str,
     knowledge_context: str = "",
 ) -> dict[str, str]:
-    """Chat turn — a coverage-driven reply.
-
-    First assesses coverage across all dimensions, then generates a reply that
-    acknowledges the client's answer and keeps interrogating open gaps. Only
-    offers to finalize when critical coverage is reached — and even then it
-    offers, leaving the decision to the client.
-    """
+    """Chat turn — a coverage-driven reply."""
     coverage = await assess_coverage(source_text, conversation, knowledge_context)
-
-    client, model = await _client()
-    resp = await client.chat.completions.create(
-        model=model,
+    llm = await get_ba_llm_client()
+    resp = await llm.chat(
         messages=[
             {"role": "system", "content": build_system_prompt(knowledge_context)},
             {"role": "user", "content": build_reply_prompt(source_text, conversation, user_message, coverage)},
@@ -177,7 +142,9 @@ async def chat_reply(
 
 async def finalize(source_text: str, conversation: list[dict], knowledge_context: str = "") -> FinalizedRequirements:
     """Stage 3 — the FinalizedRequirements object (validated / repaired)."""
-    client, model = await _client()
+    from ecms.agent.ba.llm_client import LlmCallOpts
+
+    llm = await get_ba_llm_client(opts=LlmCallOpts.for_finalize())
     messages = [
         {"role": "system", "content": build_system_prompt(knowledge_context)},
         {"role": "user", "content": build_finalize_prompt(source_text, conversation)},
@@ -196,8 +163,7 @@ async def finalize(source_text: str, conversation: list[dict], knowledge_context
                     "followed by descriptions that start with Depends on <previous phase name>:."
                 ),
             })
-        resp = await client.chat.completions.create(
-            model=model,
+        resp = await llm.chat(
             messages=messages,
             tools=[FINALIZE_TOOL],
             tool_choice={"type": "function", "function": {"name": "emit_requirements"}},
@@ -217,7 +183,6 @@ async def finalize(source_text: str, conversation: list[dict], knowledge_context
         except (json.JSONDecodeError, ValidationError) as exc:
             last_error = str(exc)
             logger.warning("[ba.finalize] attempt %d validation failed: %s", attempt, exc)
-            # Feed the assistant's tool call back so the repair turn has context.
             messages.append({
                 "role": "assistant",
                 "content": None,
@@ -244,14 +209,8 @@ async def design_team(
     knowledge_context: str = "",
     org_roster: list[dict] | None = None,
 ) -> AgentTeam:
-    """Stage 4 — design the per-project agent org chart (validated / repaired).
-
-    Mirrors `finalize`: a single forced function call at temperature 0 with a
-    2-attempt validate/repair loop. The emitted team must satisfy the org grammar
-    (one delivery_manager root, valid reports_to, no cycles, ICs are leaves) and
-    only use models/tools from the provided catalogs.
-    """
-    client, model = await _client()
+    """Stage 4 — design the per-project agent org chart (validated / repaired)."""
+    llm = await get_ba_llm_client()
     team_tool = build_team_tool(model_ids, tool_names)
     allowed_models = tuple(model_ids)
     allowed_tools = tuple(tool_names)
@@ -277,8 +236,7 @@ async def design_team(
                     "reference an existing key; only management roles may have reports."
                 ),
             })
-        resp = await client.chat.completions.create(
-            model=model,
+        resp = await llm.chat(
             messages=messages,
             tools=[team_tool],
             tool_choice={"type": "function", "function": {"name": "emit_team"}},

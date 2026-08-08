@@ -392,24 +392,40 @@ def build_finalize_prompt(source_text: str, conversation: list[dict]) -> str:
     convo = "\n\n".join(
         f"{m.get('role', '?').upper()}: {m.get('content', '')}" for m in conversation
     )
-    golden = json.dumps(GOLDEN_FINALIZED, indent=2, ensure_ascii=False)
+    if len(convo) > 12000:
+        convo = convo[-12000:]
+    golden_shape = {
+        "projectName": GOLDEN_FINALIZED["projectName"],
+        "objective": GOLDEN_FINALIZED["objective"],
+        "functionalReqs": GOLDEN_FINALIZED["functionalReqs"][:3],
+        "techStack": GOLDEN_FINALIZED["techStack"],
+        "skills": GOLDEN_FINALIZED["skills"][:3],
+        "connectors": GOLDEN_FINALIZED["connectors"][:2],
+        "governance": GOLDEN_FINALIZED["governance"][:2],
+        "guardrails": GOLDEN_FINALIZED["guardrails"][:2],
+        "infrastructure": GOLDEN_FINALIZED["infrastructure"][:2],
+        "risks": GOLDEN_FINALIZED["risks"][:2],
+        "phases": GOLDEN_FINALIZED["phases"][:2],
+    }
+    golden = json.dumps(golden_shape, indent=2, ensure_ascii=False)
     gov = ", ".join(GOVERNANCE_LABELS)
     guard = ", ".join(GUARDRAIL_LABELS)
     infra = ", ".join(INFRASTRUCTURE_LABELS)
     return (
         "Produce the FINALIZED REQUIREMENTS object for this project.\n\n"
         "ORIGINAL INPUT:\n"
-        f"\"\"\"\n{source_text.strip()}\n\"\"\"\n\n"
+        f"\"\"\"\n{source_text.strip()[:6000]}\n\"\"\"\n\n"
         "FULL DISCOVERY CONVERSATION (includes the client's answers to your "
         "clarifying questions — treat these as authoritative):\n"
         f"\"\"\"\n{convo}\n\"\"\"\n\n"
         "Call the emit_requirements function with the complete object.\n\n"
         "HARD RULES on the three detail sections:\n"
-        f"- governance MUST have exactly these labels, in order: {gov}\n"
-        f"- guardrails MUST have exactly these labels, in order: {guard}\n"
-        f"- infrastructure MUST have exactly these labels, in order: {infra}\n"
-        "For each label write a specific `detail` grounded in the client's stack "
-        "and constraints. Do NOT rename, add, or drop any label.\n\n"
+        f"- governance: pick 3 to 7 MOST RELEVANT labels from this catalog: {gov}\n"
+        f"- guardrails: pick 3 to 7 MOST RELEVANT labels from this catalog: {guard}\n"
+        f"- infrastructure: pick 3 to 7 MOST RELEVANT labels from this catalog: {infra}\n"
+        "Only use labels from the catalog above — do NOT invent new labels. "
+        "Omit labels that are not relevant to THIS project; include only the ones that matter. "
+        "For each chosen label write a specific `detail` grounded in the client's stack and constraints.\n\n"
         "HARD RULES on phases:\n"
         "- `phases` must be an ordered dependency chain, not a generic list.\n"
         "- `phases[0].name` must be exactly \"Discovery & Requirements Baseline\".\n"
@@ -435,10 +451,7 @@ def build_finalize_prompt(source_text: str, conversation: list[dict]) -> str:
         "'weekly', 'biweekly', 'monthly'. Choose based on the phase's complexity "
         "and urgency (e.g., 'daily' for a 2-day cutover, 'weekly' for a 4-week "
         "development phase, 'biweekly' for a long hypercare).\n\n"
-        "The following is a GOLDEN REFERENCE (a DIFFERENT, approved project). "
-        "Match its structure, depth of detail, and tone exactly — but the "
-        "content must describe THIS client's project, never the reference "
-        "project:\n\n"
+        "GOLDEN SHAPE (field names + exemplar rows — match this structure, not content):\n"
         f"{golden}\n"
     )
 

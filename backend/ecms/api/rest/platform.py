@@ -1036,6 +1036,7 @@ class ProjectCreateBody(BaseModel):
     priority: str | None = "Medium"
     tags: str | None = None
     requirements: dict | None = None
+    status: str | None = None
 
 
 @router.get("/projects")
@@ -1085,11 +1086,11 @@ async def create_project(body: ProjectCreateBody, request: Request):
             from sqlalchemy import text
             await session.execute(text(
                 "INSERT INTO business_projects (id, name, description, businessgoal, ownerid, department, status, priority, tags, requirements, createdat, updatedat) "
-                "VALUES (:id, :name, :desc, :goal, :owner, :dept, 'Planning', :pri, :tags, :req, :t, :t)"
+                "VALUES (:id, :name, :desc, :goal, :owner, :dept, :status, :pri, :tags, :req, :t, :t)"
             ), {
                 "id": pid, "name": body.name, "desc": body.description or "",
                 "goal": body.businessGoal, "owner": user["id"],
-                "dept": body.department or "", "pri": body.priority or "Medium",
+                "dept": body.department or "", "status": body.status or "Planning", "pri": body.priority or "Medium",
                 "tags": body.tags or "[]", "req": json.dumps(body.requirements) if body.requirements else None,
                 "t": now,
             })
@@ -1165,11 +1166,11 @@ async def update_project(project_id: str, body: dict, request: Request):
     async with db_session() as session:
         from sqlalchemy import text
         await session.execute(text(
-            "UPDATE business_projects SET name=:name, description=:desc, businessGoal=:goal, "
-            "department=:dept, status=:status, priority=:pri, tags=:tags, updatedAt=:t WHERE id=:id"
+            "UPDATE business_projects SET name=:name, description=:desc, businessgoal=:goal, "
+            "department=:dept, status=:status, priority=:pri, tags=:tags, updatedat=:t WHERE id=:id"
         ), {
             "id": project_id, "name": body.get("name", ""), "desc": body.get("description", ""),
-            "goal": body.get("businessGoal", ""), "dept": body.get("department", ""),
+            "goal": body.get("businessGoal") or body.get("businessgoal") or "", "dept": body.get("department", ""),
             "status": body.get("status", "Planning"), "pri": body.get("priority", "Medium"),
             "tags": body.get("tags", "[]"), "t": _now(),
         })
