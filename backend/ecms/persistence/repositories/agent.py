@@ -53,6 +53,63 @@ class AgentRepository:
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
+    async def list_available(self) -> list[Agent]:
+        """Active permanent agents eligible for project staffing.
+
+        Project staffing assignments do not mutate project_id, so these agents
+        stay reusable across projects.
+        """
+        stmt = select(Agent).where(
+            Agent.project_id.is_(None),
+            Agent.status == "active",
+        ).order_by(Agent.department, Agent.role, Agent.name)
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_available_tree(self) -> dict[str, Any]:
+        """Return the available-agent hierarchy as a nested dict."""
+        agents = await self.list_available()
+        agent_map = {a.id: {**a.to_dict(), "reports": []} for a in agents}
+        roots: list[dict] = []
+        for a in agents:
+            node = agent_map[a.id]
+            if a.reports_to and a.reports_to in agent_map:
+                agent_map[a.reports_to]["reports"].append(node)
+            else:
+                roots.append(node)
+        return {"root_agents": roots, "total": len(agents)}
+
+    async def count_available_by_designation(self) -> dict[str, int]:
+        """Count available agents grouped by designation."""
+        agents = await self.list_available()
+        counts: dict[str, int] = {}
+        for a in agents:
+            d = a.designation or a.role
+            counts[d] = counts.get(d, 0) + 1
+        return counts
+
+    async def assign_to_project(self, agent_id: str, project_id: str) -> Agent | None:
+        """Legacy project-scoping assignment.
+
+        New workspace staffing uses project_agent_assignments so agents remain
+        reusable across projects.
+        """
+        agent = await self.get(agent_id)
+        if not agent:
+            return None
+        agent.project_id = project_id
+        await self._session.flush()
+        return agent
+
+    async def unassign_from_project(self, agent_id: str) -> Agent | None:
+        """Legacy project_id cleanup; availability no longer depends on this."""
+        agent = await self.get(agent_id)
+        if not agent:
+            return None
+        agent.project_id = None
+        await self._session.flush()
+        return agent
+
     async def delete_by_project(self, project_id: str) -> int:
         """Delete every agent scoped to a project. Returns the count removed.
 

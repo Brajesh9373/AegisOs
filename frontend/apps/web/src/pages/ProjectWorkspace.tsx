@@ -43,6 +43,10 @@ interface WorkerHierarchyNode {
   organizationMemberId?: string;
   department?: string;
   responsibility?: string;
+  positionId?: string;
+  assignedAgentId?: string;
+  requiredDesignation?: string;
+  vacant?: boolean;
   children?: WorkerHierarchyNode[];
 }
 
@@ -343,7 +347,10 @@ export const ProjectWorkspace = () => {
   // Raw agent rows from /team (full fields: tool_policy, designation, department,
   // status, …) — the Harness tab reads these directly, not the pruned tree nodes.
   const [teamAgents, setTeamAgents] = useState<any[]>([]);
-  const [governanceMap, setGovernanceMap] = useState<Record<string, any[]>>({});
+  const [teamPositions, setTeamPositions] = useState<any[]>([]);
+  const [hirePosition, setHirePosition] = useState<any | null>(null);
+  const [hiringPositionId, setHiringPositionId] = useState<string | null>(null);
+  const [hireAgentForm] = Form.useForm();
 
   const applyWorkspaceData = (res: any) => {
     setData(res);
@@ -358,74 +365,95 @@ export const ProjectWorkspace = () => {
     setProjectNotFound(false);
   };
 
-  // Combine the real organization hierarchy with project governance assignments.
-  // Human owners/managers form the tree; project agents are always leaf workers.
+  const flattenTeamAgents = (positions: any[]) =>
+    positions.map((position) => {
+      const assigned = position.assigned_agent || {};
+      return {
+        ...position,
+        ...assigned,
+        id: position.id,
+        position_id: position.id,
+        agent_id: assigned.id,
+        name: assigned.name || position.name,
+        role: position.role,
+        designation: position.designation,
+        department: position.department,
+        skills: assigned.skills || position.skills || [],
+        certificates: assigned.certificates || [],
+        automation: position.automation || assigned.automation || {},
+        features: position.features || assigned.features || {},
+        filled: Boolean(position.assigned_agent),
+      };
+    });
+
   const buildTeamTree = (
-    agents: any[],
-    governanceEntries: any[] = [],
+    positions: any[],
+    humanOwner?: any,
     organizationMembers: any[] = [],
+    humanAssignments: any[] = [],
   ): WorkerHierarchyNode[] => {
-    const managerIds = new Set<string>(agents.map((a) => a.reports_to).filter(Boolean));
     const agentNodes: Record<string, WorkerHierarchyNode> = {};
-    for (const a of agents) {
-      const policy = a.tool_policy || {};
-      const isManager = managerIds.has(a.id) || !a.reports_to;
-      agentNodes[a.id] = {
-        id: a.id,
-        name: a.name,
+
+    for (const position of positions) {
+      const assigned = position.assigned_agent;
+      const policy = assigned?.tool_policy || position.tool_policy || {};
+      agentNodes[position.id] = {
+        id: position.id,
+        positionId: position.id,
+        assignedAgentId: assigned?.id,
+        name: assigned?.name || position.name || position.designation || 'Required Agent',
         type: 'agent',
-        status: isManager ? 'RUNNING' : 'WAITING',
-        task: a.designation || a.role,
+        status: assigned ? 'WAITING' : 'BLOCKED',
+        task: position.designation || position.role,
         progress: 0,
-        assignedWork: a.role_description || '',
-        role: a.role,
-        model: a.model || undefined,
-        goal: a.role_description || undefined,
-        instructions: a.system_prompt_addon || undefined,
-        knowledge: Array.isArray(a.skills) ? a.skills : [],
+        assignedWork: position.role_description || '',
+        role: position.role,
+        model: assigned?.model || position.model || undefined,
+        goal: position.role_description || undefined,
+        instructions: assigned?.system_prompt_addon || position.system_prompt_addon || undefined,
+        knowledge: Array.isArray(assigned?.skills) ? assigned.skills : (Array.isArray(position.skills) ? position.skills : []),
         tools: Array.isArray(policy.allowed_tools) ? policy.allowed_tools : [],
-        certificates: Array.isArray(a.certificates) ? a.certificates : [],
+        certificates: Array.isArray(assigned?.certificates) ? assigned.certificates : [],
+        department: position.department,
+        requiredDesignation: position.designation || position.role,
+        vacant: !assigned,
         children: [],
       };
-    }
-
-    const ownersByAgent = new Map<string, any>();
-    for (const entry of governanceEntries) {
-      if (entry?.primary_owner?.member_id) {
-        ownersByAgent.set(entry.agent_id, entry.primary_owner);
-      }
     }
 
     const membersById = new Map<string, any>(
       organizationMembers.map((member: any) => [member.id, member]),
     );
-    const participatingMemberIds = new Set<string>();
-    for (const owner of ownersByAgent.values()) {
-      let memberId: string | undefined = owner.member_id;
-      const seen = new Set<string>();
-      while (memberId && !seen.has(memberId)) {
-        seen.add(memberId);
-        const member = membersById.get(memberId);
-        if (!member) break;
-        participatingMemberIds.add(memberId);
-        memberId = member.reports_to || undefined;
+    if (humanOwner?.id && !membersById.has(humanOwner.id)) {
+      membersById.set(humanOwner.id, humanOwner);
+    }
+
+    const ownerByPosition = new Map<string, any>();
+    for (const assignment of humanAssignments || []) {
+      if (assignment?.scope === 'position_owner' && assignment.position_id && assignment.organization_member) {
+        ownerByPosition.set(assignment.position_id, assignment.organization_member);
+        membersById.set(assignment.organization_member.id, assignment.organization_member);
       }
     }
 
-    // Retain the legacy agent-only shape only if governance data is unavailable.
-    // Production team generation guarantees ownership, so the normal path below
-    // always produces human roots with agent leaves.
-    if (participatingMemberIds.size === 0) {
-      const legacyRoots: WorkerHierarchyNode[] = [];
-      for (const a of agents) {
-        const node = agentNodes[a.id];
-        if (a.reports_to && agentNodes[a.reports_to]) {
-          agentNodes[a.reports_to].children!.push(node);
-        } else {
-          legacyRoots.push(node);
-        }
+    const participatingMemberIds = new Set<string>();
+    const includeMemberAndManagers = (memberId?: string) => {
+      let currentId = memberId;
+      const seen = new Set<string>();
+      while (currentId && !seen.has(currentId)) {
+        seen.add(currentId);
+        const member = membersById.get(currentId);
+        if (!member) break;
+        participatingMemberIds.add(currentId);
+        currentId = member.reports_to || undefined;
       }
-      return legacyRoots;
+    };
+
+    if (humanOwner?.id) includeMemberAndManagers(humanOwner.id);
+    for (const owner of ownerByPosition.values()) includeMemberAndManagers(owner.id);
+
+    if (participatingMemberIds.size === 0 && humanOwner?.id) {
+      participatingMemberIds.add(humanOwner.id);
     }
 
     const humanNodes = new Map<string, WorkerHierarchyNode>();
@@ -435,12 +463,12 @@ export const ProjectWorkspace = () => {
       humanNodes.set(memberId, {
         id: `human:${member.id}`,
         organizationMemberId: member.id,
-        name: member.name,
+        name: member.name || 'Project Owner',
         type: 'human',
         status: 'RUNNING',
-        task: member.designation || member.role,
+        task: member.designation || member.role || 'Project Owner',
         progress: 0,
-        assignedWork: member.role_description || '',
+        assignedWork: member.role_description || 'Owns project governance and human oversight for this workspace.',
         role: member.role,
         department: member.department,
         knowledge: Array.isArray(member.skills) ? member.skills : [],
@@ -458,26 +486,44 @@ export const ProjectWorkspace = () => {
       else roots.push(node);
     }
 
-    for (const agent of agents) {
-      const owner = ownersByAgent.get(agent.id);
-      const humanOwner = owner ? humanNodes.get(owner.member_id) : undefined;
-      if (!humanOwner) continue;
-      const agentNode = agentNodes[agent.id];
-      agentNode.responsibility = owner.responsibility || 'primary_owner';
-      humanOwner.children!.push(agentNode);
+    const fallbackHuman = humanOwner?.id ? humanNodes.get(humanOwner.id) : undefined;
+    for (const position of positions) {
+      const owner = ownerByPosition.get(position.id);
+      const humanNode = owner?.id ? humanNodes.get(owner.id) : fallbackHuman;
+      const agentNode = agentNodes[position.id];
+      if (humanNode) {
+        agentNode.responsibility = 'primary_owner';
+        humanNode.children!.push(agentNode);
+      } else {
+        roots.push(agentNode);
+      }
     }
 
-    const sortNodes = (nodes: WorkerHierarchyNode[]) => {
-      nodes.sort((left, right) => {
+    const sortNodes = (items: WorkerHierarchyNode[]) => {
+      items.sort((left, right) => {
         if (left.type !== right.type) return left.type === 'human' ? -1 : 1;
         return left.name.localeCompare(right.name);
       });
-      for (const node of nodes) {
-        if (node.children?.length) sortNodes(node.children);
-      }
+      items.forEach((item) => { if (item.children?.length) sortNodes(item.children); });
     };
     sortNodes(roots);
     return roots;
+  };
+
+  const applyTeamPayload = (res: any) => {
+    const positions = Array.isArray(res.positions) ? res.positions : [];
+    const tree = buildTeamTree(
+      positions,
+      res.human_owner,
+      Array.isArray(res.organization_members) ? res.organization_members : [],
+      Array.isArray(res.human_assignments) ? res.human_assignments : [],
+    );
+    setWorkerTree(tree);
+    setTeamPositions(positions);
+    setTeamAgents(flattenTeamAgents(positions));
+    setSelectedWorkerId(tree[0]?.id || '');
+    setExpandedKeys(expandedNodeMap(tree));
+    setTeamLoaded(true);
   };
 
   const expandedNodeMap = (nodes: WorkerHierarchyNode[]) => {
@@ -492,26 +538,6 @@ export const ProjectWorkspace = () => {
     return expanded;
   };
 
-  const fetchHierarchyContext = async (projectId: string) => {
-    const token = localStorage.getItem('auth_token');
-    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-    const [governanceResponse, membersResponse] = await Promise.all([
-      fetch(`/projects/${projectId}/agent-governance`, { headers }),
-      fetch('/organization/members', { headers }),
-    ]);
-    if (!governanceResponse.ok || !membersResponse.ok) {
-      throw new Error('Could not load project hierarchy ownership data.');
-    }
-    const [governance, members] = await Promise.all([
-      governanceResponse.json(),
-      membersResponse.json(),
-    ]);
-    return {
-      governance,
-      members: Array.isArray(members) ? members : [],
-    };
-  };
-
   useEffect(() => {
     if (!id || isLegacyDemoId) return;
     let cancelled = false;
@@ -523,22 +549,8 @@ export const ProjectWorkspace = () => {
         if (cancelled) return;
         setTeamStatus(res.team_status || 'pending');
         if (res.team_status === 'ready') {
-          const agents = Array.isArray(res.agents) ? res.agents : [];
-          const { governance: gov, members } = await fetchHierarchyContext(id)
-            .catch(() => ({ governance: { agents: [] }, members: [] }));
           if (cancelled) return;
-          const governanceEntries = Array.isArray(gov?.agents) ? gov.agents : [];
-          const tree = buildTeamTree(agents, governanceEntries, Array.isArray(members) ? members : []);
-          const map: Record<string, any[]> = {};
-          for (const entry of governanceEntries) {
-            if (entry.primary_owner) map[entry.agent_id] = [entry.primary_owner];
-          }
-          setWorkerTree(tree);
-          setTeamAgents(agents);
-          setSelectedWorkerId(tree[0]?.id || '');
-          setExpandedKeys(expandedNodeMap(tree));
-          setGovernanceMap(map);
-          setTeamLoaded(true);
+          applyTeamPayload(res);
           void ApiClient.get(`/projects/${id}/workspace`)
             .then((workspace) => { if (!cancelled) applyWorkspaceData(workspace); })
             .catch(() => {});
@@ -562,6 +574,53 @@ export const ProjectWorkspace = () => {
     return () => { cancelled = true; if (timer) clearTimeout(timer); };
   }, [id, isLegacyDemoId]);
 
+  const openHireRequest = (positionOrNode: any) => {
+    const position = teamPositions.find((p) => p.id === (positionOrNode.positionId || positionOrNode.id)) || positionOrNode;
+    setHirePosition(position);
+    hireAgentForm.setFieldsValue({
+      name: `${position.designation || position.requiredDesignation || position.role || 'Project'} Agent`,
+      role: position.role || 'agent',
+      department: position.department || 'delivery',
+      role_description: position.role_description || position.assignedWork || '',
+      skills: (position.skills || position.knowledge || []).join(', '),
+    });
+  };
+
+  const requestToHire = async () => {
+    if (!hirePosition) return;
+    if (!id) return;
+    setHiringPositionId(hirePosition.id);
+    try {
+      const values = await hireAgentForm.validateFields();
+      const token = localStorage.getItem('auth_token');
+      const headers: HeadersInit = { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+      const hireRes = await fetch('/agents/hire-for-position', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          position_id: hirePosition.id,
+          name: values.name,
+          role: values.role,
+          department: values.department,
+          role_description: values.role_description || '',
+          skills: values.skills ? values.skills.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
+        }),
+      });
+      if (!hireRes.ok) throw new Error((await hireRes.json()).detail || 'Failed to hire agent');
+      await hireRes.json();
+      const teamPayload = await ApiClient.get(`/discovery/projects/${id}/team`);
+      applyTeamPayload(teamPayload);
+      setHirePosition(null);
+      hireAgentForm.resetFields();
+      message.success(`Agent hired for "${hirePosition.designation || hirePosition.role}"`);
+    } catch (err) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return;
+      message.error(`Request to hire failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+    } finally {
+      setHiringPositionId(null);
+    }
+  };
+
   // Re-trigger team design (from the 'failed' state), then resume polling.
   const regenerateTeam = async () => {
     if (!id) return;
@@ -573,20 +632,7 @@ export const ProjectWorkspace = () => {
           const res = await ApiClient.get(`/discovery/projects/${id}/team`);
           setTeamStatus(res.team_status || 'pending');
           if (res.team_status === 'ready') {
-            const agents = Array.isArray(res.agents) ? res.agents : [];
-            const { governance: gov, members } = await fetchHierarchyContext(id)
-              .catch(() => ({ governance: { agents: [] }, members: [] }));
-            const governanceEntries = Array.isArray(gov?.agents) ? gov.agents : [];
-            const tree = buildTeamTree(agents, governanceEntries, Array.isArray(members) ? members : []);
-            const map: Record<string, any[]> = {};
-            for (const entry of governanceEntries) {
-              if (entry.primary_owner) map[entry.agent_id] = [entry.primary_owner];
-            }
-            setWorkerTree(tree);
-            setTeamAgents(agents);
-            setSelectedWorkerId(tree[0]?.id || '');
-            setExpandedKeys(expandedNodeMap(tree));
-            setGovernanceMap(map);
+            applyTeamPayload(res);
             void ApiClient.get(`/projects/${id}/workspace`)
               .then(applyWorkspaceData)
               .catch(() => {});
@@ -774,18 +820,22 @@ export const ProjectWorkspace = () => {
       const badgeColors = {
         human: { bg: '#ECFDF5', text: '#047857' },
         digital: { bg: ui.color.primarySoft, text: ui.color.primary },
-        agent: { bg: ui.color.violetSoft, text: ui.color.violet }
+        agent: node.vacant ? { bg: '#F3F4F6', text: '#94A3B8' } : { bg: ui.color.violetSoft, text: ui.color.violet }
       };
       const st = node.type === 'human'
         ? { bg: '#ECFDF5', text: '#047857', dot: '#10B981', label: 'Human' }
         : STATUS_STYLE[node.status] || STATUS_STYLE.WAITING;
-      const selectedBackground = node.type === 'human' ? '#F0FDF4' : ui.color.primarySoft;
-      const selectedBorder = node.type === 'human' ? '#86EFAC' : '#BFDBFE';
+      const selectedBackground = node.vacant ? '#F9FAFB' : (node.type === 'human' ? '#F0FDF4' : ui.color.primarySoft);
+      const selectedBorder = node.vacant ? '#D1D5DB' : (node.type === 'human' ? '#86EFAC' : '#BFDBFE');
 
       return (
         <div key={node.id} style={{ marginLeft: node.type === 'human' ? 0 : 14, marginBottom: 6 }}>
           <div
             onClick={() => {
+              if (node.vacant) {
+                openHireRequest(node);
+                return;
+              }
               setSelectedWorkerId(node.id);
               setIsWorkerInspectorOpen(true);
             }}
@@ -796,8 +846,9 @@ export const ProjectWorkspace = () => {
               padding: '8px 10px',
               borderRadius: ui.radius.sm,
               background: isSelected ? selectedBackground : ui.color.surface,
-              border: `1px solid ${isSelected ? selectedBorder : ui.color.border}`,
+              border: node.vacant ? `1px dashed ${isSelected ? selectedBorder : '#CBD5E1'}` : `1px solid ${isSelected ? selectedBorder : ui.color.border}`,
               cursor: 'pointer',
+              opacity: node.vacant ? 0.72 : 1,
               boxShadow: isSelected ? 'none' : ui.shadow.xs,
               transition: 'all 0.15s',
             }}
@@ -816,19 +867,32 @@ export const ProjectWorkspace = () => {
               ) : <span style={{ width: 12 }} />}
               <Avatar size={28} icon={node.type === 'human' ? <UserOutlined /> : <RobotOutlined />} style={{ background: badgeColors[node.type].bg, color: badgeColors[node.type].text, flexShrink: 0 }} />
               <div style={{ minWidth: 0 }}>
-                <Text strong style={{ fontSize: 12, color: ui.color.text, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{node.name}</Text>
+                <Text strong style={{ fontSize: 12, color: node.vacant ? '#94A3B8' : ui.color.text, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{node.name}</Text>
                 <Text type="secondary" style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.4 }}>
-                  {node.type === 'human' ? node.task || 'Human' : 'Agent'}
+                  {node.vacant ? node.requiredDesignation || node.task || 'Required agent' : (node.type === 'human' ? node.task || 'Human' : 'Agent')}
                 </Text>
               </div>
             </div>
 
-            <Tooltip title={st.label}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: ui.radius.pill, background: st.bg, flexShrink: 0 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: st.dot }} />
-                <span style={{ fontSize: 9, fontWeight: 600, color: st.text }}>{st.label}</span>
-              </div>
-            </Tooltip>
+            {node.vacant ? (
+              <Button
+                size="small"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openHireRequest(node);
+                }}
+                style={{ fontSize: 9, padding: '0 7px', height: 22, borderColor: '#93C5FD', color: '#2563EB', background: '#EFF6FF' }}
+              >
+                Request Hire
+              </Button>
+            ) : (
+              <Tooltip title={st.label}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: ui.radius.pill, background: st.bg, flexShrink: 0 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: st.dot }} />
+                  <span style={{ fontSize: 9, fontWeight: 600, color: st.text }}>{st.label}</span>
+                </div>
+              </Tooltip>
+            )}
           </div>
 
           {hasChildren && isExpanded && (
@@ -1399,6 +1463,57 @@ export const ProjectWorkspace = () => {
 
         </Layout>
 
+        <Modal
+          title="Request to Hire Agent"
+          open={!!hirePosition}
+          onCancel={() => {
+            setHirePosition(null);
+            hireAgentForm.resetFields();
+          }}
+          onOk={requestToHire}
+          okText="Hire and Assign"
+          confirmLoading={!!hiringPositionId}
+          width={620}
+        >
+          <div style={{ padding: '4px 0 12px' }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Required designation: <Text strong>{hirePosition?.designation || hirePosition?.requiredDesignation || hirePosition?.role}</Text>
+            </Text>
+          </div>
+          <Form form={hireAgentForm} layout="vertical">
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item name="name" label="Agent Name" rules={[{ required: true, message: 'Agent name is required' }]}>
+                  <Input placeholder="e.g. Backend/API Engineer Agent" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name="role" label="Role" rules={[{ required: true, message: 'Role is required' }]}>
+                  <Input />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item name="department" label="Department" rules={[{ required: true, message: 'Department is required' }]}>
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Designation">
+                  <Input value={hirePosition?.designation || hirePosition?.requiredDesignation || hirePosition?.role || ''} disabled />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Form.Item name="role_description" label="Role Description">
+              <Input.TextArea rows={3} />
+            </Form.Item>
+            <Form.Item name="skills" label="Skills (comma-separated)">
+              <Input placeholder="Python, FastAPI, SQL" />
+            </Form.Item>
+          </Form>
+        </Modal>
+
         <Drawer
           title={
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
@@ -1473,28 +1588,14 @@ export const ProjectWorkspace = () => {
                   <Text style={{ color: '#047857', fontSize: 10, display: 'block', marginTop: 5 }}>
                     {selectedWorker.task}{selectedWorker.department ? ` · ${selectedWorker.department.replace(/_/g, ' ')}` : ''}
                   </Text>
-                ) : (() => {
-                  const assignment = (governanceMap[selectedWorker.id] || governanceMap[selectedWorkerId] || [])[0];
-                  return assignment ? (
-                    <div
-                      title={`Assigned organization employee: ${assignment.member_name || assignment.member_id}`}
-                      style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5 }}
-                    >
-                      <UserOutlined style={{ color: ui.color.primary, fontSize: 10 }} />
-                      <Text style={{ color: ui.color.textMuted, fontSize: 10 }}>
-                        Assigned to <strong style={{ color: ui.color.text }}>{assignment.member_name || assignment.member_id}</strong>
-                      </Text>
-                      <Tag color="blue" style={{ margin: 0, fontSize: 8, lineHeight: '16px', height: 18 }}>
-                        {(assignment.responsibility || 'primary_owner').replace(/_/g, ' ')}
-                      </Tag>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5 }}>
-                      <UserOutlined style={{ color: ui.color.textFaint, fontSize: 10 }} />
-                      <Text style={{ color: ui.color.textFaint, fontSize: 10 }}>No organization employee assigned</Text>
-                    </div>
-                  );
-                })()}
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5 }}>
+                    <RobotOutlined style={{ color: selectedWorker.vacant ? ui.color.textFaint : ui.color.primary, fontSize: 10 }} />
+                    <Text style={{ color: selectedWorker.vacant ? ui.color.textFaint : ui.color.textMuted, fontSize: 10 }}>
+                      {selectedWorker.vacant ? 'No agent hired for this position' : `Assigned agent: ${selectedWorker.assignedAgentId || selectedWorker.name}`}
+                    </Text>
+                  </div>
+                )}
               </div>
               {(() => { const st = STATUS_STYLE[selectedWorker.status] || STATUS_STYLE.WAITING; return (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: ui.radius.pill, background: st.bg }}>
@@ -1576,22 +1677,16 @@ export const ProjectWorkspace = () => {
                       <Tag color={selectedWorker.status === 'RUNNING' ? 'green' : 'orange'}>{selectedWorker.status}</Tag>
                     </div>
 
-                    {/* Supervised by - Governance Assignment */}
-                    {(() => {
-                      const govEntries = governanceMap[selectedWorker.id] || governanceMap[selectedWorkerId] || [];
-                      if (govEntries.length === 0) return null;
-                      const owner = govEntries[0];
-                      return (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#f0f9ff', borderRadius: 8, border: '1px solid #bae6fd', marginBottom: 16 }}>
-                          <UserOutlined style={{ fontSize: 16, color: '#2563eb' }} />
-                          <div>
-                            <Text type="secondary" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block' }}>Supervised by</Text>
-                            <Text strong style={{ fontSize: 13 }}>{owner.member_name || owner.name || owner.member_id}</Text>
-                          </div>
-                          <Tag color="blue" style={{ marginLeft: 'auto', fontSize: 10 }}>{(owner.responsibility || 'primary_owner').replace(/_/g, ' ')}</Tag>
-                        </div>
-                      );
-                    })()}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: selectedWorker.vacant ? '#f9fafb' : '#f0f9ff', borderRadius: 8, border: selectedWorker.vacant ? '1px dashed #cbd5e1' : '1px solid #bae6fd', marginBottom: 16 }}>
+                      <RobotOutlined style={{ fontSize: 16, color: selectedWorker.vacant ? '#94a3b8' : '#2563eb' }} />
+                      <div>
+                        <Text type="secondary" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block' }}>Project position</Text>
+                        <Text strong style={{ fontSize: 13 }}>{selectedWorker.requiredDesignation || selectedWorker.task}</Text>
+                      </div>
+                      <Tag color={selectedWorker.vacant ? 'default' : 'blue'} style={{ marginLeft: 'auto', fontSize: 10 }}>
+                        {selectedWorker.vacant ? 'Vacant' : 'Filled'}
+                      </Tag>
+                    </div>
 
                     {/* Goal */}
                     <div style={{ marginBottom: 16 }}>

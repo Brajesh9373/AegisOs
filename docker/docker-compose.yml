@@ -333,7 +333,7 @@ services:
     healthcheck:
       test: ["CMD", "python", "-m", "ecms.connectors.ingestion.parallel_health"]
       interval: 15s
-      timeout: 5s
+      timeout: 15s
       retries: 4
       start_period: 30s
     cpus: ${ECMS_CONNECTOR_INGESTION_CPU_LIMIT:-0.75}
@@ -378,7 +378,7 @@ services:
     healthcheck:
       test: ["CMD", "python", "-m", "ecms.connectors.ingestion.parallel_health"]
       interval: 15s
-      timeout: 5s
+      timeout: 15s
       retries: 4
       start_period: 30s
     cpus: ${ECMS_CONNECTOR_EXTRACTION_CPU_LIMIT:-0.75}
@@ -419,7 +419,7 @@ services:
     healthcheck:
       test: ["CMD", "python", "-m", "ecms.connectors.ingestion.parallel_health"]
       interval: 15s
-      timeout: 5s
+      timeout: 15s
       retries: 4
       start_period: 30s
     cpus: ${ECMS_CONNECTOR_GRAPH_WRITER_CPU_LIMIT:-0.5}

@@ -138,3 +138,24 @@ class DependencyResolutionError(EcmsError):
 
     default_message = "Dependency resolution failed."
     default_code = "dependency_resolution_error"
+
+
+class LlmProviderError(EcmsError):
+    """Raised when the LLM provider fails after retries / breaker."""
+
+    default_message = "LLM provider error."
+    default_code = "llm_provider_error"
+
+
+class DiscoveryError(EcmsError):
+    """Raised for discovery state-machine violations."""
+
+    default_message = "Discovery operation failed."
+    default_code = "discovery_error"
+
+
+class DiscoveryConflictError(EcmsError):
+    """Raised when a discovery transition conflicts with current stage."""
+
+    default_message = "Discovery state conflict."
+    default_code = "discovery_conflict"

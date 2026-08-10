@@ -1005,17 +1005,25 @@ def _fallback_team_rows(
     return rows
 
 
-async def _write_worker_hierarchy_document(session, project_id: str, rows: list[dict]) -> None:
+async def _write_worker_hierarchy_document(
+    session,
+    project_id: str,
+    rows: list[dict],
+    assigned_by_position: dict[str, dict] | None = None,
+) -> None:
     from sqlalchemy import text
 
     if not rows:
         return
     by_id = {row["id"]: row for row in rows}
+    assignments = assigned_by_position or {}
     lines = ["# Worker Hierarchy", ""]
     for row in rows:
         manager = by_id.get(row.get("reports_to") or "", {}).get("name", "Root")
+        assigned = assignments.get(row["id"])
+        staffing = f"filled by {assigned['name']}" if assigned else "vacant - hire required"
         lines.append(
-            f"- {row['name']} ({row.get('designation') or row.get('role')}) - reports to {manager}; {row.get('role_description') or ''}"
+            f"- {row['name']} ({row.get('designation') or row.get('role')}) - reports to {manager}; {staffing}; {row.get('role_description') or ''}"
         )
     content = "\n".join(lines)
     await session.execute(text(
@@ -1030,6 +1038,20 @@ async def _write_worker_hierarchy_document(session, project_id: str, rows: list[
         "uri": f"knowledge/{project_id}/worker-hierarchy.md",
         "t": _now(),
     })
+
+
+async def _delete_legacy_project_agents(session, project_id: str) -> None:
+    """Remove old project-scoped generated agent rows for this workspace."""
+    from sqlalchemy import text
+
+    await session.execute(
+        text("DELETE FROM project_agent_governance_assignments WHERE project_id = :pid"),
+        {"pid": project_id},
+    )
+    await session.execute(
+        text("DELETE FROM agents WHERE project_id = :pid"),
+        {"pid": project_id},
+    )
 
 
 async def _apply_revised_phases(project_id: str, requirements: dict, revised_phases: list[dict]) -> None:
@@ -1174,16 +1196,67 @@ def _fallback_org_mappings(rows: list[dict], org_roster: list[dict]) -> list[dic
     return mappings
 
 
+def _select_human_owner(organization_members: list[dict]) -> dict | None:
+    """Choose the top active organization human that owns the project workspace.
+
+    The worker hierarchy should remain human-led: organization root first,
+    generated project agent positions beneath it. Prefer an explicit CEO/root
+    member; otherwise use the highest available active member.
+    """
+    if not organization_members:
+        return None
+
+    def norm(value: str | None) -> str:
+        return (value or "").lower().replace("_", " ").replace("-", " ").strip()
+
+    root_members = [member for member in organization_members if not member.get("reports_to")]
+    for member in root_members:
+        role = norm(member.get("role"))
+        designation = norm(member.get("designation"))
+        if role in {"ceo", "chief executive officer"} or "chief executive officer" in designation:
+            return member
+    if root_members:
+        return root_members[0]
+    return organization_members[0]
+
+
+async def _load_active_organization_members() -> list[dict]:
+    """Return active organization members in the shape the workspace hierarchy needs."""
+    from sqlalchemy import text
+
+    async with db_session() as session:
+        rows = (await session.execute(text(
+            "SELECT id, name, role, designation, department, reports_to, role_description, skills "
+            "FROM organization_members "
+            "WHERE status = 'active' "
+            "ORDER BY reports_to NULLS FIRST, name"
+        ))).fetchall()
+
+    members: list[dict] = []
+    for row in rows:
+        mapping = row._mapping
+        members.append({
+            "id": mapping["id"],
+            "name": mapping["name"],
+            "role": mapping["role"],
+            "designation": mapping["designation"],
+            "department": mapping["department"],
+            "reports_to": mapping["reports_to"],
+            "role_description": mapping["role_description"],
+            "skills": mapping["skills"] or [],
+        })
+    return members
+
+
 async def _run_team_design(project_id: str, requirements: dict, conversation: list[dict]) -> None:
-    """Background worker: generate the org chart and persist it as agents rows.
+    """Background worker: generate required positions and assign reusable agents.
 
     On any failure the project's team_status is set to 'failed' so the workspace
     can offer a regenerate action; project creation itself is never affected.
     """
-    import uuid as _uuid
     from ecms.agent.ba.agent import design_team as ba_design_team, retrieve_knowledge
     from ecms.agent.ba.catalog import get_model_ids, get_tool_names
-    from ecms.persistence.repositories.agent import AgentRepository
+    from ecms.persistence.repositories.project_agent_position import ProjectAgentPositionRepository
 
     try:
         knowledge_context = await retrieve_knowledge(
@@ -1192,37 +1265,14 @@ async def _run_team_design(project_id: str, requirements: dict, conversation: li
         model_ids = await get_model_ids()
         tool_names = get_tool_names()
 
-        # Fetch permanent org roster for mapping
-        org_roster: list[dict] = []
-        try:
-            async with db_session() as session:
-                from sqlalchemy import text
-                org_rows = (await session.execute(
-                    text("SELECT id, name, role, department, skills FROM organization_members WHERE status = 'active'")
-                )).fetchall()
-                org_roster = [
-                    {"id": r[0], "name": r[1], "role": r[2], "department": r[3], "skills": r[4] or []}
-                    for r in org_rows
-                ]
-        except Exception:
-            logger.warning("[discovery] could not fetch org roster for team design")
-
-        if not org_roster:
-            raise RuntimeError(
-                "team design requires at least one active organization employee"
-            )
-
         revised_phases = []
-        org_mappings: list[dict] = []
         try:
             team = await ba_design_team(
                 requirements, conversation, model_ids, tool_names,
                 knowledge_context=knowledge_context,
-                org_roster=org_roster,
             )
             rows = team.to_rows(project_id)
             revised_phases = [p.model_dump() for p in team.revised_phases]
-            org_mappings = [m.model_dump() for m in team.org_mappings]
         except Exception as exc:  # noqa: BLE001 - fallback keeps workspace usable
             logger.warning("[discovery] LLM team design failed for %s, using deterministic fallback: %s", project_id, exc)
             rows = _fallback_team_rows(project_id, requirements, model_ids, tool_names)
@@ -1231,83 +1281,30 @@ async def _run_team_design(project_id: str, requirements: dict, conversation: li
         if revised_phases:
             await _apply_revised_phases(project_id, requirements, revised_phases)
 
-        expected_agent_keys = {
-            row["id"].split(":", 1)[-1] if ":" in row["id"] else row["id"]
-            for row in rows
-        }
-        active_member_ids = {member["id"] for member in org_roster}
-
-        # Keep valid BA assignments and deterministically fill every gap. An
-        # incomplete or hallucinated mapping must never prevent the team from
-        # becoming ready when active organization employees are available.
-        org_mappings = [
-            mapping
-            for mapping in org_mappings
-            if mapping["project_agent_key"] in expected_agent_keys
-            and mapping["org_member_id"] in active_member_ids
-        ]
-        mapped_agent_keys = {mapping["project_agent_key"] for mapping in org_mappings}
-        if mapped_agent_keys != expected_agent_keys:
-            fallback_mappings = _fallback_org_mappings(rows, org_roster)
-            org_mappings.extend(
-                mapping
-                for mapping in fallback_mappings
-                if mapping["project_agent_key"] not in mapped_agent_keys
-            )
-
         async with db_session() as session:
-            repo = AgentRepository(session)
-            await repo.delete_by_project(project_id)  # idempotent re-design
-            for row in rows:
-                await repo.create(**row)
-            await _write_worker_hierarchy_document(session, project_id, rows)
-
-            # Write governance assignments from org_mappings
-            from sqlalchemy import text
-            for row in rows:
-                await session.execute(
-                    text(
-                        "DELETE FROM project_agent_governance_assignments "
-                        "WHERE project_agent_id = :aid"
-                    ),
-                    {"aid": row["id"]},
-                )
-            for mapping in org_mappings:
-                project_agent_id = f"{project_id}:{mapping['project_agent_key']}"
-                await session.execute(text(
-                    "INSERT INTO project_agent_governance_assignments "
-                    "(id, organization_member_id, project_agent_id, project_id, "
-                    "responsibility, status, assigned_by_user_id, assigned_at, updated_at) "
-                    "VALUES (:id, :mid, :paid, :pid, :resp, 'active', 'ba_agent', NOW(), NOW())"
-                ), {
-                    "id": f"gov-{_uuid.uuid4().hex[:12]}",
-                    "mid": mapping["org_member_id"],
-                    "paid": project_agent_id,
-                    "pid": project_id,
-                    "resp": mapping["responsibility"],
-                })
-
-            assigned_agent_ids = set((await session.execute(text(
-                "SELECT DISTINCT project_agent_id "
-                "FROM project_agent_governance_assignments "
-                "WHERE project_id = :pid AND status = 'active'"
-            ), {"pid": project_id})).scalars().all())
-            expected_agent_ids = {row["id"] for row in rows}
-            missing_assignments = sorted(expected_agent_ids - assigned_agent_ids)
-            if missing_assignments:
-                raise RuntimeError(
-                    "governance persistence left project agents unassigned: "
-                    f"{missing_assignments}"
-                )
+            repo = ProjectAgentPositionRepository(session)
+            await _delete_legacy_project_agents(session, project_id)
+            await repo.replace_project_positions(project_id, rows)
+            assigned_count = await repo.auto_assign_project(project_id)
+            await repo.ensure_workspace_owner(project_id, assigned_by_user_id="ba_agent", source="team_design")
+            await repo.ensure_position_owners(project_id, assigned_by_user_id="ba_agent", source="team_design")
+            serialized_positions = await repo.serialize_project(project_id)
+            assigned_by_position = {
+                position["id"]: position["assigned_agent"]
+                for position in serialized_positions
+                if position.get("assigned_agent")
+            }
+            await _write_worker_hierarchy_document(session, project_id, rows, assigned_by_position)
 
             logger.info(
-                "[discovery] wrote %d governance assignments for project %s",
-                len(org_mappings),
+                "[discovery] wrote %d project agent positions for project %s (%d filled)",
+                len(rows),
                 project_id,
+                assigned_count,
             )
 
         await _set_team_status(project_id, "ready")
-        logger.info("[discovery] team ready for project %s (%d agents)", project_id, len(rows))
+        logger.info("[discovery] team ready for project %s (%d positions)", project_id, len(rows))
     except Exception as exc:  # noqa: BLE001 - background task must not crash silently
         logger.exception("[discovery] team design failed for project %s: %s", project_id, exc)
         try:
@@ -1378,7 +1375,7 @@ async def regenerate_project_team(project_id: str, request: Request):
 
 @router.get("/projects/{project_id}/team")
 async def get_project_team(project_id: str, request: Request):
-    """Return the project's team status and its agents (if ready)."""
+    """Return the project's team status and required/assigned agent positions."""
     await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
@@ -1390,13 +1387,35 @@ async def get_project_team(project_id: str, request: Request):
             _error("NOT-FOUND", "Project not found", 404)
         team_status = row[0] or "pending"
 
-    from ecms.persistence.repositories.agent import AgentRepository
+    from ecms.persistence.repositories.project_agent_position import ProjectAgentPositionRepository
     async with db_session() as session:
-        repo = AgentRepository(session)
-        agents = await repo.list_by_project(project_id)
+        repo = ProjectAgentPositionRepository(session)
+        await repo.ensure_workspace_owner(project_id, assigned_by_user_id="system", source="read_repair")
+        await repo.ensure_position_owners(project_id, assigned_by_user_id="system", source="read_repair")
+        positions = await repo.serialize_project(project_id)
+        human_assignments = await repo.serialize_human_assignments(project_id)
+        agents = [
+            {**position["assigned_agent"], "position_id": position["id"], "position_reports_to": position["reports_to"]}
+            for position in positions
+            if position.get("assigned_agent")
+        ]
+    organization_members = await _load_active_organization_members()
+    workspace_owner = next(
+        (
+            assignment
+            for assignment in human_assignments
+            if assignment.get("scope") == "workspace_owner" and assignment.get("organization_member")
+        ),
+        None,
+    )
+    human_owner = workspace_owner["organization_member"] if workspace_owner else _select_human_owner(organization_members)
 
     return {
         "project_id": project_id,
         "team_status": team_status,
-        "agents": [a.to_dict() for a in agents],
+        "human_owner": human_owner,
+        "human_assignments": human_assignments,
+        "organization_members": organization_members,
+        "positions": positions,
+        "agents": agents,
     }

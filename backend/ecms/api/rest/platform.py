@@ -1184,6 +1184,7 @@ async def delete_project(project_id: str, request: Request):
         from sqlalchemy import text
         await session.execute(text("DELETE FROM execution_nodes WHERE projectId = :id"), {"id": project_id})
         await session.execute(text("DELETE FROM project_agents WHERE projectId = :id"), {"id": project_id})
+        await session.execute(text("DELETE FROM project_agent_governance_assignments WHERE project_id = :id"), {"id": project_id})
         await session.execute(text("DELETE FROM agents WHERE project_id = :id"), {"id": project_id})
         await session.execute(text("DELETE FROM artifacts WHERE projectId = :id"), {"id": project_id})
         await session.execute(text("DELETE FROM human_queue WHERE projectId = :id"), {"id": project_id})
@@ -1197,6 +1198,12 @@ async def delete_project(project_id: str, request: Request):
         await session.execute(text("DELETE FROM project_story_bugs WHERE project_id = :id"), {"id": project_id})
         await session.execute(text("DELETE FROM project_stories WHERE project_id = :id"), {"id": project_id})
         await session.execute(text("DELETE FROM project_epics WHERE project_id = :id"), {"id": project_id})
+        await session.execute(text("DELETE FROM project_human_assignments WHERE project_id = :id"), {"id": project_id})
+        await session.execute(text(
+            "DELETE FROM project_agent_assignments "
+            "WHERE position_id IN (SELECT id FROM project_agent_positions WHERE project_id = :id)"
+        ), {"id": project_id})
+        await session.execute(text("DELETE FROM project_agent_positions WHERE project_id = :id"), {"id": project_id})
         await session.execute(text("DELETE FROM business_projects WHERE id = :id"), {"id": project_id})
     return {"success": True}
 
@@ -1556,6 +1563,23 @@ async def get_workspace(project_id: str, request: Request):
         )).fetchall()
         real_agents = [_row_to_dict(r) for r in real_agent_rows]
 
+        assigned_agent_rows = (await session.execute(text(
+            "SELECT "
+            "a.*, "
+            "p.id AS position_id, "
+            "p.name AS position_name, "
+            "p.role AS position_role, "
+            "p.designation AS position_designation, "
+            "p.reports_to AS position_reports_to, "
+            "p.role_description AS position_role_description "
+            "FROM project_agent_positions p "
+            "JOIN project_agent_assignments pa ON pa.position_id = p.id "
+            "JOIN agents a ON a.id = pa.agent_id "
+            "WHERE p.project_id = :id "
+            "ORDER BY p.reports_to NULLS FIRST, p.role, p.name"
+        ), {"id": target_id})).fetchall()
+        assigned_reusable_agents = [_row_to_dict(r) for r in assigned_agent_rows]
+
         artifacts_rows = (await session.execute(
             text("SELECT * FROM artifacts WHERE projectId = :id"), {"id": target_id}
         )).fetchall()
@@ -1599,8 +1623,9 @@ async def get_workspace(project_id: str, request: Request):
     progress = _compute_progress(nodes, work_rows, project)
     current_phase = project.get("status") or ""
     pending_approvals = len([q for q in queue_items if (q.get("status") or "").lower() == "pending"])
+    workspace_agents = real_agents + assigned_reusable_agents
     active_workers = len([
-        a for a in real_agents
+        a for a in workspace_agents
         if (a.get("status") or "").lower() in {"active", "running", "executing"}
     ])
 
@@ -1630,7 +1655,7 @@ async def get_workspace(project_id: str, request: Request):
     ]
 
     documents = [_artifact_to_workspace_doc(a) for a in artifacts_list]
-    timeline = _workspace_timeline(project, reqs, meetings, real_agents)
+    timeline = _workspace_timeline(project, reqs, meetings, workspace_agents)
 
     return {
         "project": project,
@@ -1643,19 +1668,24 @@ async def get_workspace(project_id: str, request: Request):
         "kpis": kpis,
         "workers": [
             {
-                "id": a["id"],
-                "name": a["name"],
+                "id": a.get("position_id") or a["id"],
+                "agentId": a["id"],
+                "positionId": a.get("position_id"),
+                "name": a.get("position_name") or a["name"],
+                "agentName": a["name"],
+                "role": a.get("position_role") or a.get("role"),
+                "designation": a.get("position_designation") or a.get("designation"),
                 "status": a["status"],
-                "purpose": a.get("role_description", ""),
+                "purpose": a.get("position_role_description") or a.get("role_description", ""),
                 "config": {
-                    "manager": a.get("reports_to"),
+                    "manager": a.get("position_reports_to") or a.get("reports_to"),
                     "skills": a.get("skills") or [],
                     "knowledge": [d["name"] for d in documents],
                     "connectors": reqs.get("connectors") or [],
                     "tools": (a.get("tool_policy") or {}).get("allowed_tools", []) if isinstance(a.get("tool_policy"), dict) else [],
                 },
             }
-            for a in real_agents
+            for a in workspace_agents
         ],
         "documents": documents,
         "artifacts": documents,
