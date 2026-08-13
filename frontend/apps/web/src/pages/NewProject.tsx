@@ -596,17 +596,21 @@ export const NewProject: React.FC = () => {
 
   // ── 5. Create project → uses the already-generated requirements ─────────
 
-  const waitForWorkspaceReady = async (projectId: string) => {
+  const waitForWorkspaceReady = async (projectId: string): Promise<'ready' | 'team_failed' | 'timeout'> => {
     for (let attempt = 0; attempt < 10; attempt += 1) {
       const [team, workspace] = await Promise.all([
         ApiClient.get(`/discovery/projects/${projectId}/team`).catch(() => null),
         ApiClient.get(`/projects/${projectId}/workspace`).catch(() => null),
       ]);
-      const teamReady = team?.team_status === 'ready' && Array.isArray(team?.agents) && team.agents.length > 0;
+      const positionsReady = Array.isArray(team?.positions) && team.positions.length > 0;
+      const assignedAgentsReady = Array.isArray(team?.agents) && team.agents.length > 0;
+      const teamReady = team?.team_status === 'ready' && (positionsReady || assignedAgentsReady);
       const docsReady = Array.isArray(workspace?.documents) && workspace.documents.length > 0;
-      if (teamReady && docsReady) return;
+      if (teamReady && docsReady) return 'ready';
+      if (team?.team_status === 'failed') return 'team_failed';
       await new Promise((resolve) => setTimeout(resolve, 1500));
     }
+    return 'timeout';
   };
 
   const handleCreateProject = async () => {
@@ -649,7 +653,12 @@ export const NewProject: React.FC = () => {
           // workspace polls team-status and swaps in the org chart when ready.
           await ApiClient.post(`/discovery/${sessionId}/link-project`, { project_id: data.id });
           message.loading({ key: 'create-project', content: 'Creating workers and knowledge documents...', duration: 0 });
-          await waitForWorkspaceReady(data.id);
+          const readyState = await waitForWorkspaceReady(data.id);
+          if (readyState === 'team_failed') {
+            message.warning({ key: 'create-project', content: 'Workspace created. Team generation failed; regenerate it from the workspace.', duration: 3 });
+          } else if (readyState === 'timeout') {
+            message.info({ key: 'create-project', content: 'Workspace created. Team setup is still finishing in the background.', duration: 3 });
+          }
         } catch (linkErr) {
           // Non-critical — project is already created
           console.error('[NewProject] Could not link discovery session to project', linkErr);
@@ -657,7 +666,7 @@ export const NewProject: React.FC = () => {
         }
       }
 
-      message.success({ key: 'create-project', content: 'Workspace ready', duration: 1 });
+      message.success({ key: 'create-project', content: 'Opening workspace', duration: 1 });
       navigate(`/projects/${data.id}/workspace`);
     } catch (err: any) {
       console.error('[NewProject] create project failed:', err);

@@ -15,6 +15,7 @@ from ecms.persistence.models import project  # noqa: F401  (registers project mo
 from ecms.persistence.models import session  # noqa: F401  (registers session models)
 from ecms.persistence.models import session_context  # noqa: F401  (registers session context KV)
 from ecms.persistence.models import agent  # noqa: F401  (registers agent models)
+from ecms.persistence.models import project_agent_position  # noqa: F401  (registers project staffing models)
 from ecms.persistence.models import organization_member  # noqa: F401  (registers org member models)
 from ecms.persistence.models import governance_assignment  # noqa: F401  (registers governance models)
 from ecms.persistence.models import task  # noqa: F401  (registers task/dependency/CTR models)

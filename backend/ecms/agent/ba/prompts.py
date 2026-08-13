@@ -392,24 +392,40 @@ def build_finalize_prompt(source_text: str, conversation: list[dict]) -> str:
     convo = "\n\n".join(
         f"{m.get('role', '?').upper()}: {m.get('content', '')}" for m in conversation
     )
-    golden = json.dumps(GOLDEN_FINALIZED, indent=2, ensure_ascii=False)
+    if len(convo) > 12000:
+        convo = convo[-12000:]
+    golden_shape = {
+        "projectName": GOLDEN_FINALIZED["projectName"],
+        "objective": GOLDEN_FINALIZED["objective"],
+        "functionalReqs": GOLDEN_FINALIZED["functionalReqs"][:3],
+        "techStack": GOLDEN_FINALIZED["techStack"],
+        "skills": GOLDEN_FINALIZED["skills"][:3],
+        "connectors": GOLDEN_FINALIZED["connectors"][:2],
+        "governance": GOLDEN_FINALIZED["governance"][:2],
+        "guardrails": GOLDEN_FINALIZED["guardrails"][:2],
+        "infrastructure": GOLDEN_FINALIZED["infrastructure"][:2],
+        "risks": GOLDEN_FINALIZED["risks"][:2],
+        "phases": GOLDEN_FINALIZED["phases"][:2],
+    }
+    golden = json.dumps(golden_shape, indent=2, ensure_ascii=False)
     gov = ", ".join(GOVERNANCE_LABELS)
     guard = ", ".join(GUARDRAIL_LABELS)
     infra = ", ".join(INFRASTRUCTURE_LABELS)
     return (
         "Produce the FINALIZED REQUIREMENTS object for this project.\n\n"
         "ORIGINAL INPUT:\n"
-        f"\"\"\"\n{source_text.strip()}\n\"\"\"\n\n"
+        f"\"\"\"\n{source_text.strip()[:6000]}\n\"\"\"\n\n"
         "FULL DISCOVERY CONVERSATION (includes the client's answers to your "
         "clarifying questions — treat these as authoritative):\n"
         f"\"\"\"\n{convo}\n\"\"\"\n\n"
         "Call the emit_requirements function with the complete object.\n\n"
         "HARD RULES on the three detail sections:\n"
-        f"- governance MUST have exactly these labels, in order: {gov}\n"
-        f"- guardrails MUST have exactly these labels, in order: {guard}\n"
-        f"- infrastructure MUST have exactly these labels, in order: {infra}\n"
-        "For each label write a specific `detail` grounded in the client's stack "
-        "and constraints. Do NOT rename, add, or drop any label.\n\n"
+        f"- governance: pick 3 to 7 MOST RELEVANT labels from this catalog: {gov}\n"
+        f"- guardrails: pick 3 to 7 MOST RELEVANT labels from this catalog: {guard}\n"
+        f"- infrastructure: pick 3 to 7 MOST RELEVANT labels from this catalog: {infra}\n"
+        "Only use labels from the catalog above — do NOT invent new labels. "
+        "Omit labels that are not relevant to THIS project; include only the ones that matter. "
+        "For each chosen label write a specific `detail` grounded in the client's stack and constraints.\n\n"
         "HARD RULES on phases:\n"
         "- `phases` must be an ordered dependency chain, not a generic list.\n"
         "- `phases[0].name` must be exactly \"Discovery & Requirements Baseline\".\n"
@@ -435,10 +451,7 @@ def build_finalize_prompt(source_text: str, conversation: list[dict]) -> str:
         "'weekly', 'biweekly', 'monthly'. Choose based on the phase's complexity "
         "and urgency (e.g., 'daily' for a 2-day cutover, 'weekly' for a 4-week "
         "development phase, 'biweekly' for a long hypercare).\n\n"
-        "The following is a GOLDEN REFERENCE (a DIFFERENT, approved project). "
-        "Match its structure, depth of detail, and tone exactly — but the "
-        "content must describe THIS client's project, never the reference "
-        "project:\n\n"
+        "GOLDEN SHAPE (field names + exemplar rows — match this structure, not content):\n"
         f"{golden}\n"
     )
 
@@ -505,61 +518,41 @@ FINALIZE_TOOL = {
 # ── Team design (stage 4) ────────────────────────────────────────────────────
 
 def build_team_prompt(requirements: dict, conversation: list[dict], org_roster: list[dict] | None = None) -> str:
-    """Stage 4 — design the per-project agent org chart (structured output)."""
+    """Stage 4 — design the per-project required agent-position org chart."""
     convo = "\n\n".join(
         f"{m.get('role', '?').upper()}: {m.get('content', '')}" for m in conversation
     )
     reqs = json.dumps(requirements, indent=2, ensure_ascii=False)
     golden = json.dumps(GOLDEN_TEAM, indent=2, ensure_ascii=False)
 
-    org_section = ""
-    if org_roster:
-        roster_lines = []
-        for m in org_roster:
-            skills = ", ".join(m.get("skills") or [])
-            roster_lines.append(
-                f"  - id: {m['id']}, name: {m['name']}, role: {m.get('role','')}, "
-                f"department: {m.get('department','')}, skills: [{skills}]"
-            )
-        org_section = (
-            "\n\nPERMANENT AEGISOS ORGANIZATION ROSTER (these are the real human-in-the-loop "
-            "overseers of the AegisOS platform — map your project agents to them):\n"
-            f"{chr(10).join(roster_lines)}\n\n"
-            "For EACH project agent you design, also produce an org_mapping entry that "
-            "links it to the most appropriate permanent org member. Choose the org member "
-            "whose department, role, and skills best match the project agent's discipline. "
-            "Set responsibility to 'primary_owner' for every mapping.\n"
-            "Every project agent MUST have exactly one org_mapping entry.\n"
-        )
-
     return (
-        "Design the AGENT DELIVERY TEAM that will execute this project — a real "
-        "software-services company org chart, staffed with AI agents only (no "
-        "humans).\n\n"
+        "Design the REQUIRED AGENT POSITIONS for this project — a real "
+        "software-services company org chart of AI-agent roles only (no humans). "
+        "These are positions the workspace must staff from the permanent reusable "
+        "agent workforce; do not assume each position is already hired.\n\n"
         "FINALIZED REQUIREMENTS:\n"
         f"\"\"\"\n{reqs}\n\"\"\"\n\n"
         "DISCOVERY CONVERSATION (context for scoping the team):\n"
         f"\"\"\"\n{convo}\n\"\"\"\n"
-        f"{org_section}\n"
-        "Call the emit_team function with a FLAT list of agents AND updated "
-        "phase dates. Express the hierarchy with `reports_to`, which must "
-        "reference another agent's `key`.\n\n"
+        "Call the emit_team function with a FLAT list of required positions AND "
+        "updated phase dates. Express the hierarchy with `reports_to`, which "
+        "must reference another position's `key`.\n\n"
         "HARD RULES:\n"
         "- Exactly ONE root: the top delivery/engagement leader with "
         "reports_to = null. Every other agent must report to someone.\n"
         "- reports_to must reference a real agent `key`; no cycles.\n"
-        "- Pick each agent's `model` and `tools` ONLY from the catalogs given in "
-        "the schema (so every agent is actually instantiable).\n"
-        "- Give any agent that manages others the delegation tool `assign_task`; "
+        "- Pick each position's `model` and `tools` ONLY from the catalogs given "
+        "in the schema (so the assigned agent is actually instantiable).\n"
+        "- Give any position that manages others the delegation tool `assign_task`; "
         "give each individual contributor the tools its actual work needs "
         "(nothing more).\n"
-        "- Every agent MUST have a non-empty `skills` array (at least 2-3 concrete "
-        "skills relevant to the agent's role and the project's tech stack). "
+        "- Every position MUST have a non-empty `skills` array (at least 2-3 concrete "
+        "skills relevant to the position's role and the project's tech stack). "
         "Derive skills from the finalized requirements' skill and tech requirements.\n\n"
         "- After designing the team, REVISE each phase's startDate, endDate, and "
         "meetingFrequency based on:\n"
-        "  * How many agents you assigned to work on that phase\n"
-        "  * What those agents' skills and tools are (do they match the phase needs?)\n"
+        "  * How many positions you require for that phase\n"
+        "  * What those positions' skills and tools are (do they match the phase needs?)\n"
         "  * Whether work within the phase can be parallelized across agents or "
         "must be sequential\n"
         "  * The complexity and risk of the phase\n"
@@ -604,7 +597,7 @@ def build_team_tool(model_ids: list[str], tool_names: list[str]) -> dict:
         "type": "function",
         "function": {
             "name": "emit_team",
-            "description": "Emit the complete agent delivery team as a flat list; hierarchy via reports_to.",
+            "description": "Emit the complete required project agent-position tree as a flat list; hierarchy via reports_to.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -647,7 +640,7 @@ def build_team_tool(model_ids: list[str], tool_names: list[str]) -> dict:
                     },
                     "org_mappings": {
                         "type": "array",
-                        "description": "Maps each project agent to the permanent AegisOS org member who oversees it. Every project agent must have exactly one entry.",
+                        "description": "Legacy field. Leave empty unless an org roster is explicitly provided.",
                         "items": {
                             "type": "object",
                             "properties": {
@@ -659,7 +652,7 @@ def build_team_tool(model_ids: list[str], tool_names: list[str]) -> dict:
                         },
                     },
                 },
-                "required": ["agents", "revised_phases", "org_mappings"],
+                "required": ["agents", "revised_phases"],
             },
         },
     }

@@ -86,20 +86,56 @@ class FinalizedRequirements(BaseModel):
     @field_validator("governance")
     @classmethod
     def _check_governance(cls, v: list[DetailItem]) -> list[DetailItem]:
-        _require_labels(v, GOVERNANCE_LABELS, "governance")
+        v = _normalize_labels(v)
+        _check_flexible(v, GOVERNANCE_LABELS, "governance")
         return _reorder(v, GOVERNANCE_LABELS)
 
     @field_validator("guardrails")
     @classmethod
     def _check_guardrails(cls, v: list[DetailItem]) -> list[DetailItem]:
-        _require_labels(v, GUARDRAIL_LABELS, "guardrails")
+        v = _normalize_labels(v)
+        _check_flexible(v, GUARDRAIL_LABELS, "guardrails")
         return _reorder(v, GUARDRAIL_LABELS)
 
     @field_validator("infrastructure")
     @classmethod
     def _check_infrastructure(cls, v: list[DetailItem]) -> list[DetailItem]:
-        _require_labels(v, INFRASTRUCTURE_LABELS, "infrastructure")
+        v = _normalize_labels(v)
+        _check_flexible(v, INFRASTRUCTURE_LABELS, "infrastructure")
         return _reorder(v, INFRASTRUCTURE_LABELS)
+
+    @field_validator("phases", mode="before")
+    @classmethod
+    def _coerce_phases(cls, v):
+        if not isinstance(v, list) or not v:
+            return v
+        first = v[0] if isinstance(v[0], dict) else {"name": getattr(v[0], "name", ""), "description": getattr(v[0], "description", "")}
+        name = (first.get("name") or "").strip() if isinstance(first, dict) else str(first.get("name", "")).strip()
+        if name.lower() not in ("discovery & requirements baseline", "discovery & requirements baseline ", "discovery and requirements baseline"):
+            if isinstance(v[0], dict):
+                v[0]["name"] = "Discovery & Requirements Baseline"
+            else:
+                try:
+                    v[0].name = "Discovery & Requirements Baseline"
+                except Exception:
+                    pass
+        if isinstance(v[0], dict) and not (v[0].get("description") or "").strip():
+            v[0]["description"] = "Baseline of discovery so far and prerequisites for execution."
+        for idx in range(1, len(v)):
+            item = v[idx]
+            desc = (item.get("description") or "") if isinstance(item, dict) else getattr(item, "description", "")
+            prev_name = (v[idx - 1].get("name") or "") if isinstance(v[idx - 1], dict) else getattr(v[idx - 1], "name", "")
+            prefix = f"Depends on {prev_name.strip()}:"
+            if not desc.strip().startswith(prefix):
+                fixed = f"{prefix} {desc.strip()}" if desc.strip() else prefix
+                if isinstance(item, dict):
+                    item["description"] = fixed
+                else:
+                    try:
+                        item.description = fixed
+                    except Exception:
+                        pass
+        return v
 
     @field_validator("phases")
     @classmethod
@@ -111,15 +147,6 @@ class FinalizedRequirements(BaseModel):
             raise ValueError('phases[0].name must be "Discovery & Requirements Baseline"')
         if not first.description.strip():
             raise ValueError("phases[0].description must capture the discovery baseline and prerequisites")
-
-        previous_name = first.name.strip()
-        for idx, phase in enumerate(v[1:], start=1):
-            expected_prefix = f"Depends on {previous_name}:"
-            if not phase.description.strip().startswith(expected_prefix):
-                raise ValueError(
-                    f"phases[{idx}].description must start with {expected_prefix!r}"
-                )
-            previous_name = phase.name.strip()
         return v
 
     def to_frontend(self) -> dict:
@@ -141,6 +168,15 @@ class FinalizedRequirements(BaseModel):
 
 # ── Validation helpers ────────────────────────────────────────────────────
 
+def _normalize_labels(items: list[DetailItem]) -> list[DetailItem]:
+    norm_map = {lbl.lower().strip(): lbl for lbl in GOVERNANCE_LABELS + GUARDRAIL_LABELS + INFRASTRUCTURE_LABELS}
+    for it in items:
+        key = it.label.strip().lower()
+        if key in norm_map:
+            it.label = norm_map[key]
+    return items
+
+
 def _require_labels(items: list[DetailItem], expected: tuple[str, ...], section: str) -> None:
     got = {i.label for i in items}
     missing = [lbl for lbl in expected if lbl not in got]
@@ -148,7 +184,22 @@ def _require_labels(items: list[DetailItem], expected: tuple[str, ...], section:
         raise ValueError(f"{section} missing required labels: {missing}")
 
 
+def _check_flexible(items: list[DetailItem], allowed: tuple[str, ...], section: str) -> None:
+    """Flexible count (3-7), fixed catalog — not 5/6/6."""
+    allowed_set = set(allowed)
+    for it in items:
+        if it.label not in allowed_set:
+            raise ValueError(f"{section} label {it.label!r} not in allowed catalog {allowed}")
+    labels = [it.label for it in items]
+    if len(labels) != len(set(labels)):
+        raise ValueError(f"{section} has duplicate labels: {labels}")
+    if len(items) < 3:
+        raise ValueError(f"{section} needs at least 3 items, got {len(items)}")
+    if len(items) > 7:
+        raise ValueError(f"{section} needs at most 7 items, got {len(items)}")
+
+
 def _reorder(items: list[DetailItem], order: tuple[str, ...]) -> list[DetailItem]:
     """Return items in the fixed taxonomy order, dropping any extras."""
     by_label = {i.label: i for i in items}
-    return [by_label[lbl] for lbl in order]
+    return [by_label[lbl] for lbl in order if lbl in by_label]

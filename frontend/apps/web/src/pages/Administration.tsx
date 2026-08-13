@@ -8,6 +8,7 @@ import { ApiClient } from '../api/client';
 import { KnowledgeGraph } from '../components/KnowledgeGraph';
 import { CollaborationPanel } from '../components/CollaborationPanel';
 import { OrganizationPanel } from '../components/OrganizationPanel';
+import { AvailableAgentsPanel } from '../components/AvailableAgentsPanel';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -108,6 +109,76 @@ export function Administration() {
   const [editingAgent, setEditingAgent] = useState<any>(null);
   const [agentForm, setAgentForm] = useState<Record<string, any>>({});
   const [loadingAgents, setLoadingAgents] = useState(false);
+
+  // Available Agents state
+  const [availableAgents, setAvailableAgents] = useState<any[]>([]);
+  const [selectedAvailableAgent, setSelectedAvailableAgent] = useState<any>(null);
+  const [showHireForm, setShowHireForm] = useState(false);
+  const [hireForm, setHireForm] = useState<Record<string, any>>({});
+  const [editingAvailableAgent, setEditingAvailableAgent] = useState<any>(null);
+  const [loadingAvailable, setLoadingAvailable] = useState(false);
+
+  const fetchAvailableAgents = async () => {
+    setLoadingAvailable(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch('/agents/available', { headers });
+      const data = await res.json();
+      setAvailableAgents(Array.isArray(data) ? data : []);
+    } catch {
+      setAvailableAgents([]);
+    } finally {
+      setLoadingAvailable(false);
+    }
+  };
+
+  useEffect(() => { fetchAvailableAgents(); }, []);
+
+  const handleHireAgent = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const body = {
+        name: hireForm.name, role: hireForm.role || 'mid_dev', department: hireForm.department || 'backend',
+        reports_to: hireForm.reports_to || null, designation: hireForm.designation || '',
+        role_description: hireForm.role_description || '',
+        skills: hireForm.skills ? hireForm.skills.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
+        status: 'active',
+      };
+      const payload = editingAvailableAgent ? body : { id: `agent-${Date.now()}`, ...body };
+      const res = await fetch(editingAvailableAgent ? `/agents/${editingAvailableAgent.id}` : '/agents', {
+        method: editingAvailableAgent ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error((await res.json()).detail || 'Failed');
+      message.success(editingAvailableAgent ? `Agent "${hireForm.name}" updated` : `Agent "${hireForm.name}" hired and added to the reusable workforce`);
+      setShowHireForm(false);
+      setEditingAvailableAgent(null);
+      setHireForm({});
+      fetchAvailableAgents();
+    } catch (err: any) { message.error(err?.message || 'Failed to hire agent'); }
+  };
+
+  const openHireForm = () => {
+    setEditingAvailableAgent(null);
+    setHireForm({ name: '', role: 'mid_dev', department: 'backend', reports_to: '', designation: '', role_description: '', skills: '' });
+    setShowHireForm(true);
+  };
+
+  const openEditAvailableAgentForm = (agent: any) => {
+    setEditingAvailableAgent(agent);
+    setHireForm({
+      name: agent.name,
+      role: agent.role,
+      department: agent.department,
+      reports_to: agent.reports_to || '',
+      designation: agent.designation || '',
+      role_description: agent.role_description || '',
+      skills: (agent.skills || []).join(', '),
+    });
+    setShowHireForm(true);
+  };
 
   const fetchAgents = async () => {
     setLoadingAgents(true);
@@ -418,6 +489,98 @@ export function Administration() {
                   onCreate={openCreateForm}
                   onEdit={openEditForm}
                   onDelete={handleDeleteAgent}
+                />
+              </div>
+            )
+          },
+          {
+            key: 'available-agents',
+            label: 'Available Agents',
+            children: (
+              <div>
+                <Modal
+                  title={editingAvailableAgent ? `Edit ${editingAvailableAgent.name}` : 'Hire Certified Agent'}
+                  open={showHireForm}
+                  onCancel={() => { setShowHireForm(false); setEditingAvailableAgent(null); setHireForm({}); }}
+                  onOk={handleHireAgent}
+                  okText={editingAvailableAgent ? 'Update Agent' : 'Hire Agent'}
+                  width={600}
+                >
+                  <Form layout="vertical">
+                    <Row gutter={16}>
+                      <Col span={12}>
+                        <Form.Item label="Name" required>
+                          <Input value={hireForm.name} onChange={(e) => setHireForm({ ...hireForm, name: e.target.value })} placeholder="e.g. Data Migration Specialist" />
+                        </Form.Item>
+                      </Col>
+                      <Col span={12}>
+                        <Form.Item label="Designation" required>
+                          <Input value={hireForm.designation || ''} onChange={(e) => setHireForm({ ...hireForm, designation: e.target.value })} placeholder="e.g. Senior Data Engineer" />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Row gutter={16}>
+                      <Col span={12}>
+                        <Form.Item label="Role" required>
+                          <Select value={hireForm.role} onChange={(v) => setHireForm({ ...hireForm, role: v })}>
+                            {roleOptions.map((r) => <Option key={r} value={r}>{r.replace(/_/g, ' ')}</Option>)}
+                          </Select>
+                        </Form.Item>
+                      </Col>
+                      <Col span={12}>
+                        <Form.Item label="Department" required>
+                          <Select value={hireForm.department} onChange={(v) => setHireForm({ ...hireForm, department: v })}>
+                            {deptOptions.map((d) => <Option key={d} value={d}>{d}</Option>)}
+                          </Select>
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Form.Item label="Reports To">
+                      <Select
+                        value={hireForm.reports_to || undefined}
+                        onChange={(v) => setHireForm({ ...hireForm, reports_to: v })}
+                        allowClear
+                        showSearch
+                        optionFilterProp="label"
+                        placeholder="Select a manager from agent workforce..."
+                      >
+                        {availableAgents.map((a) => (
+                          <Option key={a.id} value={a.id} label={a.name}>
+                            {a.name} <Tag style={{ fontSize: 10 }}>{a.designation || a.role?.replace(/_/g, ' ')}</Tag>
+                          </Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                    <Form.Item label="Role Description">
+                      <Input.TextArea value={hireForm.role_description || ''} onChange={(e) => setHireForm({ ...hireForm, role_description: e.target.value })} rows={3} placeholder="What does this agent do?" />
+                    </Form.Item>
+                    <Form.Item label="Skills (comma-separated)">
+                      <Input value={hireForm.skills || ''} onChange={(e) => setHireForm({ ...hireForm, skills: e.target.value })} placeholder="Python, SQL, Docker" />
+                    </Form.Item>
+                  </Form>
+                </Modal>
+                <AvailableAgentsPanel
+                  agents={availableAgents}
+                  selectedAgent={selectedAvailableAgent}
+                  loading={loadingAvailable}
+                  onSelect={setSelectedAvailableAgent}
+                  onCreate={openHireForm}
+                  onEdit={openEditAvailableAgentForm}
+                  onDelete={(agent) => {
+                    Modal.confirm({
+                      title: 'Delete agent',
+                      content: `Remove "${agent.name}" from the available agent pool?`,
+                      okText: 'Delete',
+                      okType: 'danger',
+                      onOk: async () => {
+                        const token = localStorage.getItem('auth_token');
+                        await fetch(`/agents/${agent.id}`, { method: 'DELETE', headers: token ? { Authorization: `Bearer ${token}` } : {} });
+                        message.success('Agent removed');
+                        setSelectedAvailableAgent(null);
+                        fetchAvailableAgents();
+                      },
+                    });
+                  }}
                 />
               </div>
             )

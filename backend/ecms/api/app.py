@@ -148,6 +148,7 @@ def create_app(sdk: EcmsSDK | None = None) -> FastAPI:
         # Memory bridge: continuous sync every 2 minutes (lightweight — 5 nodes max)
         import asyncio as _asyncio
         loop.create_task(_run_bridge_worker())
+        loop.create_task(_reset_stuck_team_statuses())
 
     return app
 
@@ -167,3 +168,34 @@ async def _run_bridge_worker() -> None:
         except Exception as e:
             logger.warning("Bridge sync failed: %s", e)
         await _asyncio.sleep(120)  # every 2 minutes
+
+
+async def _reset_stuck_team_statuses() -> None:
+    """Reset team_status='generating' to 'failed' on startup so the workspace
+    can offer a Regenerate button instead of being stuck forever.
+
+    This is the safety net for background `_run_team_design` tasks that died
+    with the container — the only state they leave behind is `generating`.
+    """
+    import asyncio as _asyncio, logging
+    logger = logging.getLogger("ecms.startup")
+    await _asyncio.sleep(5)  # let migrations finish
+    try:
+        from ecms.persistence.database.rest_session import db_session
+        from sqlalchemy import text
+        async with db_session() as session:
+            result = await session.execute(text(
+                "UPDATE business_projects SET team_status='failed', updatedat=NOW() "
+                "WHERE team_status = 'generating'"
+            ))
+            count = result.rowcount or 0
+            if count:
+                logger.warning(
+                    "[startup] reset %d stuck 'generating' projects to 'failed' "
+                    "(background team_design tasks were lost to container restart)",
+                    count,
+                )
+            else:
+                logger.info("[startup] no stuck 'generating' projects found")
+    except Exception as exc:
+        logger.warning("[startup] could not reset stuck team statuses: %s", exc)

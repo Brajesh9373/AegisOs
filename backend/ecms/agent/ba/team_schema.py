@@ -1,13 +1,13 @@
 """BA team-design — output schema and structural (grammar) validators.
 
-After finalize, the BA designs a professional software-services delivery org for
-the project: an agents-only company hierarchy. The team is emitted as a FLAT list;
-the tree is expressed via `reports_to` referencing each agent's stable `key`.
+After finalize, the BA designs the professional software-services positions
+required for the project. The team is emitted as a FLAT list; the tree is
+expressed via `reports_to` referencing each position's stable `key`.
 
 Design freedom is deliberate. The BA decides the ROLES, TITLES, DEPARTMENTS, and
 the DEPTH/BREADTH of the org entirely from the project's needs — nothing about the
 vocabulary is fixed. The validators enforce only what must hold for the result to
-persist to the `agents` table and render as a tree:
+persist as project agent positions and render as a tree:
 
   - at least one agent, unique keys;
   - exactly one root (reports_to is None);
@@ -61,7 +61,7 @@ class PhaseUpdate(BaseModel):
 
 
 class OrgMapping(BaseModel):
-    """Maps a project agent to a permanent AegisOS organization member."""
+    """Legacy mapping of a project position to a permanent organization member."""
 
     project_agent_key: str = Field(..., description="The key of the project agent (references a TeamAgent.key).")
     org_member_id: str = Field(..., description="The id of the permanent org member who oversees this agent.")
@@ -69,7 +69,7 @@ class OrgMapping(BaseModel):
 
 
 class AgentTeam(BaseModel):
-    """The complete per-project agent org chart (flat; tree via reports_to)."""
+    """The complete per-project required-position org chart (flat; tree via reports_to)."""
 
     agents: list[TeamAgent] = Field(default_factory=list)
     revised_phases: list[PhaseUpdate] = Field(default_factory=list)
@@ -165,12 +165,7 @@ class AgentTeam(BaseModel):
                     raise ValueError(f"agent '{a.key}' uses unknown tools: {bad}")
 
     def _check_org_mapping_coverage(self, allowed_org_member_ids: tuple[str, ...]) -> None:
-        """Require every agent to be governed by at least one real org member.
-
-        The check is activated when the caller supplies the active organization
-        roster. This keeps structural unit tests independent of persistence while
-        making production team design reject incomplete or hallucinated mappings.
-        """
+        """Validate legacy org mappings only when a roster is supplied."""
         if not allowed_org_member_ids:
             return
 
@@ -199,7 +194,7 @@ class AgentTeam(BaseModel):
         return any(a.reports_to == key for a in self.agents)
 
     def to_rows(self, project_id: str) -> list[dict]:
-        """Map to `agents` table rows for a project.
+        """Map to project-position rows for a project.
 
         Keys are namespaced by project to keep ids unique and scoped, and
         reports_to keys are resolved to the same namespaced ids.

@@ -62,6 +62,19 @@ def test_requires_employee_assignment_for_every_agent() -> None:
         )
 
 
+def test_employee_assignment_not_required_without_org_roster() -> None:
+    payload = _payload()
+    payload["org_mappings"] = []
+
+    team = AgentTeam.validate_payload(
+        payload,
+        allowed_models=("gpt-4o",),
+        allowed_tools=("Jira", "GitHub"),
+    )
+
+    assert team.org_mappings == []
+
+
 def test_rejects_unknown_or_inactive_employee_assignment() -> None:
     payload = _payload()
     payload["org_mappings"][1]["org_member_id"] = "inactive-employee"
