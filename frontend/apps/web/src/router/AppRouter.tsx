@@ -27,6 +27,9 @@ import { RFQBuilder } from '../pages/RFQBuilder';
 import { BudgetEstimation } from '../pages/BudgetEstimation';
 import { Proposal } from '../pages/Proposal';
 import { ProjectInitialization } from '../pages/ProjectInitialization';
+import Landing from '../pages/public/website/Landing';
+import BusinessAnalyst from '../pages/public/website/BusinessAnalyst';
+import { Signup } from '../pages/Signup';
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode, requiredRole?: string }) {
   const [auth, setAuth] = useState<{ allowed: boolean, loading: boolean }>({ allowed: false, loading: true });
@@ -62,7 +65,10 @@ export function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/landing" element={<Landing />} />
+        <Route path="/business-analyst" element={<BusinessAnalyst />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
         <Route path="/install" element={locked ? <Navigate to="/login" /> : <InstallWizard onComplete={() => setLocked(true)} />} />
         
         <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>

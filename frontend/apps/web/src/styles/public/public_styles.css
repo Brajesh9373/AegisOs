@@ -1,0 +1,111 @@
+/* Base reset and typographic styling for public-facing components */
+.aegis-public-body {
+  font-family: var(--aegis-font);
+  background-color: var(--aegis-bg);
+  color: var(--aegis-navy);
+  line-height: 1.6;
+}
+
+.aegis-container {
+  max-width: var(--aegis-max-width);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.aegis-section {
+  padding: 96px 0;
+}
+
+.aegis-section-dark {
+  background-color: var(--aegis-navy);
+  color: var(--aegis-surface);
+  padding: 96px 0;
+}
+
+/* Typography styles */
+.aegis-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--aegis-cobalt);
+  margin-bottom: 16px;
+  display: inline-block;
+}
+
+.aegis-eyebrow-light {
+  color: #93C5FD;
+}
+
+.aegis-h1 {
+  font-size: clamp(40px, 6vw, 72px);
+  font-weight: 900;
+  color: var(--aegis-navy);
+  letter-spacing: -0.04em;
+  line-height: 1.08;
+  margin-bottom: 28px;
+}
+
+.aegis-h2 {
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 800;
+  color: var(--aegis-navy);
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin-bottom: 20px;
+}
+
+.aegis-h2-light {
+  color: var(--aegis-surface);
+}
+
+.aegis-paragraph {
+  font-size: 17px;
+  color: var(--aegis-slate-muted);
+  line-height: 1.7;
+  max-width: 680px;
+  margin-bottom: 40px;
+}
+
+.aegis-paragraph-light {
+  color: #94A3B8;
+}
+
+/* Card layout components */
+.aegis-card {
+  background: var(--aegis-surface);
+  border: 1px solid var(--aegis-border);
+  border-radius: var(--aegis-radius-lg);
+  padding: 24px;
+  transition: all 0.2s ease-in-out;
+}
+
+.aegis-card:hover {
+  border-color: var(--aegis-cobalt);
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.04);
+}
+
+/* Navigation items hover states */
+.aegis-nav-link {
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--aegis-slate-muted);
+  border-radius: 7px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.15s ease-in-out;
+}
+
+.aegis-nav-link:hover, .aegis-nav-link.active {
+  background-color: var(--aegis-slate-muted) 15;
+  color: var(--aegis-navy);
+}
+
+/* Product Preview Layouts */
+.aegis-mockup-wrapper {
+  border: 1px solid var(--aegis-border);
+  border-radius: var(--aegis-radius-lg);
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(15, 23, 42, 0.08);
+}

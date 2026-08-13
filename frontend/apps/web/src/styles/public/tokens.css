@@ -1,0 +1,15 @@
+/* Public website design tokens */
+:root {
+  --aegis-bg: #FCFBF9; /* Warm premium off-white */
+  --aegis-surface: #FFFFFF;
+  --aegis-surface-muted: #F8FAF6; /* Very light cool surface */
+  --aegis-navy: #0B132B; /* Near-black/deep navy primary text */
+  --aegis-slate-muted: #5C677D; /* Muted secondary text */
+  --aegis-cobalt: #1D4ED8; /* Premium cobalt blue accent */
+  --aegis-cobalt-light: #EFF6FF; /* Very light cobalt tint */
+  --aegis-border: #E2E8F0; /* Subtle border */
+  --aegis-radius-lg: 16px;
+  --aegis-radius-md: 10px;
+  --aegis-font: 'Inter', -apple-system, sans-serif;
+  --aegis-max-width: 1120px;
+}

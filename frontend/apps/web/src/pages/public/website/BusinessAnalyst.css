@@ -1,0 +1,451 @@
+/* Professional Business Analyst UI Stylesheet */
+
+.aegis-public-ba-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: #fcfbf9;
+  color: #242321;
+}
+
+/* Header style */
+.aegis-public-ba-shell .ba-header-nav {
+  height: 56px;
+  border-bottom: 1px solid #e7e5df;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  width: 100%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.aegis-public-ba-shell .ba-header-nav .brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.aegis-public-ba-shell .ba-header-nav .brand-mark {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #69765d;
+  border-radius: 6px;
+  position: relative;
+}
+
+.aegis-public-ba-shell .ba-header-nav .brand-mark:after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #69765d;
+}
+
+.aegis-public-ba-shell .ba-header-nav .brand-text {
+  font-weight: 700;
+  font-size: 15px;
+  color: #191817;
+}
+
+.aegis-public-ba-shell .ba-header-nav .product-badge {
+  font-size: 11px;
+  background: #f4f1ea;
+  color: #575756;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  margin-left: 6px;
+  letter-spacing: 0.02em;
+}
+
+.aegis-public-ba-shell .ba-header-nav .header-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.aegis-public-ba-shell .ba-header-nav .session-context {
+  font-size: 12px;
+  color: #8c8a82;
+  font-weight: 500;
+}
+
+.aegis-public-ba-shell .ba-header-nav .user-profile {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fdfdfd;
+  border: 1px solid #e7e5df;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.aegis-public-ba-shell .ba-header-nav .user-icon {
+  color: #69765d;
+}
+
+.aegis-public-ba-shell .ba-header-nav .user-email {
+  color: #242321;
+  font-weight: 500;
+}
+
+.aegis-public-ba-shell .ba-header-nav .settings-btn {
+  color: #575756;
+  font-weight: 500;
+  font-size: 12px;
+  border-radius: 6px;
+}
+
+.aegis-public-ba-shell .ba-header-nav .settings-btn:hover {
+  background-color: #f4f1ea;
+  color: #242321;
+}
+
+.aegis-public-ba-shell .ba-header-nav .logout-btn {
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+}
+
+/* Three panel workspace container */
+.aegis-public-ba-shell .ba-simulation-container {
+  display: flex;
+  height: calc(100vh - 56px);
+  width: 100%;
+  background: #fdfdfc;
+  overflow: hidden;
+}
+
+/* Side Panels */
+.aegis-public-ba-shell .ba-side-panel {
+  width: 280px;
+  border-right: 1px solid #e7e5df;
+  background: #ffffff;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+.aegis-public-ba-shell .ba-side-panel.right-panel {
+  border-right: none;
+  border-left: 1px solid #e7e5df;
+}
+
+.aegis-public-ba-shell .ba-side-panel .panel-header h3 {
+  font-size: 13px;
+  font-weight: 700;
+  color: #191817;
+  margin: 0;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #f4f1ea;
+  padding-bottom: 8px;
+}
+
+.aegis-public-ba-shell .ba-side-panel .side-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.aegis-public-ba-shell .ba-side-panel .section-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #8c8a82;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.aegis-public-ba-shell .ba-side-panel .value-text {
+  font-size: 13px;
+  color: #242321;
+  line-height: 1.5;
+  background: #faf9f6;
+  border: 1px solid #e7e5df;
+  padding: 10px;
+  border-radius: 6px;
+}
+
+.aegis-public-ba-shell .ba-side-panel .next-step-value {
+  font-weight: 600;
+  color: #69765d;
+  background: #f4f7f2;
+  border-color: #d1dcc8;
+}
+
+.aegis-public-ba-shell .ba-side-panel .list-item {
+  font-size: 13px;
+  color: #575756;
+  margin-top: 6px;
+  padding-left: 4px;
+}
+
+.aegis-public-ba-shell .ba-side-panel .empty-text {
+  font-size: 12px;
+  color: #a3a199;
+  font-style: italic;
+  margin-top: 2px;
+  padding: 8px 10px;
+  border: 1px dashed #e7e5df;
+  border-radius: 6px;
+  background: #fafaf9;
+}
+
+.aegis-public-ba-shell .specialist-tag {
+  margin-top: 4px;
+  font-weight: 500;
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+/* Chat Main Layout */
+.aegis-public-ba-shell .ba-chat-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #faf9f6;
+  overflow: hidden;
+  position: relative;
+}
+
+.aegis-public-ba-shell .chat-log-wrapper {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Onboarding empty state */
+.aegis-public-ba-shell .ba-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  max-width: 680px;
+  margin: auto;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.aegis-public-ba-shell .ba-empty-state .empty-logo {
+  width: 64px;
+  height: 64px;
+  background: #ffffff;
+  border: 1px solid #e7e5df;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+  margin-bottom: 24px;
+}
+
+.aegis-public-ba-shell .ba-empty-state h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #191817;
+  margin: 0 0 8px;
+  letter-spacing: -0.01em;
+}
+
+.aegis-public-ba-shell .ba-empty-state .empty-subtitle {
+  font-size: 14px;
+  color: #575756;
+  margin: 0 0 32px;
+  line-height: 1.6;
+}
+
+.aegis-public-ba-shell .suggestions-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  width: 100%;
+}
+
+@media(min-width: 600px) {
+  .aegis-public-ba-shell .suggestions-grid {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+
+.aegis-public-ba-shell .suggestion-card {
+  background: #ffffff;
+  border: 1px solid #e7e5df;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.aegis-public-ba-shell .suggestion-card:hover {
+  border-color: #69765d;
+  box-shadow: 0 4px 12px rgba(105, 118, 93, 0.06);
+  transform: translateY(-2px);
+}
+
+.aegis-public-ba-shell .suggestion-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #191817;
+  margin-bottom: 6px;
+}
+
+.aegis-public-ba-shell .suggestion-desc {
+  font-size: 12px;
+  color: #8c8a82;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Chat bubble styling */
+.aegis-public-ba-shell .chat-bubble-container {
+  display: flex;
+  width: 100%;
+}
+
+.aegis-public-ba-shell .bubble-user {
+  justify-content: flex-end;
+}
+
+.aegis-public-ba-shell .bubble-ai {
+  justify-content: flex-start;
+}
+
+.aegis-public-ba-shell .chat-bubble {
+  max-width: 75%;
+  background: #ffffff;
+  border: 1px solid #e7e5df;
+  border-radius: 12px;
+  padding: 14px 18px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.aegis-public-ba-shell .bubble-user .chat-bubble {
+  background: #fdfdfd;
+  border-color: #d1dcc8;
+  box-shadow: 0 2px 6px rgba(105, 118, 93, 0.03);
+}
+
+.aegis-public-ba-shell .bubble-sender {
+  font-size: 11px;
+  font-weight: 700;
+  color: #69765d;
+  margin-bottom: 6px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.aegis-public-ba-shell .bubble-user .bubble-sender {
+  color: #55624b;
+}
+
+.aegis-public-ba-shell .bubble-body {
+  font-size: 13.5px;
+  color: #242321;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.aegis-public-ba-shell .byok-inline-card {
+  margin-top: 12px;
+  border-top: 1px solid #e7e5df;
+  padding-top: 12px;
+}
+
+/* Fixed Composer Wrapper */
+.aegis-public-ba-shell .chat-composer-wrapper {
+  background: linear-gradient(180deg, rgba(250, 249, 246, 0) 0%, #faf9f6 50%);
+  padding: 12px 24px 24px;
+}
+
+.aegis-public-ba-shell .chat-input-bar {
+  border: 1px solid #e7e5df;
+  border-radius: 12px;
+  padding: 8px 12px;
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.aegis-public-ba-shell .input-toolbar {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Action button style inside composer */
+.aegis-public-ba-shell .chat-send-btn {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: none;
+  outline: none;
+  background-color: #69765d;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.aegis-public-ba-shell .chat-send-btn:hover {
+  background-color: #55624b;
+}
+
+.aegis-public-ba-shell .chat-send-btn:disabled {
+  background-color: #f4f1ea;
+  color: #c4c2ba;
+  cursor: not-allowed;
+}
+
+.aegis-public-ba-shell .chat-send-btn .anticon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Tablet & Mobile Responsiveness */
+@media(max-width: 1024px) {
+  .aegis-public-ba-shell .ba-side-panel {
+    width: 220px;
+    padding: 16px;
+    gap: 16px;
+  }
+}
+
+@media(max-width: 768px) {
+  .aegis-public-ba-shell .ba-side-panel {
+    display: none;
+  }
+  .aegis-public-ba-shell .ba-header-nav .session-context {
+    display: none;
+  }
+  .aegis-public-ba-shell .ba-header-nav .user-profile {
+    display: none;
+  }
+}
