@@ -30,8 +30,8 @@ export function Login() {
   };
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f0f2f5', padding: '0 16px' }}>
-      <Card style={{ width: '100%', maxWidth: 400, borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f0f2f5' }}>
+      <Card style={{ width: 400, }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <Title level={3} style={{ margin: 0 }}>aegisOS</Title>
           <Text type="secondary">Enterprise AI Operating System</Text>
@@ -41,23 +41,22 @@ export function Login() {
 
         <Form name="login" onFinish={onFinish} layout="vertical" size="large" initialValues={{ remember: true }}>
           <Form.Item name="email" rules={[{ required: true, type: 'email', message: 'Please input a valid email!' }]}>
-            <Input prefix={<UserOutlined style={{ color: '#888' }} />} placeholder="Email" />
+            <Input prefix={<UserOutlined />} placeholder="Email" />
           </Form.Item>
           <Form.Item name="password" rules={[{ required: true, message: 'Please input your Password!' }]}>
-            <Input.Password prefix={<LockOutlined style={{ color: '#888' }} />} placeholder="Password" />
+            <Input.Password prefix={<LockOutlined />} placeholder="Password" />
           </Form.Item>
-          <Form.Item name="remember" valuePropName="checked" style={{ marginBottom: 16 }}>
+          <Form.Item name="remember" valuePropName="checked">
             <Checkbox>Remember me</Checkbox>
           </Form.Item>
-          <Form.Item style={{ marginBottom: 12 }}>
+          <Form.Item>
             <Button type="primary" htmlType="submit" block loading={loading}>
               Sign In
             </Button>
           </Form.Item>
         </Form>
         <div style={{ textAlign: 'center' }}>
-          <Text type="secondary">Don't have an account? </Text>
-          <a href="/signup" onClick={(e) => { e.preventDefault(); navigate('/signup'); }} style={{ fontWeight: 600 }}>Create Account</a>
+          <Text type="secondary">SSO Options (Azure AD, Google, Okta) deferred.</Text>
         </div>
       </Card>
     </div>
