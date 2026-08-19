@@ -1,0 +1,185 @@
+/* V11 — Lenis + scroll-driven AegisOS entry sequence */
+.aegis-intro-v11{
+  --intro-progress:0;
+  position:relative;
+  height:100vh;
+  min-height:680px;
+  z-index:120;
+  background:#f7f9fc;
+  isolation:isolate;
+}
+.aegis-intro-v11__shell{
+  position:relative;
+  width:100%;
+  height:100vh;
+  min-height:680px;
+  overflow:hidden;
+  display:grid;
+  place-items:center;
+  background:#f7f9fc;
+  color:#0c1830;
+  contain:paint;
+  will-change:background-color;
+}
+.aegis-intro-v11__grid{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  opacity:.78;
+  background-image:
+    linear-gradient(rgba(86,113,155,.075) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(86,113,155,.075) 1px,transparent 1px);
+  background-size:48px 48px;
+  -webkit-mask-image:radial-gradient(circle at 50% 48%,#000 0 34%,rgba(0,0,0,.65) 64%,transparent 92%);
+  mask-image:radial-gradient(circle at 50% 48%,#000 0 34%,rgba(0,0,0,.65) 64%,transparent 92%);
+}
+.aegis-intro-v11__grid:after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:
+    radial-gradient(circle at 50% 46%,rgba(49,87,213,.10),transparent 29%),
+    radial-gradient(circle at 72% 38%,rgba(19,145,132,.07),transparent 20%);
+}
+.aegis-intro-v11__bloom{
+  position:absolute;
+  width:min(54vw,760px);
+  aspect-ratio:1;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(49,87,213,.09),rgba(49,87,213,.035) 42%,transparent 70%);
+  filter:blur(2px);
+  opacity:.55;
+  transform:scale(.72);
+  pointer-events:none;
+  will-change:transform,opacity;
+}
+.aegis-intro-v11__word{
+  position:relative;
+  z-index:2;
+  display:flex;
+  align-items:baseline;
+  justify-content:center;
+  font-size:clamp(88px,15.2vw,270px);
+  line-height:.76;
+  letter-spacing:-.072em;
+  font-weight:700;
+  white-space:nowrap;
+  transform:translateZ(0);
+  will-change:transform,opacity,letter-spacing;
+  user-select:none;
+}
+.aegis-intro-v11__word span{font-weight:680;color:#0c1830}
+.aegis-intro-v11__word strong{font:inherit;color:#3157d5;font-weight:680}
+.aegis-intro-v11__eyebrow{
+  position:absolute;
+  z-index:3;
+  top:36px;
+  left:clamp(24px,4vw,72px);
+  right:clamp(24px,4vw,72px);
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  color:#667996;
+  font-size:9px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+}
+.aegis-intro-v11__eyebrow span{display:flex;align-items:center;gap:9px}
+.aegis-intro-v11__eyebrow span i{width:6px;height:6px;border-radius:50%;background:#139184;box-shadow:0 0 0 5px rgba(19,145,132,.08)}
+.aegis-intro-v11__eyebrow b{font-size:8px;font-weight:600;letter-spacing:.12em;color:#8a99ad}
+.aegis-intro-v11__hint{
+  position:absolute;
+  z-index:4;
+  left:50%;
+  bottom:44px;
+  transform:translateX(-50%);
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  color:#526783;
+  text-decoration:none;
+  text-transform:uppercase;
+  letter-spacing:.14em;
+  font-size:8px;
+  font-weight:650;
+}
+.aegis-intro-v11__hint svg{animation:aegisIntroArrow 1.7s cubic-bezier(.45,0,.55,1) infinite}
+.aegis-intro-v11__index{
+  position:absolute;
+  z-index:3;
+  right:clamp(24px,4vw,72px);
+  bottom:44px;
+  display:flex;
+  align-items:center;
+  gap:9px;
+  font-size:7px;
+  letter-spacing:.15em;
+  color:#8797ad;
+}
+.aegis-intro-v11__index i{display:block;width:42px;height:1px;background:#bdc9da}
+.aegis-intro-v11__progress{
+  position:absolute;
+  z-index:5;
+  left:clamp(24px,4vw,72px);
+  right:clamp(24px,4vw,72px);
+  bottom:20px;
+  height:1px;
+  background:#dbe3ed;
+  overflow:hidden;
+}
+.aegis-intro-v11__progress span{
+  display:block;
+  width:100%;
+  height:100%;
+  background:linear-gradient(90deg,#3157d5,#139184);
+  transform:scaleX(0);
+  transform-origin:left center;
+  will-change:transform;
+}
+@keyframes aegisIntroArrow{0%,100%{transform:translateY(0);opacity:.65}50%{transform:translateY(5px);opacity:1}}
+
+/* Hero begins as the destination of the zoom sequence. */
+#main-hero{scroll-margin-top:0}
+.aegis-intro-v11 + #main-hero{position:relative;z-index:2}
+
+/* Lenis should own smoothing; never layer CSS smooth-scroll on top. */
+html.lenis,html.lenis body{height:auto}
+.lenis.lenis-smooth{scroll-behavior:auto!important}
+.lenis.lenis-smooth [data-lenis-prevent]{overscroll-behavior:contain}
+.lenis.lenis-stopped{overflow:hidden}
+.lenis.lenis-smooth iframe{pointer-events:none}
+
+@media(max-width:760px){
+  .aegis-intro-v11,.aegis-intro-v11__shell{min-height:580px}
+  .aegis-intro-v11__word{font-size:clamp(72px,23vw,126px);letter-spacing:-.08em}
+  .aegis-intro-v11__eyebrow{top:24px;left:18px;right:18px}
+  .aegis-intro-v11__eyebrow b{display:none}
+  .aegis-intro-v11__hint{left:18px;bottom:38px;transform:none}
+  .aegis-intro-v11__index{right:18px;bottom:38px}
+  .aegis-intro-v11__progress{left:18px;right:18px;bottom:18px}
+  .aegis-intro-v11__grid{background-size:34px 34px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .aegis-intro-v11{height:100vh}
+  .aegis-intro-v11__word{transform:none!important;opacity:1!important}
+  .aegis-intro-v11__hint svg{animation:none}
+  .aegis-intro-v11__progress span{transform:scaleX(1)!important}
+}
+
+/* Prevent a one-frame header/progress flash before the homepage intro hydrates. */
+body:has(.aegis-intro-v11) .v3-header,
+body:has(.aegis-intro-v11) .v4-scroll-progress{
+  opacity:0;
+  visibility:hidden;
+}
+body:has(.aegis-intro-v11) .v3-header{transform:translateY(-12px)}
+
+@media(prefers-reduced-motion:reduce){
+  body:has(.aegis-intro-v11) .v3-header,
+  body:has(.aegis-intro-v11) .v4-scroll-progress{
+    opacity:1;
+    visibility:visible;
+  }
+  body:has(.aegis-intro-v11) .v3-header{transform:none}
+}

@@ -511,6 +511,15 @@ services:
     networks:
       - ecms-network
 
+  website:
+    build:
+      context: ../website
+      dockerfile: Dockerfile
+    expose:
+      - "3000"
+    networks:
+      - ecms-network
+
   frontend:
     # Pre-built: image: brajesh07/ecms-frontend:latest
     build:
@@ -521,6 +530,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+      website:
+        condition: service_started
     networks:
       - ecms-network
 
