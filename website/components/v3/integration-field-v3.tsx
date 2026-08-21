@@ -32,7 +32,6 @@ export function IntegrationFieldV3() {
         </svg>
         <div className="v3-aegis-hub"><span className="v3-brand-glyph"><i/><i/><i/></span><strong>AegisOS</strong><small>Execution layer</small><em><ShieldCheck size={12}/> Policy enforced</em></div>
         {systems.map(({label,icon:Icon,cls,meta},i)=><motion.div className={`v3-system-node ${cls}`} key={label} animate={{y:[0,i%2?-5:5,0]}} transition={{duration:6+i*.42,repeat:Infinity,ease:[.45,0,.55,1]}} whileHover={{scale:1.05}}><span><Icon size={17}/></span><div><b>{label}</b><small>{meta}</small></div></motion.div>)}
-        <div className="v3-packet packet-a"><PlugZap size={11}/></div><div className="v3-packet packet-b"><PlugZap size={11}/></div><div className="v3-packet packet-c"><PlugZap size={11}/></div>
       </div>
     </section>
   );

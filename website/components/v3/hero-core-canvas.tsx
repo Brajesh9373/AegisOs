@@ -50,8 +50,6 @@ function Core() {
         <torusGeometry args={[2.56, .004, 8, 128]} />
         <meshBasicMaterial color="#f0ae5a" transparent opacity={0.16} />
       </mesh>
-      <Line points={[[-2.75, 0, 0], [-1.25, 0, 0]]} color="#7e93c7" lineWidth={.6} transparent opacity={.5} />
-      <Line points={[[1.25, 0, 0], [2.75, 0, 0]]} color="#7e93c7" lineWidth={.6} transparent opacity={.5} />
       <Sparkles count={24} scale={5.8} size={0.85} speed={0.1} opacity={0.20} color="#5575df" />
     </group>
   );

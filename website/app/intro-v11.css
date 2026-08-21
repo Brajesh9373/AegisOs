@@ -118,6 +118,7 @@
 }
 .aegis-intro-v11__index i{display:block;width:42px;height:1px;background:#bdc9da}
 .aegis-intro-v11__progress{
+  display:none!important;
   position:absolute;
   z-index:5;
   left:clamp(24px,4vw,72px);
