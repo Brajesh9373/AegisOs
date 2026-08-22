@@ -1,7 +1,10 @@
 /* AegisOS V5 — visual QA / finishing layer
    Loaded after the V4 theme so it can refine geometry without destabilising components. */
 :root {
-  --max: 1440px;
+  /* Full-bleed layout: --max always spans the viewport minus two 24px gutters,
+     so every "max(24px, calc((100vw - var(--max))/2))" gutter resolves to 24px
+     on any screen width instead of growing into blank side margins. */
+  --max: calc(100vw - 48px);
   --page-gutter: max(24px, calc((100vw - var(--max))/2));
   --hairline: rgba(117, 138, 170, .22);
   --soft-blue: #edf3ff;
@@ -59,7 +62,7 @@ main {
 }
 
 .v3-nav-shell {
-  max-width: 1420px;
+  max-width: none;
   border-radius: 16px;
   padding-inline: 17px 12px;
   box-shadow: 0 12px 38px rgba(29, 52, 88, .085)
@@ -106,7 +109,7 @@ main {
 }
 
 .v3-hero-copy {
-  max-width: 1420px
+  max-width: none
 }
 
 .v3-hero h1 {
@@ -129,7 +132,7 @@ main {
 }
 
 .v3-hero-stage {
-  max-width: 1420px;
+  max-width: none;
   height: 630px;
   margin-top: 66px;
   border-radius: 22px;

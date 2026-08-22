@@ -20,7 +20,7 @@
   --shadow:0 24px 70px rgba(28,48,82,.10);
   --shadow-soft:0 12px 38px rgba(28,48,82,.08);
   --radius:20px;
-  --max:1500px;
+  --max:calc(100vw - 48px);
 }
 html{background:var(--paper)}
 body{background:var(--paper);color:var(--ink)}

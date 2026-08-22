@@ -11,7 +11,7 @@
   --line:rgba(19,24,18,.14);
   --line-dark:rgba(255,255,255,.12);
   --radius:18px;
-  --max:1500px;
+  --max:calc(100vw - 48px);
 }
 *{box-sizing:border-box}
 html{scroll-behavior:auto;background:var(--ink)}

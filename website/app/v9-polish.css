@@ -1218,86 +1218,45 @@
 .v9-footer-glow {
   position: absolute;
   left: 50%;
-  top: -260px;
+  top: -180px;
   width: 800px;
-  height: 520px;
+  height: 380px;
   transform: translateX(-50%);
   background: radial-gradient(circle, rgba(77, 70, 229, .18), rgba(36, 102, 166, .08) 34%, transparent 68%);
   pointer-events: none
 }
 
-.v9-footer-cta {
-  position: relative;
-  z-index: 1;
-  max-width: 1440px;
-  margin: auto;
-  padding: 78px 24px 64px;
-  display: grid;
-  grid-template-columns: 1.15fr .65fr;
-  gap: 80px;
-  border-bottom: 1px solid rgba(150, 171, 203, .18)
-}
-
-.v9-footer-cta>div:first-child>span {
-  font-size: 8px;
-  letter-spacing: .16em;
-  color: #8197b8;
-  font-weight: 800
-}
-
-.v9-footer-cta h2 {
-  font-size: clamp(42px, 4.6vw, 68px);
-  line-height: .96;
-  letter-spacing: -.052em;
-  color: #f5f8fd;
-  margin: 20px 0 0;
-  font-weight: 570
-}
-
-.v9-footer-cta-side {
-  align-self: end;
-  padding-bottom: 5px
-}
-
-.v9-footer-cta-side p {
-  font-size: 11px;
-  line-height: 1.7;
-  color: #8ea1bd;
-  max-width: 430px;
-  margin: 0 0 22px
-}
-
-.v9-footer-cta-side>div {
-  display: flex;
-  align-items: center;
-  gap: 18px
-}
-
-.v9-footer-primary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 15px;
-  border-radius: 9px;
-  background: #edf3ff;
-  color: #11203d !important;
-  font-size: 9px;
-  font-weight: 750
-}
-
-.v9-footer-cta-side>div>a:last-child {
-  font-size: 9px;
-  color: #aabbd3 !important
-}
+/* Footer — compact single-row layout: brand | PRODUCT | COMPANY | RESOURCES */
 
 .v9-footer-top {
   position: relative;
   z-index: 1;
-  max-width: 1440px;
+  max-width: none;
   margin: auto;
-  padding: 56px 24px 62px !important;
-  grid-template-columns: .9fr 1.25fr !important;
-  gap: 100px !important
+  padding: 48px 24px 52px !important;
+  display: grid !important;
+  align-items: center !important;
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  gap: clamp(40px, 5vw, 96px) !important
+}
+
+.v9-footer-wordmark {
+  display: inline-block;
+  justify-self: start;
+  font-size: clamp(58px, 6.8vw, 128px);
+  line-height: .74;
+  letter-spacing: -.07em;
+  font-weight: 760;
+  white-space: nowrap;
+  user-select: none;
+  /* Expand the paint box so descenders/end bearings stay covered by the
+     gradient, then reclaim the added space so the row height is unchanged. */
+  padding: .18em .09em .24em;
+  margin: -.18em -.09em -.24em;
+  color: transparent;
+  background: linear-gradient(180deg, rgba(170, 190, 219, .42) 0%, rgba(170, 190, 219, .15) 100%);
+  -webkit-background-clip: text;
+  background-clip: text
 }
 
 .v9-footer .v3-footer-brand strong {
@@ -1305,42 +1264,8 @@
   color: #eff5ff
 }
 
-.v9-footer-brand-block>p {
-  font-size: 10px !important;
-  line-height: 1.6;
-  color: #7f91ad !important;
-  max-width: 310px;
-  margin-top: 14px !important
-}
-
-.v9-footer-status {
-  display: grid;
-  grid-template-columns: 16px auto 1fr;
-  align-items: center;
-  gap: 7px;
-  margin-top: 34px;
-  width: max-content;
-  border: 1px solid rgba(139, 163, 198, .18);
-  background: rgba(255, 255, 255, .025);
-  border-radius: 999px;
-  padding: 8px 11px;
-  color: #79d3c6
-}
-
-.v9-footer-status span {
-  font-size: 7px;
-  color: #bdcce0
-}
-
-.v9-footer-status small {
-  font-size: 6px;
-  color: #637590;
-  padding-left: 8px;
-  border-left: 1px solid rgba(139, 163, 198, .2)
-}
-
 .v9-footer .v3-footer-links {
-  gap: 64px !important
+  gap: clamp(28px, 4vw, 64px) !important
 }
 
 .v9-footer .v3-footer-links span {
@@ -1362,28 +1287,12 @@
   transform: translateX(2px)
 }
 
-.v9-footer-wordmark {
-  position: relative;
-  z-index: 1;
-  max-width: 1440px;
-  margin: -6px auto 0;
-  padding: 0 24px 5% 0px;
-  font-size: clamp(92px, 13.5vw, 205px);
-  line-height: .72;
-  letter-spacing: -.07em;
-  font-weight: 760;
-  color: rgba(170, 190, 219, .055);
-  user-select: none;
-  white-space: nowrap;
-  overflow: hidden
-}
-
 .v9-footer .v3-footer-bottom {
   position: relative;
   z-index: 1;
-  max-width: 1440px;
-  margin: 40px auto 0;
-  padding: 19px 24px 27px !important;
+  max-width: none;
+  margin: 30px auto 0;
+  padding: 18px 24px 24px !important;
   border-top: 1px solid rgba(151, 171, 203, .17) !important;
   display: grid !important;
   grid-template-columns: 1fr 1fr 1fr;
@@ -1406,7 +1315,7 @@
   }
 
   .v9-footer-top {
-    gap: 55px !important
+    gap: 36px !important
   }
 }
 
@@ -1483,23 +1392,33 @@
     min-height: 470px !important
   }
 
-  .v9-footer-cta {
-    grid-template-columns: 1fr;
-    gap: 30px;
-    padding-top: 62px
-  }
-
-  .v9-footer-cta-side {
-    max-width: 600px
-  }
-
   .v9-footer-top {
-    grid-template-columns: 1fr !important;
-    gap: 50px !important
+    display: flex !important;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 34px !important;
+    padding-top: 38px !important
+  }
+
+  .v9-footer-wordmark {
+    font-size: clamp(64px, 11vw, 104px)
   }
 
   .v9-footer .v3-footer-links {
-    gap: 30px !important
+    width: 100%;
+    gap: 26px !important
+  }
+
+  .v9-footer .v3-footer-bottom {
+    display: flex !important;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px
+  }
+
+  .v9-footer .v3-footer-bottom span:nth-child(2),
+  .v9-footer .v3-footer-bottom span:nth-child(3) {
+    text-align: left
   }
 }
 
@@ -1545,33 +1464,9 @@
     width: 100%
   }
 
-  .v9-footer-cta h2 {
-    font-size: 42px
-  }
-
-  .v9-footer-cta-side>div {
-    align-items: flex-start;
-    flex-direction: column
-  }
-
   .v9-footer .v3-footer-links {
     grid-template-columns: 1fr 1fr !important;
-    row-gap: 40px !important
-  }
-
-  .v9-footer .v3-footer-bottom {
-    grid-template-columns: 1fr !important;
-    gap: 8px
-  }
-
-  .v9-footer .v3-footer-bottom span:nth-child(2),
-  .v9-footer .v3-footer-bottom span:nth-child(3) {
-    text-align: left
-  }
-
-  .v9-footer-wordmark {
-    font-size: 25vw;
-    margin-top: 10px
+    row-gap: 26px !important
   }
 }
 
@@ -1873,17 +1768,6 @@
   font-size: 5px !important
 }
 
-.v9-footer-wordmark {
-  color: transparent !important;
-  background: linear-gradient(180deg, rgba(170, 190, 219, 0.38) 0%, rgba(170, 190, 219, 0.12) 100%) !important;
-  -webkit-background-clip: text !important;
-  background-clip: text !important
-}
-
-.v9-footer-status {
-  padding-right: 16px
-}
-
 @media(max-width:620px) {
   .v9-analyst-workspace {
     grid-template-columns: 1fr
@@ -2045,19 +1929,6 @@
 }
 
 /* 4. Issue 1 — Dark Footer Visibility Contrast Improvements */
-.v9-footer .v3-brand-glyph i {
-  background: #4d46e5 !important;
-}
-
-.v9-footer .v3-footer-brand strong {
-  color: #ffffff !important;
-  font-weight: 700 !important;
-}
-
-.v9-footer-brand-block>p {
-  color: #9fb0cc !important;
-}
-
 .v9-footer .v3-footer-links span {
   color: #8fa0bd !important;
 }
@@ -2068,11 +1939,4 @@
 
 .v9-footer .v3-footer-bottom {
   color: #8095b5 !important;
-}
-
-.v9-footer-wordmark {
-  color: transparent !important;
-  background: linear-gradient(180deg, rgba(170, 190, 219, 0.28) 0%, rgba(170, 190, 219, 0.08) 100%) !important;
-  -webkit-background-clip: text !important;
-  background-clip: text !important;
 }
