@@ -124,9 +124,65 @@ export function Administration() {
     try {
       const token = localStorage.getItem('auth_token');
       const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-      const res = await fetch('/agents/available', { headers });
-      const data = await res.json();
-      setAvailableAgents(Array.isArray(data) ? data : []);
+
+      // Fetch both sources in parallel
+      const [agentsRes, profilesRes] = await Promise.all([
+        fetch('/agents/available', { headers }),
+        fetch('/api/agent-profiles', { headers })
+      ]);
+
+      let agentsData = [];
+      let profilesData = { profiles: [] };
+
+      try {
+        const agentsJson = await agentsRes.json();
+        agentsData = Array.isArray(agentsJson) ? agentsJson : [];
+      } catch (e) {
+        console.error('Failed to parse agents:', e);
+        agentsData = [];
+      }
+
+      try {
+        const profilesJson = await profilesRes.json();
+        profilesData = profilesJson && typeof profilesJson === 'object' ? profilesJson : { profiles: [] };
+      } catch (e) {
+        console.error('Failed to parse profiles:', e);
+        profilesData = { profiles: [] };
+      }
+
+      // Transform agent profiles to match the Agent interface
+      const profileAgents = (profilesData.profiles || []).filter(Boolean).map((profile: any) => ({
+        id: profile.id || profile.profile_id,
+        name: profile.name,
+        role: profile.role || profile.profile_id,
+        department: 'ai-agents',
+        designation: profile.name,
+        role_description: profile.description || `AI agent with ${profile.role} role`,
+        reports_to: profile.parent_profile_id || null,
+        skills: profile.tool_scope?.allowed_tools || [],
+        status: profile.status || 'active',
+        model: profile.model_name || 'gpt-4o',
+        system_prompt_addon: profile.system_prompt,
+        tool_policy: { allowed_tools: profile.tool_scope?.allowed_tools || [] },
+        workspace_scope: {
+          memory: profile.memory_scope?.categories || [],
+          knowledge: profile.knowledge_scope?.graphs || []
+        },
+        automation: profile.execution_budget || {},
+        features: {
+          memoryRetentionDays: profile.memory_scope?.retention_days || 30,
+          dataQueryAccess: profile.knowledge_scope?.write ? 'write' : 'read',
+          rateLimitPerMinute: profile.tool_scope?.rate_limit || 60
+        },
+        source: 'profile', // Mark as coming from AgentProfile
+        profile_id: profile.profile_id,
+        version: profile.version,
+        stages: profile.stages
+      }));
+
+      // Combine both sources (profiles first, then agents)
+      const dbAgents = Array.isArray(agentsData) ? agentsData : [];
+      setAvailableAgents([...profileAgents, ...dbAgents]);
     } catch {
       setAvailableAgents([]);
     } finally {
@@ -576,16 +632,26 @@ export function Administration() {
                   onSelect={setSelectedAvailableAgent}
                   onCreate={openHireForm}
                   onEdit={openEditAvailableAgentForm}
-                  onDelete={(agent) => {
+                  onDelete={(agent: any) => {
                     Modal.confirm({
-                      title: 'Delete agent',
-                      content: `Remove "${agent.name}" from the available agent pool?`,
+                      title: agent.source === 'profile' ? 'Delete Agent Profile' : 'Delete agent',
+                      content: agent.source === 'profile'
+                        ? `Delete the agent profile "${agent.name}"? This will remove it from the available agents.`
+                        : `Remove "${agent.name}" from the available agent pool?`,
                       okText: 'Delete',
                       okType: 'danger',
                       onOk: async () => {
                         const token = localStorage.getItem('auth_token');
-                        await fetch(`/agents/${agent.id}`, { method: 'DELETE', headers: token ? { Authorization: `Bearer ${token}` } : {} });
-                        message.success('Agent removed');
+                        const authHeader = token ? { Authorization: `Bearer ${token}` } : undefined;
+
+                        // Use appropriate endpoint based on source
+                        if (agent.source === 'profile') {
+                          await fetch(`/api/agent-profiles/${agent.profile_id}`, { method: 'DELETE', headers: authHeader });
+                          message.success('Agent profile deleted');
+                        } else {
+                          await fetch(`/agents/${agent.id}`, { method: 'DELETE', headers: authHeader });
+                          message.success('Agent removed');
+                        }
                         setSelectedAvailableAgent(null);
                         fetchAvailableAgents();
                       },
