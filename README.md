@@ -1,5 +1,7 @@
 # AegisOS
 
+> 🏢 Enterprise AI Workforce Operating System | 🌐 Live: https://aegisos.tailb5c137.ts.net/
+
 <p align="center">
 
 [![License](https://img.shields.io/github/license/Brajesh9373/AegisOs?style=flat&color=blue)](LICENSE)
@@ -20,7 +22,7 @@ AegisOS is the execution layer for AI-native organizations. Connect enterprise s
 
 <p align="center">
 <a href="https://github.com/Brajesh9373/AegisOs"><strong>Explore the docs »</strong></a>
-<a href="http://localhost:3000"><strong>View Demo</strong></a>
+<a href="https://aegisos.tailb5c137.ts.net/"><strong>🌐 Live Demo</strong></a>
  ·
 <a href="https://github.com/Brajesh9373/AegisOs/issues">Report Bug</a>
  ·
