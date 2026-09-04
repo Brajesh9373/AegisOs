@@ -55,7 +55,9 @@ async def check_readiness() -> AgentOSReadiness:
                 readiness = profile.readiness()
                 profile_readiness[profile.profile_spec.profile_id] = readiness.ready
             except Exception as exc:
-                logger.warning("Profile %s readiness failed: %s", profile.profile_spec.profile_id, exc)
+                logger.warning(
+                    "Profile %s readiness failed: %s", profile.profile_spec.profile_id, exc
+                )
                 profile_readiness[profile.profile_spec.profile_id] = False
                 reasons.append(f"profile_{profile.profile_spec.profile_id}_unready")
 
@@ -83,8 +85,9 @@ async def check_readiness() -> AgentOSReadiness:
 
     # Check database connectivity
     try:
-        from ecms.agent_os.persistence.database import db_session
         from sqlalchemy import text
+
+        from ecms.agent_os.persistence.database import db_session
 
         async with db_session() as session:
             await session.execute(text("SELECT 1"))
@@ -93,11 +96,7 @@ async def check_readiness() -> AgentOSReadiness:
         reasons.append("database_unavailable")
 
     # Determine overall readiness
-    ready = (
-        any(profile_readiness.values())
-        and capability_count > 0
-        and not reasons
-    )
+    ready = any(profile_readiness.values()) and capability_count > 0 and not reasons
 
     reason_code = reasons[0] if reasons else None
 

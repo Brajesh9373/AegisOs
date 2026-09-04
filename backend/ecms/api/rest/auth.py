@@ -5,8 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
-from ecms.auth import Identity
 from ecms.api.dependencies.providers import get_sdk, require_identity
+from ecms.auth import Identity
 from ecms.sdk import EcmsSDK
 
 __all__ = ["router"]
@@ -62,7 +62,9 @@ async def refresh(body: RefreshRequest, request: Request) -> LoginResponse:
 
 
 @router.post("/logout")
-async def logout(request: Request, identity: Identity = Depends(require_identity)) -> dict[str, str]:
+async def logout(
+    request: Request, identity: Identity = Depends(require_identity)
+) -> dict[str, str]:
     """Revoke the current access token."""
     token = request.headers.get("Authorization", "").removeprefix("Bearer ")
     if token:

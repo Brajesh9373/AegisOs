@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -36,14 +36,15 @@ class EventStore:
     def _save_index(self) -> None:
         self._index_path.write_text(json.dumps(self._index))
 
-    def record(self, session_id: str, question: str, answer: str,
-               atom_ids: list[str] | None = None) -> str:
+    def record(
+        self, session_id: str, question: str, answer: str, atom_ids: list[str] | None = None
+    ) -> str:
         """Record a conversation turn as an episodic event."""
-        event_id = f"ep-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{len(self._index)}"
+        event_id = f"ep-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}-{len(self._index)}"
         event = {
             "id": event_id,
             "session_id": session_id,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "question": question[:500],
             "answer_summary": answer[:500],
             "keywords": self._extract_keywords(question),
@@ -66,7 +67,7 @@ class EventStore:
             return results
 
         # Scan from end (most recent first)
-        with open(self._path, "r", encoding="utf-8") as f:
+        with open(self._path, encoding="utf-8") as f:
             lines = f.readlines()
 
         for line in reversed(lines):
@@ -82,12 +83,14 @@ class EventStore:
             event_terms = set(re.findall(r"[a-z0-9]+", event_text.lower()))
 
             if query_terms & event_terms:
-                results.append({
-                    "id": event.get("id", ""),
-                    "timestamp": event.get("timestamp", ""),
-                    "question": event.get("question", "")[:200],
-                    "answer_preview": event.get("answer_summary", "")[:200],
-                })
+                results.append(
+                    {
+                        "id": event.get("id", ""),
+                        "timestamp": event.get("timestamp", ""),
+                        "question": event.get("question", "")[:200],
+                        "answer_preview": event.get("answer_summary", "")[:200],
+                    }
+                )
 
             if len(results) >= limit:
                 break
@@ -99,28 +102,63 @@ class EventStore:
         results: list[dict] = []
         if not self._path.exists():
             return results
-        with open(self._path, "r", encoding="utf-8") as f:
+        with open(self._path, encoding="utf-8") as f:
             lines = f.readlines()
         for line in reversed(lines[-limit:]):
             if not line.strip():
                 continue
             try:
                 event = json.loads(line)
-                results.append({
-                    "id": event.get("id", ""),
-                    "timestamp": event.get("timestamp", ""),
-                    "question": event.get("question", "")[:200],
-                })
+                results.append(
+                    {
+                        "id": event.get("id", ""),
+                        "timestamp": event.get("timestamp", ""),
+                        "question": event.get("question", "")[:200],
+                    }
+                )
             except json.JSONDecodeError:
                 continue
         return results
 
     def _extract_keywords(self, text: str) -> list[str]:
         """Extract meaningful keywords from text."""
-        stopwords = {"the", "a", "an", "is", "was", "are", "has", "have", "of",
-                     "in", "on", "at", "to", "for", "with", "and", "or", "that",
-                     "this", "it", "be", "by", "from", "as", "not", "but", "they",
-                     "what", "how", "does", "can", "i", "you", "we", "me"}
+        stopwords = {
+            "the",
+            "a",
+            "an",
+            "is",
+            "was",
+            "are",
+            "has",
+            "have",
+            "of",
+            "in",
+            "on",
+            "at",
+            "to",
+            "for",
+            "with",
+            "and",
+            "or",
+            "that",
+            "this",
+            "it",
+            "be",
+            "by",
+            "from",
+            "as",
+            "not",
+            "but",
+            "they",
+            "what",
+            "how",
+            "does",
+            "can",
+            "i",
+            "you",
+            "we",
+            "me",
+        }
         words = re.findall(r"[a-z0-9]+", text.lower())
         return list(dict.fromkeys(w for w in words if w not in stopwords and len(w) > 2))[:15]
 

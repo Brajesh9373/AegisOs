@@ -24,8 +24,8 @@ async def handle_start(update, context) -> None:
         "/search <query> — search the knowledge base\n"
         "/stats — show knowledge base statistics\n\n"
         "*Or just talk to me naturally:*\n"
-        "\"For financial services, always probe SOX compliance\"\n"
-        "\"This client's CTO is very technical, skip basics\"\n\n"
+        '"For financial services, always probe SOX compliance"\n'
+        '"This client\'s CTO is very technical, skip basics"\n\n'
         "I'll auto-classify and store everything you say.",
         parse_mode="Markdown",
     )
@@ -35,7 +35,9 @@ async def handle_teach(update, context) -> None:
     """Explicitly ingest as a pattern or best practice."""
     text = " ".join(context.args) if context.args else ""
     if not text:
-        await update.message.reply_text("Usage: /teach <knowledge>\nExample: /teach Always ask about data residency for EU clients")
+        await update.message.reply_text(
+            "Usage: /teach <knowledge>\nExample: /teach Always ask about data residency for EU clients"
+        )
         return
 
     await _ingest_and_reply(update, text, source="telegram_teach")
@@ -45,7 +47,9 @@ async def handle_learn(update, context) -> None:
     """Record a lesson learned."""
     text = " ".join(context.args) if context.args else ""
     if not text:
-        await update.message.reply_text("Usage: /learn <lesson>\nExample: /learn Projects that skip rollback planning always fail cutover")
+        await update.message.reply_text(
+            "Usage: /learn <lesson>\nExample: /learn Projects that skip rollback planning always fail cutover"
+        )
         return
 
     await _ingest_and_reply(update, f"LESSON LEARNED: {text}", source="telegram_learn")
@@ -70,11 +74,12 @@ async def handle_correct(update, context) -> None:
             break
 
     if not parts or len(parts) < 2:
-        await update.message.reply_text("Please use → to separate wrong from right.\nExample: /correct Accepted vague answer → Always drill into specifics")
+        await update.message.reply_text(
+            "Please use → to separate wrong from right.\nExample: /correct Accepted vague answer → Always drill into specifics"
+        )
         return
 
     from ecms.agent.ba.knowledge.ingest import ingest_correction
-    from ecms.telegram.auth import is_authorized
 
     wrong = parts[0].strip()
     right = parts[1].strip()
@@ -84,14 +89,13 @@ async def handle_correct(update, context) -> None:
 
     try:
         entries = await ingest_correction(
-            wrong, right,
+            wrong,
+            right,
             source="telegram",
             contributor=str(chat_id),
         )
         await update.message.reply_text(
-            f"✅ Correction stored ({len(entries)} entries):\n"
-            f"❌ Wrong: {wrong}\n"
-            f"✅ Right: {right}"
+            f"✅ Correction stored ({len(entries)} entries):\n❌ Wrong: {wrong}\n✅ Right: {right}"
         )
     except Exception as exc:
         logger.error("[handlers] correction ingest failed: %s", exc)
@@ -102,7 +106,9 @@ async def handle_search(update, context) -> None:
     """Search the knowledge base."""
     query = " ".join(context.args) if context.args else ""
     if not query:
-        await update.message.reply_text("Usage: /search <query>\nExample: /search migration rollback")
+        await update.message.reply_text(
+            "Usage: /search <query>\nExample: /search migration rollback"
+        )
         return
 
     from ecms.agent.ba.knowledge.store import search_by_text
@@ -115,7 +121,7 @@ async def handle_search(update, context) -> None:
             await update.message.reply_text("No matching knowledge found.")
             return
 
-        lines = [f"🔍 *Results for \"{query}\":*\n"]
+        lines = [f'🔍 *Results for "{query}":*\n']
         for i, r in enumerate(results, 1):
             cat = r.entry.category.replace("_", " ").title()
             domain = f" [{r.entry.domain}]" if r.entry.domain else ""
@@ -138,7 +144,7 @@ async def handle_stats(update, context) -> None:
         by_cat = stats.get("by_category", {})
         by_domain = stats.get("by_domain", {})
 
-        lines = [f"📊 *Knowledge Base Stats*\n", f"Total entries: *{total}*\n"]
+        lines = ["📊 *Knowledge Base Stats*\n", f"Total entries: *{total}*\n"]
 
         if by_cat:
             lines.append("*By category:*")

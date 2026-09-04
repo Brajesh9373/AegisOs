@@ -27,9 +27,7 @@ from ecms.infrastructure.storage import InMemoryObjectStore
 
 
 class FakeStore:
-    def __init__(
-        self, work: PartitionWork, *, register_result: bool = True
-    ) -> None:
+    def __init__(self, work: PartitionWork, *, register_result: bool = True) -> None:
         self.work = work
         self.register_result = register_result
         self.batches = []
@@ -150,9 +148,7 @@ async def test_handler_stages_bounded_verified_batches(tmp_path: Path) -> None:
         lease_poll_seconds=60,
     )
 
-    await handler(
-        ExtractionDelivery("1-0", "job-1", "manifest-1", "partition-1")
-    )
+    await handler(ExtractionDelivery("1-0", "job-1", "manifest-1", "partition-1"))
 
     assert store.is_staged is True
     assert len(store.batches) == 2
@@ -297,9 +293,7 @@ async def test_encoded_ceiling_splits_deterministically_and_preserves_paths(
         capture_output=True,
         text=True,
     ).stdout.strip()
-    manifest = build_manifest(
-        [ManifestSource("a.py", content), ManifestSource("b.md", content)]
-    )
+    manifest = build_manifest([ManifestSource("a.py", content), ManifestSource("b.md", content)])
     partition = partition_manifest(manifest, 1)[0]
     objects = InMemoryObjectStore()
     await store_manifest_plan(
@@ -334,11 +328,7 @@ async def test_encoded_ceiling_splits_deterministically_and_preserves_paths(
             max_batch_encoded_bytes=1_500,
             lease_poll_seconds=60,
         )
-        await handler(
-            ExtractionDelivery(
-                "1-0", work.job_id, work.manifest_id, work.id
-            )
-        )
+        await handler(ExtractionDelivery("1-0", work.job_id, work.manifest_id, work.id))
         return store.batches
 
     first = await execute()
@@ -351,8 +341,5 @@ async def test_encoded_ceiling_splits_deterministically_and_preserves_paths(
     ]
     assert "org/same" not in first[0].object_key
     assert "job/same" not in first[0].object_key
-    nodes = [
-        json.loads(gzip.decompress(batch.payload))["nodes"][0]["id"]
-        for batch in first
-    ]
+    nodes = [json.loads(gzip.decompress(batch.payload))["nodes"][0]["id"] for batch in first]
     assert len(set(nodes)) == 2

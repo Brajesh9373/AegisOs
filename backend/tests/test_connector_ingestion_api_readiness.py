@@ -20,13 +20,9 @@ async def test_parallel_readiness_requires_declared_worker_capacity(
         "from_url",
         lambda *_args, **_kwargs: redis,
     )
-    await redis.set(
-        "ecms:connector-ingestion:coordinator-health:c1", "1", ex=30
-    )
+    await redis.set("ecms:connector-ingestion:coordinator-health:c1", "1", ex=30)
     await redis.set("ecms:connector-ingestion:extractor-health:e1", "1", ex=30)
-    await redis.set(
-        "ecms:connector-ingestion:graph-writer-health:w1", "1", ex=30
-    )
+    await redis.set("ecms:connector-ingestion:graph-writer-health:w1", "1", ex=30)
 
     assert not await connector_ingestions._parallel_workers_ready()
 

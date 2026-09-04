@@ -12,7 +12,6 @@ from __future__ import annotations
 from typing import Any
 
 import falkordb
-
 from legacy_ecms.config import get_settings
 
 
@@ -31,16 +30,17 @@ class OrgLearning:
         if self._graph is None:
             s = get_settings()
             db = falkordb.FalkorDB(
-                host=s.falkordb_host, port=s.falkordb_port,
+                host=s.falkordb_host,
+                port=s.falkordb_port,
                 password=s.falkordb_password or None,
             )
             self._graph = db.select_graph(s.falkordb_database)
         return self._graph
 
-    def publish(self, pattern_type: str, description: str,
-                validated_by: str = "agent") -> str:
+    def publish(self, pattern_type: str, description: str, validated_by: str = "agent") -> str:
         """Publish a validated pattern to the organization. Returns pattern_id."""
         import uuid
+
         pattern_id = f"org-{pattern_type}-{uuid.uuid4().hex[:8]}"
         try:
             g = self._get_graph()
@@ -53,14 +53,20 @@ class OrgLearning:
                 "  validation_count: 1,"
                 "  created_at: timestamp()"
                 "})",
-                {"pid": pattern_id, "ptype": pattern_type, "desc": description, "vby": validated_by},
+                {
+                    "pid": pattern_id,
+                    "ptype": pattern_type,
+                    "desc": description,
+                    "vby": validated_by,
+                },
             )
             return pattern_id
         except Exception:
             return ""
 
-    def search(self, query: str, pattern_type: str | None = None,
-               min_validations: int = 0, limit: int = 10) -> list[dict]:
+    def search(
+        self, query: str, pattern_type: str | None = None, min_validations: int = 0, limit: int = 10
+    ) -> list[dict]:
         """Search organizational patterns by keyword overlap."""
         try:
             g = self._get_graph()
@@ -81,7 +87,9 @@ class OrgLearning:
                 desc_terms = set(desc.lower().split())
                 if query and not (query_terms & desc_terms):
                     continue
-                all_patterns.append({"id": pid, "type": ptype, "description": desc, "validations": vcount})
+                all_patterns.append(
+                    {"id": pid, "type": ptype, "description": desc, "validations": vcount}
+                )
             all_patterns.sort(key=lambda p: p["validations"], reverse=True)
             return all_patterns[:limit]
         except Exception:

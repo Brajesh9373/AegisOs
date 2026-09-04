@@ -29,7 +29,9 @@ def _load_authorized_ids() -> set[int]:
             _authorized_ids.add(int(part))
 
     if not _authorized_ids:
-        logger.warning("[telegram.auth] No TELEGRAM_MANAGER_CHAT_ID set — all messages will be rejected")
+        logger.warning(
+            "[telegram.auth] No TELEGRAM_MANAGER_CHAT_ID set — all messages will be rejected"
+        )
 
     return _authorized_ids
 

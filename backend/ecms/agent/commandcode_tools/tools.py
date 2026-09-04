@@ -18,7 +18,6 @@ import shutil
 import signal
 import socket
 import subprocess
-import sys
 import tempfile
 import time
 import urllib.parse
@@ -155,14 +154,12 @@ _CONTEXT = ToolContext()
 
 def set_context(context: ToolContext) -> None:
     """Replace the global default context."""
-
     global _CONTEXT
     _CONTEXT = context
 
 
 def configure_context(**kwargs: Any) -> ToolContext:
     """Create and install a ToolContext from keyword arguments."""
-
     context = ToolContext(**kwargs)
     set_context(context)
     return context
@@ -303,7 +300,9 @@ def _load_gitignore_patterns(start: Path, context: ToolContext) -> list[str]:
     return patterns
 
 
-def _is_ignored(path: Path, base: Path, context: ToolContext, extra: list[str] | None = None) -> bool:
+def _is_ignored(
+    path: Path, base: Path, context: ToolContext, extra: list[str] | None = None
+) -> bool:
     rel = str(path.resolve(strict=False).relative_to(base.resolve())).replace("\\", "/")
     patterns = list(extra or [])
     patterns.extend(_load_gitignore_patterns(base, context))
@@ -353,7 +352,6 @@ async def read_file(
     context: ToolContext | None = None,
 ) -> str:
     """Read a file from the workspace."""
-
     ctx = _ctx(context)
     path = _resolve_absolute_path(absolutePath, ctx)
     if not path.exists():
@@ -381,7 +379,7 @@ async def read_file(
     visible = text[:MAX_READ_CHARS]
     header = [
         f"File: {path}",
-        f"Type: text",
+        "Type: text",
         f"Size: {size} bytes",
     ]
     if total_lines is not None:
@@ -398,7 +396,6 @@ async def write_file(
     context: ToolContext | None = None,
 ) -> str:
     """Create or overwrite a UTF-8 text file."""
-
     ctx = _ctx(context)
     path = _resolve_absolute_path(filePath, ctx)
     if _is_taste_file(path):
@@ -422,7 +419,6 @@ async def edit_file(
     context: ToolContext | None = None,
 ) -> str:
     """Perform exact text replacement in a file."""
-
     ctx = _ctx(context)
     if ctx.plan_mode:
         return f"Plan mode active — edit_file is blocked for {filePath}."
@@ -459,7 +455,6 @@ async def read_directory(
     context: ToolContext | None = None,
 ) -> str:
     """List a directory's files and subdirectories."""
-
     ctx = _ctx(context)
     directory = _resolve_absolute_path(path, ctx)
     if not directory.exists():
@@ -495,7 +490,6 @@ async def glob(
     context: ToolContext | None = None,
 ) -> str:
     """Find files by glob pattern."""
-
     ctx = _ctx(context)
     directory = _resolve_directory(path, ctx)
     matches: dict[Path, float] = {}
@@ -525,7 +519,6 @@ async def grep(
     context: ToolContext | None = None,
 ) -> str:
     """Search text files by regular expression."""
-
     ctx = _ctx(context)
     base = _resolve_directory(directory, ctx)
     try:
@@ -574,7 +567,6 @@ async def read_multiple_files(
     context: ToolContext | None = None,
 ) -> str:
     """Read multiple files selected by glob patterns."""
-
     ctx = _ctx(context)
     base = _resolve_directory(targetDirectory, ctx)
     exclusions = list(exclude or [])
@@ -741,7 +733,6 @@ async def shell_command(
     context: ToolContext | None = None,
 ) -> str:
     """Execute a shell command."""
-
     ctx = _ctx(context)
     if ctx.plan_mode:
         return "Plan mode active — shell_command is blocked."
@@ -793,7 +784,7 @@ def _format_background_task(task: ShellTask, heading: str) -> str:
             f"PID: {task.pid}",
             f"CWD: {task.cwd}",
             f"Output: {task.output_path}",
-            f"Stop: kill_shell({{ taskId: \"{task.id}\" }})",
+            f'Stop: kill_shell({{ taskId: "{task.id}" }})',
         ]
     )
 
@@ -810,7 +801,6 @@ async def monitor_command(
     context: ToolContext | None = None,
 ) -> str:
     """Start a long-running monitor command."""
-
     ctx = _ctx(context)
     if ctx.plan_mode:
         return "Plan mode active — monitor_command is blocked."
@@ -846,7 +836,7 @@ async def monitor_command(
     if notify == "scheduled" and checkAfterMs:
         lines.append(f"Auto-wakeup: scheduled after {checkAfterMs}ms and on exit.")
     lines.append(f"Output: {task.output_path}")
-    lines.append(f"Stop: kill_shell({{ taskId: \"{task.id}\" }})")
+    lines.append(f'Stop: kill_shell({{ taskId: "{task.id}" }})')
     return "\n".join(lines)
 
 
@@ -866,7 +856,6 @@ async def monitor_events(
     context: ToolContext | None = None,
 ) -> str:
     """Read new monitor output."""
-
     ctx = _ctx(context)
     task = ctx.shell_tasks.get(taskId)
     if task is None:
@@ -917,7 +906,6 @@ async def shell_tasks(
     context: ToolContext | None = None,
 ) -> str:
     """List tracked shell and monitor tasks."""
-
     ctx = _ctx(context)
     tasks = list(ctx.shell_tasks.values())
     for task in tasks:
@@ -1008,7 +996,6 @@ async def kill_shell(
     context: ToolContext | None = None,
 ) -> str:
     """Stop a tracked shell/monitor task or process."""
-
     ctx = _ctx(context)
     if ctx.plan_mode:
         return "Plan mode active — kill_shell is blocked."
@@ -1038,7 +1025,6 @@ async def todo_write(
     context: ToolContext | None = None,
 ) -> str:
     """Create or replace the current structured task list."""
-
     ctx = _ctx(context)
     if ctx.plan_mode:
         return "Plan mode active — todo_write is blocked."
@@ -1066,7 +1052,6 @@ async def ask_user_question(
     context: ToolContext | None = None,
 ) -> str:
     """Ask structured questions through a host callback or return a question card payload."""
-
     ctx = _ctx(context)
     payload_questions: list[dict[str, Any]] = []
     for index, question in enumerate(questions, start=1):
@@ -1114,7 +1099,6 @@ def _is_plan_file(path: Path) -> bool:
 
 async def enter_plan_mode(*, context: ToolContext | None = None) -> str:
     """Enter read-only planning mode."""
-
     ctx = _ctx(context)
     ctx.plan_mode = True
     return "Entered plan mode. Write and shell tools are blocked except plan-file writes."
@@ -1122,7 +1106,6 @@ async def enter_plan_mode(*, context: ToolContext | None = None) -> str:
 
 async def exit_plan_mode(*, context: ToolContext | None = None) -> str:
     """Exit read-only planning mode."""
-
     ctx = _ctx(context)
     ctx.plan_mode = False
     return "Exited plan mode. Write and shell tools are enabled by host policy."
@@ -1194,7 +1177,6 @@ async def web_fetch(
     context: ToolContext | None = None,
 ) -> str:
     """Fetch a URL and return simplified markdown."""
-
     ctx = _ctx(context)
     if ctx.web_fetch_provider is not None:
         return str(await _maybe_await(ctx.web_fetch_provider(url)))
@@ -1233,7 +1215,6 @@ async def web_search(
     context: ToolContext | None = None,
 ) -> str:
     """Search the web using a host provider or DuckDuckGo HTML fallback."""
-
     ctx = _ctx(context)
     count = min(10, max(1, int(numResults)))
     if ctx.web_search_provider is not None:
@@ -1279,7 +1260,6 @@ async def diagnostics(
     context: ToolContext | None = None,
 ) -> str:
     """Return diagnostics from a host IDE/LSP provider."""
-
     ctx = _ctx(context)
     if ctx.diagnostics_provider is None:
         return "Diagnostics provider not configured."
@@ -1288,7 +1268,6 @@ async def diagnostics(
 
 async def get_self_knowledge(*, context: ToolContext | None = None) -> str:
     """Return compact CommandCode product knowledge."""
-
     return """# Command Code
 
 Command Code is a coding agent CLI focused on learning coding taste and applying it while building, fixing, testing, and refactoring software.
@@ -1639,7 +1618,6 @@ async def invoke_tool(
     context: ToolContext | None = None,
 ) -> str:
     """Dispatch a tool by name."""
-
     func = _TOOL_MAP.get(name)
     if func is None:
         return f"Unknown tool: {name}"
@@ -1649,21 +1627,14 @@ async def invoke_tool(
         return f"Tool '{name}' failed: {exc}"
 
 
-def get_tools_for_mode(mode: str, tools: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+def get_tools_for_mode(
+    mode: str, tools: list[dict[str, Any]] | None = None
+) -> list[dict[str, Any]]:
     """Return tool schemas filtered for a CommandCode-like permission mode."""
-
     source = tools if tools is not None else TOOL_DEFINITIONS
     if mode in {"standard", "auto-accept", "bypass"}:
-        return [
-            tool
-            for tool in source
-            if tool.get("function", {}).get("name") != "exit_plan_mode"
-        ]
+        return [tool for tool in source if tool.get("function", {}).get("name") != "exit_plan_mode"]
     if mode == "plan":
         blocked = PLAN_BLOCKED_TOOLS | {"enter_plan_mode"}
-        return [
-            tool
-            for tool in source
-            if tool.get("function", {}).get("name") not in blocked
-        ]
+        return [tool for tool in source if tool.get("function", {}).get("name") not in blocked]
     raise ValueError(f"Invalid permission mode: {mode}")

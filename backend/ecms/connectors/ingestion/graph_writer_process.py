@@ -34,9 +34,7 @@ async def run() -> None:
     await queue.ensure_group()
     objects = create_snapshot_object_store(settings)
     await objects.ensure_bucket()
-    store = PostgresGraphBatchStore(
-        lease_seconds=settings.connector_ingestion_stale_after_seconds
-    )
+    store = PostgresGraphBatchStore(lease_seconds=settings.connector_ingestion_stale_after_seconds)
     semaphore = GraphWriteSemaphore(
         redis,
         ttl_seconds=settings.connector_ingestion_stale_after_seconds,
@@ -48,9 +46,7 @@ async def run() -> None:
             objects=objects,
             semaphore=semaphore,
             sink=LegacyGraphChunkSink(
-                snapshot_timeout_seconds=(
-                    settings.connector_ingestion_snapshot_timeout_seconds
-                )
+                snapshot_timeout_seconds=(settings.connector_ingestion_snapshot_timeout_seconds)
             ),
             writer_id=writer_id,
         ),

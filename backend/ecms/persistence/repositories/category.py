@@ -36,9 +36,7 @@ class CategoryRepository:
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def create(
-        self, *, name: str, description: str, color: str, priority: int
-    ) -> Category:
+    async def create(self, *, name: str, description: str, color: str, priority: int) -> Category:
         cat = Category(
             id=f"cat-{name}",
             name=name,
@@ -52,8 +50,13 @@ class CategoryRepository:
         return cat
 
     async def update(
-        self, category: Category, *, description: str | None = None,
-        color: str | None = None, priority: int | None = None, name: str | None = None,
+        self,
+        category: Category,
+        *,
+        description: str | None = None,
+        color: str | None = None,
+        priority: int | None = None,
+        name: str | None = None,
     ) -> Category:
         if description is not None:
             category.description = description

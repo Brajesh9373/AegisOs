@@ -5,14 +5,14 @@ Provides database session management for Agent OS repositories.
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from ecms.configuration.schemas.settings import get_settings
 
-__all__ = ["db_session", "init_agent_os_db", "get_engine"]
+__all__ = ["db_session", "get_engine", "init_agent_os_db"]
 
 
 def get_engine():

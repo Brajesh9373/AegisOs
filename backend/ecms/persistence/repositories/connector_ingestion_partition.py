@@ -58,9 +58,7 @@ def _lease_expired(expires_at: datetime | None, now: datetime | None = None) -> 
     """Compare database timestamps safely across SQLite and PostgreSQL."""
     if expires_at is None:
         return True
-    comparable_expiry = (
-        expires_at.replace(tzinfo=UTC) if expires_at.tzinfo is None else expires_at
-    )
+    comparable_expiry = expires_at.replace(tzinfo=UTC) if expires_at.tzinfo is None else expires_at
     comparable_now = now or utcnow()
     if comparable_now.tzinfo is None:
         comparable_now = comparable_now.replace(tzinfo=UTC)
@@ -247,9 +245,7 @@ class ConnectorIngestionPartitionRepository:
                 ConnectorIngestionPartition.state.in_(("claimed", "extracting")),
                 ConnectorIngestionPartition.lease_expires_at >= renewed_at,
             )
-            .values(
-                lease_expires_at=renewed_at + timedelta(seconds=max(lease_seconds, 1))
-            )
+            .values(lease_expires_at=renewed_at + timedelta(seconds=max(lease_seconds, 1)))
             .execution_options(synchronize_session=False)
         )
         return result.rowcount == 1
@@ -345,8 +341,7 @@ class ConnectorIngestionPartitionRepository:
             "files_processed": sum(row[3] for row in rows),
             "nodes_extracted": sum(row[4] for row in rows),
             "edges_extracted": sum(row[5] for row in rows),
-            "all_committed": bool(states)
-            and states.get("committed", 0) == sum(states.values()),
+            "all_committed": bool(states) and states.get("committed", 0) == sum(states.values()),
             "has_failures": states.get("failed", 0) > 0,
         }
 
@@ -403,9 +398,7 @@ class ConnectorIngestionStageBatchRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get(
-        self, batch_id: str, organization_id: str
-    ) -> ConnectorIngestionStageBatch | None:
+    async def get(self, batch_id: str, organization_id: str) -> ConnectorIngestionStageBatch | None:
         """Return a staged batch only within the requesting organization."""
         result = await self._session.execute(
             select(ConnectorIngestionStageBatch).where(
@@ -474,8 +467,7 @@ class ConnectorIngestionStageBatchRepository:
             .values(
                 state="writing",
                 writer_owner=writer_id,
-                writer_lease_expires_at=claimed_at
-                + timedelta(seconds=max(lease_seconds, 1)),
+                writer_lease_expires_at=claimed_at + timedelta(seconds=max(lease_seconds, 1)),
                 attempt=ConnectorIngestionStageBatch.attempt + 1,
                 error_summary=None,
             )
@@ -508,10 +500,7 @@ class ConnectorIngestionStageBatchRepository:
                 ConnectorIngestionStageBatch.state == "writing",
                 ConnectorIngestionStageBatch.writer_lease_expires_at >= renewed_at,
             )
-            .values(
-                writer_lease_expires_at=renewed_at
-                + timedelta(seconds=max(lease_seconds, 1))
-            )
+            .values(writer_lease_expires_at=renewed_at + timedelta(seconds=max(lease_seconds, 1)))
             .execution_options(synchronize_session=False)
         )
         return result.rowcount == 1
@@ -543,9 +532,7 @@ class ConnectorIngestionStageBatchRepository:
         batch.error_summary = error_summary[:4_000] if error_summary else None
         if target == "writing":
             batch.writer_owner = writer_id
-            batch.writer_lease_expires_at = changed_at + timedelta(
-                seconds=max(lease_seconds, 1)
-            )
+            batch.writer_lease_expires_at = changed_at + timedelta(seconds=max(lease_seconds, 1))
             batch.attempt += 1
         if target in {"staged", "committed", "failed", "cancelled"}:
             batch.writer_owner = None
@@ -580,8 +567,7 @@ class ConnectorIngestionStageBatchRepository:
             "node_count": sum(row[2] for row in rows),
             "edge_count": sum(row[3] for row in rows),
             "byte_count": sum(row[4] for row in rows),
-            "all_committed": bool(states)
-            and states.get("committed", 0) == sum(states.values()),
+            "all_committed": bool(states) and states.get("committed", 0) == sum(states.values()),
             "has_failures": states.get("failed", 0) > 0,
         }
 

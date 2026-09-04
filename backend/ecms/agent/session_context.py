@@ -31,9 +31,11 @@ def _get_session_memory() -> RedisSessionMemory:
 
 async def _pg_set(session_id: str, key: str, value: Any) -> None:
     try:
+        from sqlalchemy import select
+
         from ecms.persistence.database.rest_session import db_session
         from ecms.persistence.models.session_context import SessionContextKV
-        from sqlalchemy import select
+
         async with db_session() as s:
             stmt = select(SessionContextKV).where(
                 SessionContextKV.session_id == session_id,
@@ -51,9 +53,11 @@ async def _pg_set(session_id: str, key: str, value: Any) -> None:
 
 async def _pg_get(session_id: str, key: str) -> Any:
     try:
+        from sqlalchemy import select
+
         from ecms.persistence.database.rest_session import db_session
         from ecms.persistence.models.session_context import SessionContextKV
-        from sqlalchemy import select
+
         async with db_session() as s:
             stmt = select(SessionContextKV).where(
                 SessionContextKV.session_id == session_id,
@@ -70,9 +74,11 @@ async def _pg_get(session_id: str, key: str) -> Any:
 
 async def _pg_snapshot(session_id: str) -> dict[str, Any]:
     try:
+        from sqlalchemy import select
+
         from ecms.persistence.database.rest_session import db_session
         from ecms.persistence.models.session_context import SessionContextKV
-        from sqlalchemy import select
+
         async with db_session() as s:
             stmt = select(SessionContextKV).where(
                 SessionContextKV.session_id == session_id,

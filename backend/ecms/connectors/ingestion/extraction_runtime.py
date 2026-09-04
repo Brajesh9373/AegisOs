@@ -156,14 +156,11 @@ class ExtractionHandler:
                 if stop.is_set():
                     raise ExtractionCancelledError("partition lease lost or cancelled")
                 record = (await asyncio.to_thread(_extract_entries, work, (entry,)))[0]
-                candidate = _build_batch(
-                    work, sequence, (*pending, record), pending_files + 1
-                )
+                candidate = _build_batch(work, sequence, (*pending, record), pending_files + 1)
                 if candidate.encoded_byte_count > self._max_batch_encoded_bytes:
                     if not pending:
                         raise ValueError(
-                            f"derived record exceeds staged batch byte limit: "
-                            f"{entry.relative_path}"
+                            f"derived record exceeds staged batch byte limit: {entry.relative_path}"
                         )
                     batch = _build_batch(work, sequence, pending, pending_files)
                     processed, nodes, edges, sequence = await self._stage(
@@ -179,8 +176,7 @@ class ExtractionHandler:
                     candidate = _build_batch(work, sequence, pending, pending_files)
                     if candidate.encoded_byte_count > self._max_batch_encoded_bytes:
                         raise ValueError(
-                            f"derived record exceeds staged batch byte limit: "
-                            f"{entry.relative_path}"
+                            f"derived record exceeds staged batch byte limit: {entry.relative_path}"
                         )
                 else:
                     pending.append(record)
@@ -254,17 +250,14 @@ class ExtractionHandler:
     async def _guard_lease(self, work: PartitionWork, stop: asyncio.Event) -> None:
         while not stop.is_set():
             await asyncio.sleep(self._lease_poll_seconds)
-            if (
-                not await self._store.renew(work, self._worker_id)
-                or await self._store.cancellation_requested(work)
-            ):
+            if not await self._store.renew(
+                work, self._worker_id
+            ) or await self._store.cancellation_requested(work):
                 stop.set()
                 return
 
 
-async def _load_partition(
-    objects: ObjectStore, work: PartitionWork
-) -> LoadedPartition:
+async def _load_partition(objects: ObjectStore, work: PartitionWork) -> LoadedPartition:
     selected: list[ManifestEntry] = []
     digest = hashlib.sha256()
     digest.update(b"[")
@@ -309,9 +302,7 @@ async def _load_partition(
     digest.update(b"]")
     if header is None:
         raise ValueError("stored manifest has no header")
-    if seen != _as_int(header["file_count"]) or total_bytes != _as_int(
-        header["total_bytes"]
-    ):
+    if seen != _as_int(header["file_count"]) or total_bytes != _as_int(header["total_bytes"]):
         raise ValueError("stored manifest totals are invalid")
     if digest.hexdigest() != work.manifest_checksum:
         raise ValueError("stored manifest content checksum is invalid")
@@ -322,9 +313,7 @@ async def _load_partition(
         "total_weight": sum(max(1, entry.size_bytes) for entry in selected),
     }
     partition_checksum = hashlib.sha256(
-        json.dumps(
-            checksum_payload, sort_keys=True, separators=(",", ":")
-        ).encode()
+        json.dumps(checksum_payload, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
     return LoadedPartition(tuple(selected), partition_checksum)
 
@@ -336,9 +325,7 @@ def _as_int(value: object) -> int:
 
 
 async def _validate_revision(repository: Path, expected: str) -> None:
-    is_safe = await asyncio.to_thread(
-        lambda: repository.is_dir() and not repository.is_symlink()
-    )
+    is_safe = await asyncio.to_thread(lambda: repository.is_dir() and not repository.is_symlink())
     if not is_safe:
         raise ValueError("repository workspace is unavailable or unsafe")
     process = await asyncio.create_subprocess_exec(
@@ -373,9 +360,7 @@ def _extract_entries(
             raise ValueError(f"file size changed: {entry.relative_path}")
         if hashlib.sha256(content).hexdigest() != entry.content_hash:
             raise ValueError(f"file content changed: {entry.relative_path}")
-        identity = (
-            f"{work.organization_id}\0{work.connection_id}\0{entry.relative_path}"
-        )
+        identity = f"{work.organization_id}\0{work.connection_id}\0{entry.relative_path}"
         node_id = f"git:file:{hashlib.sha256(identity.encode()).hexdigest()}"
         records.append(
             {
@@ -407,16 +392,8 @@ def _build_batch(
     records: Sequence[dict[str, object]],
     file_count: int,
 ) -> StagedBatch:
-    nodes = [
-        node
-        for record in records
-        for node in cast(list[dict[str, Any]], record["nodes"])
-    ]
-    edges = [
-        edge
-        for record in records
-        for edge in cast(list[dict[str, Any]], record["edges"])
-    ]
+    nodes = [node for record in records for node in cast(list[dict[str, Any]], record["nodes"])]
+    edges = [edge for record in records for edge in cast(list[dict[str, Any]], record["edges"])]
     document = {
         "schema_version": 1,
         "job_id": work.job_id,
@@ -431,17 +408,14 @@ def _build_batch(
     ).encode()
     checksum = hashlib.sha256(canonical).hexdigest()
     payload = gzip.compress(canonical, mtime=0)
-    batch_id = hashlib.sha256(
-        f"{work.id}:{sequence}:{checksum}".encode()
-    ).hexdigest()
+    batch_id = hashlib.sha256(f"{work.id}:{sequence}:{checksum}".encode()).hexdigest()
     tenant = hashlib.sha256(work.organization_id.encode()).hexdigest()[:20]
     job = hashlib.sha256(work.job_id.encode()).hexdigest()[:20]
     return StagedBatch(
         id=batch_id,
         sequence_number=sequence,
         object_key=(
-            f"connector-ingestion/staged/{tenant}/{job}/"
-            f"{work.id}/{sequence:08d}-{checksum}.json.gz"
+            f"connector-ingestion/staged/{tenant}/{job}/{work.id}/{sequence:08d}-{checksum}.json.gz"
         ),
         checksum=checksum,
         payload=payload,

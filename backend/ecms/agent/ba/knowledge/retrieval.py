@@ -30,8 +30,9 @@ async def _extract_project_metadata(source_text: str) -> dict:
     This is a lightweight call — just enough to know what knowledge to retrieve.
     Returns {"domain": str, "keywords": list[str]}.
     """
-    from ecms.agent.ba.model import resolve_ba_model
     from openai import AsyncOpenAI
+
+    from ecms.agent.ba.model import resolve_ba_model
 
     try:
         cfg = await resolve_ba_model()
@@ -113,7 +114,9 @@ async def retrieve_for_project(
         try:
             query_embedding = await generate_embedding(query)
         except Exception as exc:
-            logger.warning("[retrieval] embedding generation failed, using text search only: %s", exc)
+            logger.warning(
+                "[retrieval] embedding generation failed, using text search only: %s", exc
+            )
 
         # Step 3: Get universal patterns (always included)
         universal = await list_by_category("universal_pattern", top_k=5)
@@ -121,14 +124,16 @@ async def retrieve_for_project(
         # Step 4: Search for domain-specific knowledge
         if query_embedding:
             domain_results = await hybrid_search(
-                query, query_embedding,
+                query,
+                query_embedding,
                 domain=domain if domain else None,
                 top_k=top_k,
             )
             keyword_query = " ".join(keywords[:3]) if keywords else ""
             if keyword_query:
                 keyword_results = await hybrid_search(
-                    keyword_query, query_embedding,
+                    keyword_query,
+                    query_embedding,
                     top_k=5,
                 )
             else:
@@ -136,8 +141,11 @@ async def retrieve_for_project(
         else:
             # Fallback: text-only search
             from ecms.agent.ba.knowledge.store import search_by_text
+
             domain_results = await search_by_text(
-                query, domain=domain if domain else None, top_k=top_k,
+                query,
+                domain=domain if domain else None,
+                top_k=top_k,
             )
             keyword_results = []
 
@@ -149,9 +157,9 @@ async def retrieve_for_project(
         for entry in universal:
             if entry.id not in seen_ids:
                 seen_ids.add(entry.id)
-                all_results.append(KnowledgeSearchResult(
-                    entry=entry, score=1.0, match_type="universal"
-                ))
+                all_results.append(
+                    KnowledgeSearchResult(entry=entry, score=1.0, match_type="universal")
+                )
 
         # Domain results
         for r in domain_results:
@@ -170,7 +178,8 @@ async def retrieve_for_project(
         if context:
             logger.info(
                 "[retrieval] found %d knowledge entries for domain=%s",
-                len(all_results), domain,
+                len(all_results),
+                domain,
             )
         return context
 

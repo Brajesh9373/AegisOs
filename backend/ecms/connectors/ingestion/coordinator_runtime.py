@@ -86,9 +86,7 @@ class SqlCoordinatorPlanStore:
 
     def __init__(
         self,
-        session_factory: Callable[
-            [], AbstractAsyncContextManager[AsyncSession]
-        ] = db_session,
+        session_factory: Callable[[], AbstractAsyncContextManager[AsyncSession]] = db_session,
     ) -> None:
         """Use short transaction-scoped sessions."""
         self._session_factory = session_factory
@@ -108,18 +106,12 @@ class SqlCoordinatorPlanStore:
             existing = await manifests.get_for_job(spec.job_id, spec.organization_id)
             if existing is not None:
                 self._validate_recovery(existing, revision, plan.manifest.checksum)
-                records = await partitions.list_for_job(
-                    spec.job_id, spec.organization_id
-                )
+                records = await partitions.list_for_job(spec.job_id, spec.organization_id)
                 if len(records) != len(plan.partitions):
                     if records:
-                        raise RuntimeError(
-                            "persisted manifest has incomplete partition records"
-                        )
+                        raise RuntimeError("persisted manifest has incomplete partition records")
                     records = await partitions.add_all(
-                        self._partition_records(
-                            spec, existing.id, object_key, plan
-                        )
+                        self._partition_records(spec, existing.id, object_key, plan)
                     )
                 if existing.state == "building":
                     existing.object_key = object_key
@@ -224,13 +216,9 @@ class SqlCoordinatorPlanStore:
         checksum: str,
     ) -> None:
         if manifest.resolved_revision != revision or manifest.checksum != checksum:
-            raise RuntimeError(
-                "coordinator recovery resolved a different immutable manifest"
-            )
+            raise RuntimeError("coordinator recovery resolved a different immutable manifest")
         if manifest.state in {"failed", "cancelled"}:
-            raise RuntimeError(
-                f"cannot recover terminal {manifest.state} manifest"
-            )
+            raise RuntimeError(f"cannot recover terminal {manifest.state} manifest")
 
 
 class ConnectorIngestionCoordinator:
@@ -260,17 +248,13 @@ class ConnectorIngestionCoordinator:
         self._scan_limits = scan_limits
         self._partition_count = partition_count
 
-    async def coordinate(
-        self, *, job_id: str, organization_id: str
-    ) -> CoordinationResult | None:
+    async def coordinate(self, *, job_id: str, organization_id: str) -> CoordinationResult | None:
         """Coordinate one claimed parent job, safely replaying after a crash."""
         spec = await self._jobs.claim(job_id, organization_id)
         if spec is None:
             return None
         cancel = asyncio.Event()
-        cancellation_poll = asyncio.create_task(
-            self._poll_cancellation(spec.job_id, cancel)
-        )
+        cancellation_poll = asyncio.create_task(self._poll_cancellation(spec.job_id, cancel))
         try:
             await self._jobs.mark_stage(spec.job_id, "cloning")
             repository = await self._workspace.prepare(
@@ -288,14 +272,10 @@ class ConnectorIngestionCoordinator:
                     access_token=spec.access_token,
                 )
                 if spec.requested_revision
-                else await self._workspace.current_revision(
-                    repository, cancel=cancel
-                )
+                else await self._workspace.current_revision(repository, cancel=cancel)
             )
             if spec.resolved_revision and revision != spec.resolved_revision:
-                raise RuntimeError(
-                    "source revision changed during coordinator recovery"
-                )
+                raise RuntimeError("source revision changed during coordinator recovery")
             await self._jobs.record_revision(spec.job_id, revision)
             spec = replace(spec, resolved_revision=revision)
             if revision == spec.last_successful_revision:
@@ -348,9 +328,7 @@ class ConnectorIngestionCoordinator:
             )
         except IngestionCancelledError:
             await self._jobs.cancel(spec.job_id)
-            return CoordinationResult(
-                "cancelled", spec.resolved_revision or ""
-            )
+            return CoordinationResult("cancelled", spec.resolved_revision or "")
         except Exception as exc:
             await self._jobs.fail(
                 spec.job_id,
@@ -363,13 +341,9 @@ class ConnectorIngestionCoordinator:
             await asyncio.gather(cancellation_poll, return_exceptions=True)
 
     def _repository_path(self, spec: GitJobSpec) -> Path:
-        return repository_workspace_path(
-            self._workspace_root, spec.organization_id, spec.job_id
-        )
+        return repository_workspace_path(self._workspace_root, spec.organization_id, spec.job_id)
 
-    async def _poll_cancellation(
-        self, job_id: str, cancellation: asyncio.Event
-    ) -> None:
+    async def _poll_cancellation(self, job_id: str, cancellation: asyncio.Event) -> None:
         while not cancellation.is_set():
             if not await self._jobs.renew_lease(job_id):
                 cancellation.set()
@@ -388,9 +362,7 @@ async def store_manifest_plan(
     plan: IngestionPlan,
 ) -> None:
     """Stream a compressed full manifest to durable object storage."""
-    temporary_path = await asyncio.to_thread(
-        _write_manifest_file, revision, plan
-    )
+    temporary_path = await asyncio.to_thread(_write_manifest_file, revision, plan)
     try:
         await object_store.put_file(
             object_key,
@@ -417,9 +389,7 @@ async def iter_stored_manifest(
             while raw_line := await asyncio.to_thread(stream.readline):
                 value = json.loads(raw_line)
                 if not isinstance(value, dict):
-                    raise ValueError(
-                        "stored manifest contains a non-object record"
-                    )
+                    raise ValueError("stored manifest contains a non-object record")
                 if first:
                     if value.get("format") != MANIFEST_FORMAT:
                         raise ValueError("stored manifest format is unsupported")
@@ -461,19 +431,12 @@ def _write_manifest_file(revision: str, plan: IngestionPlan) -> Path:
     return path
 
 
-def _manifest_object_key(
-    spec: GitJobSpec, revision: str, plan: IngestionPlan
-) -> str:
+def _manifest_object_key(spec: GitJobSpec, revision: str, plan: IngestionPlan) -> str:
     tenant = hashlib.sha256(spec.organization_id.encode()).hexdigest()[:20]
-    return (
-        f"connector-ingestion/manifests/{tenant}/{revision}/"
-        f"{plan.manifest.checksum}.jsonl.gz"
-    )
+    return f"connector-ingestion/manifests/{tenant}/{revision}/{plan.manifest.checksum}.jsonl.gz"
 
 
-def repository_workspace_path(
-    root: Path, organization_id: str, job_id: str
-) -> Path:
+def repository_workspace_path(root: Path, organization_id: str, job_id: str) -> Path:
     """Return the shared traversal-safe checkout path for a parent job."""
     org = hashlib.sha256(organization_id.encode()).hexdigest()[:20]
     job = hashlib.sha256(job_id.encode()).hexdigest()[:20]

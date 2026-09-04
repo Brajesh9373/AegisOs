@@ -87,7 +87,9 @@ class _ExplodingCandidatePolicy(BACandidatePolicy):
         raise RuntimeError("candidate policy failure")
 
 
-async def test_record_rolls_back_the_full_durable_unit_on_policy_failure(database: Database) -> None:
+async def test_record_rolls_back_the_full_durable_unit_on_policy_failure(
+    database: Database,
+) -> None:
     """A caught policy error cannot leave an orphaned immutable receipt behind."""
     async with database.session() as session:
         repository = BAStageOutcomeRepository(session)
@@ -117,7 +119,14 @@ async def test_records_receipt_and_approval_gated_candidate_atomically(database:
         assert candidate.organization_id == "org-a"
         assert candidate.state == "pending_approval"
         assert candidate.approval_required is True
-        assert await session.scalar(BAPromotionOutbox.__table__.select().with_only_columns(BAPromotionOutbox.id).limit(1)) is None
+        assert (
+            await session.scalar(
+                BAPromotionOutbox.__table__.select()
+                .with_only_columns(BAPromotionOutbox.id)
+                .limit(1)
+            )
+            is None
+        )
 
 
 async def test_duplicate_stage_delivery_returns_same_immutable_receipt(database: Database) -> None:
@@ -148,7 +157,9 @@ async def test_idempotency_collision_with_different_output_is_rejected(database:
             )
 
 
-async def test_approval_creates_claimable_outbox_and_tenant_scopes_records(database: Database) -> None:
+async def test_approval_creates_claimable_outbox_and_tenant_scopes_records(
+    database: Database,
+) -> None:
     """Approval is explicit and cross-organization lookups cannot see the candidate."""
     async with database.session() as session:
         repository = BAStageOutcomeRepository(session)
@@ -170,7 +181,9 @@ async def test_approval_creates_claimable_outbox_and_tenant_scopes_records(datab
         assert outbox.attempt == 1
 
 
-async def test_outbox_respects_scheduled_retry_and_recovers_expired_leases(database: Database) -> None:
+async def test_outbox_respects_scheduled_retry_and_recovers_expired_leases(
+    database: Database,
+) -> None:
     """Workers cannot claim work before availability and can reclaim failed leases."""
     async with database.session() as session:
         outcomes = BAStageOutcomeRepository(session)
@@ -213,9 +226,10 @@ async def test_expired_final_attempt_is_dead_lettered_without_reclaim(database: 
         leased.max_attempts = 1
         leased.lease_expires_at = clock - timedelta(seconds=1)
 
-        assert await outbox_repository.claim_next(
-            worker_id="worker-b", lease_seconds=60, now=clock
-        ) is None
+        assert (
+            await outbox_repository.claim_next(worker_id="worker-b", lease_seconds=60, now=clock)
+            is None
+        )
         await session.refresh(leased)
         assert leased.state == "dead_letter"
         assert leased.lease_owner is None
@@ -223,7 +237,9 @@ async def test_expired_final_attempt_is_dead_lettered_without_reclaim(database: 
         assert leased.error_code == "LEASE_EXPIRED"
 
 
-async def test_dead_letter_after_bounded_attempts_and_rejection_revokes_lease(database: Database) -> None:
+async def test_dead_letter_after_bounded_attempts_and_rejection_revokes_lease(
+    database: Database,
+) -> None:
     """Exhausted projection work is retained and a rejection prevents stale completion."""
     async with database.session() as session:
         outcomes = BAStageOutcomeRepository(session)
@@ -254,7 +270,10 @@ async def test_dead_letter_after_bounded_attempts_and_rejection_revokes_lease(da
         rejected = await outcomes.reject_candidate(candidate_two, organization_id="org-a")
         assert rejected is not None
         assert rejected.state == "rejected"
-        assert await outbox_repository.complete(leased.id, worker_id="worker-b", outcome="promoted") is None
+        assert (
+            await outbox_repository.complete(leased.id, worker_id="worker-b", outcome="promoted")
+            is None
+        )
 
 
 async def test_terminal_deduplicated_candidate_is_not_requeued(database: Database) -> None:

@@ -10,7 +10,15 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Index, Integer, String
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    DateTime,
+    ForeignKeyConstraint,
+    Index,
+    Integer,
+    String,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ecms.persistence.models.base import Base
@@ -67,9 +75,7 @@ class AgentRun(Base):
     request_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
 
     # State tracking
-    state: Mapped[str] = mapped_column(
-        String(32), nullable=False, default=RunState.PENDING.value
-    )
+    state: Mapped[str] = mapped_column(String(32), nullable=False, default=RunState.PENDING.value)
 
     # Profile fingerprint at execution time
     profile_fingerprint: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -123,9 +129,7 @@ class AgentRunStep(Base):
     stage_id: Mapped[str] = mapped_column(String(64), nullable=False)
 
     # State
-    state: Mapped[str] = mapped_column(
-        String(32), nullable=False, default=StepState.PENDING.value
-    )
+    state: Mapped[str] = mapped_column(String(32), nullable=False, default=StepState.PENDING.value)
 
     # Receipt data (checksum, not full content)
     receipt_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)

@@ -7,11 +7,7 @@ from ecms.configuration.schemas.settings import AppSettings, get_settings
 
 def selected_runtime(settings: AppSettings) -> str:
     """Return the only parent consumer permitted for this deployment."""
-    return (
-        "parallel"
-        if settings.connector_parallel_ingestion_enabled
-        else "legacy"
-    )
+    return "parallel" if settings.connector_parallel_ingestion_enabled else "legacy"
 
 
 def main() -> None:

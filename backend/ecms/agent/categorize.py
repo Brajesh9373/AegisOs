@@ -16,12 +16,12 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from legacy_ecms.config import get_settings
 from openai import AsyncOpenAI
 
 from ecms.agent.loop import AgentLoop
 from ecms.persistence.database.rest_session import db_session
 from ecms.persistence.repositories.category import CategoryRepository
-from legacy_ecms.config import get_settings
 
 logger = logging.getLogger("ecms.categorize")
 _CATEGORIZE_OUTPUT_DIR = Path("/tmp/categorize")
@@ -30,7 +30,19 @@ _CATEGORIZE_OUTPUT_DIR = Path("/tmp/categorize")
 def _pre_scan(repo_paths: list[Path]) -> str:
     """Walk repos up to depth 3 — directory tree only."""
     lines: list[str] = []
-    skip = {"node_modules", "__pycache__", ".git", "build", "dist", ".venv", "venv", ".idea", "target", ".kotlin"}
+    skip = {
+        "node_modules",
+        "__pycache__",
+        ".git",
+        "build",
+        "dist",
+        ".venv",
+        "venv",
+        ".idea",
+        "target",
+        ".kotlin",
+    }
+
     def _walk(d: Path, indent: str, depth: int) -> None:
         if depth > 3:
             lines.append(f"{indent}  ...")
@@ -47,6 +59,7 @@ def _pre_scan(repo_paths: list[Path]) -> str:
                 _walk(e, f"{indent}    ", depth + 1)
             else:
                 lines.append(f"{indent}  {e.name}")
+
     for rp in repo_paths:
         lines.append(f"## {rp.name}")
         _walk(rp, "", 0)
@@ -101,13 +114,14 @@ def _extract_patterns(text: str) -> list[dict]:
         return []
     for strategy in [
         lambda t: json.loads(t).get("patterns", []),
-        lambda t: json.loads(t[t.find("{"):t.rfind("}") + 1]).get("patterns", []),
+        lambda t: json.loads(t[t.find("{") : t.rfind("}") + 1]).get("patterns", []),
     ]:
         try:
             return strategy(text)
         except Exception:
             continue
     import re
+
     m = re.search(r'"patterns"\s*:\s*\[(.*)\]', text, re.DOTALL)
     if m:
         try:
@@ -145,16 +159,71 @@ def _classify(source_id: str | None, node_id: str | None, mapping: list[dict], d
     if scored:
         scored.sort(key=lambda x: x[0])
         return scored[0][1]
-    ext = (clean.rsplit("/", 1)[-1] if "/" in clean else clean).rsplit(".", 1)[-1].lower() if "." in clean.rsplit("/", 1)[-1] else ""
-    if ext in {"py","java","kt","go","rs","rb","php","swift","c","h","cpp","hpp","dart","scala","ex","exs","clj"}:
+    ext = (
+        (clean.rsplit("/", 1)[-1] if "/" in clean else clean).rsplit(".", 1)[-1].lower()
+        if "." in clean.rsplit("/", 1)[-1]
+        else ""
+    )
+    if ext in {
+        "py",
+        "java",
+        "kt",
+        "go",
+        "rs",
+        "rb",
+        "php",
+        "swift",
+        "c",
+        "h",
+        "cpp",
+        "hpp",
+        "dart",
+        "scala",
+        "ex",
+        "exs",
+        "clj",
+    }:
         return "backend"
-    if ext in {"js","ts","tsx","jsx","vue","svelte","css","scss","less","html","png","jpg","jpeg","gif","svg","webp","ico"}:
+    if ext in {
+        "js",
+        "ts",
+        "tsx",
+        "jsx",
+        "vue",
+        "svelte",
+        "css",
+        "scss",
+        "less",
+        "html",
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "svg",
+        "webp",
+        "ico",
+    }:
         return "frontend"
-    if ext in {"yaml","yml","toml","gradle","properties","cfg","ini","env","tf","tfvars","sh","bash","ps1","lock"}:
+    if ext in {
+        "yaml",
+        "yml",
+        "toml",
+        "gradle",
+        "properties",
+        "cfg",
+        "ini",
+        "env",
+        "tf",
+        "tfvars",
+        "sh",
+        "bash",
+        "ps1",
+        "lock",
+    }:
         return "infrastructure"
     if ext == "sql":
         return "database"
-    if ext in {"md","rst","txt"}:
+    if ext in {"md", "rst", "txt"}:
         return "documentation"
     if ext == "json":
         return "backend"  # default JSON to backend (Frappe configs), LLM can override
@@ -164,69 +233,77 @@ def _classify(source_id: str | None, node_id: str | None, mapping: list[dict], d
 
 
 _FALLBACK_PATTERNS: list[dict] = [
-    {"pattern":"**/*.py","domain":"backend","reason":"Python","priority":100},
-    {"pattern":"**/*.java","domain":"backend","reason":"Java","priority":100},
-    {"pattern":"**/*.kt","domain":"backend","reason":"Kotlin","priority":100},
-    {"pattern":"**/*.go","domain":"backend","reason":"Go","priority":100},
-    {"pattern":"**/*.rs","domain":"backend","reason":"Rust","priority":100},
-    {"pattern":"**/*.rb","domain":"backend","reason":"Ruby","priority":100},
-    {"pattern":"**/*.php","domain":"backend","reason":"PHP","priority":100},
-    {"pattern":"**/*.swift","domain":"backend","reason":"Swift","priority":100},
-    {"pattern":"**/*.c","domain":"backend","reason":"C","priority":100},
-    {"pattern":"**/*.h","domain":"backend","reason":"C header","priority":100},
-    {"pattern":"**/*.cpp","domain":"backend","reason":"C++","priority":100},
-    {"pattern":"**/*.dart","domain":"backend","reason":"Dart","priority":100},
-    {"pattern":"**/*.scala","domain":"backend","reason":"Scala","priority":100},
-    {"pattern":"**/*.ex","domain":"backend","reason":"Elixir","priority":100},
-    {"pattern":"**/*.r","domain":"data-ml","reason":"R","priority":100},
-    {"pattern":"**/*.js","domain":"frontend","reason":"JavaScript","priority":100},
-    {"pattern":"**/*.ts","domain":"frontend","reason":"TypeScript","priority":100},
-    {"pattern":"**/*.tsx","domain":"frontend","reason":"TSX","priority":100},
-    {"pattern":"**/*.jsx","domain":"frontend","reason":"JSX","priority":100},
-    {"pattern":"**/*.vue","domain":"frontend","reason":"Vue","priority":100},
-    {"pattern":"**/*.svelte","domain":"frontend","reason":"Svelte","priority":100},
-    {"pattern":"**/*.css","domain":"frontend","reason":"CSS","priority":100},
-    {"pattern":"**/*.scss","domain":"frontend","reason":"SCSS","priority":100},
-    {"pattern":"**/*.less","domain":"frontend","reason":"LESS","priority":100},
-    {"pattern":"**/*.html","domain":"frontend","reason":"HTML","priority":100},
-    {"pattern":"**/*.json","domain":"backend","reason":"JSON config","priority":100},
-    {"pattern":"**/*.xml","domain":"frontend","reason":"XML","priority":100},
-    {"pattern":"**/*.yaml","domain":"infrastructure","reason":"YAML","priority":100},
-    {"pattern":"**/*.yml","domain":"infrastructure","reason":"YAML","priority":100},
-    {"pattern":"**/*.toml","domain":"infrastructure","reason":"TOML","priority":100},
-    {"pattern":"**/*.png","domain":"frontend","reason":"Image","priority":100},
-    {"pattern":"**/*.jpg","domain":"frontend","reason":"Image","priority":100},
-    {"pattern":"**/*.svg","domain":"frontend","reason":"Image","priority":100},
-    {"pattern":"**/*.gradle","domain":"infrastructure","reason":"Gradle","priority":100},
-    {"pattern":"**/*.properties","domain":"infrastructure","reason":"Properties","priority":100},
-    {"pattern":"**/*.cfg","domain":"infrastructure","reason":"Config","priority":100},
-    {"pattern":"**/*.ini","domain":"infrastructure","reason":"Config","priority":100},
-    {"pattern":"**/*.env","domain":"infrastructure","reason":"Env","priority":100},
-    {"pattern":"**/*.tf","domain":"infrastructure","reason":"Terraform","priority":100},
-    {"pattern":"**/*.sh","domain":"infrastructure","reason":"Shell","priority":100},
-    {"pattern":"**/Dockerfile*","domain":"infrastructure","reason":"Docker","priority":100},
-    {"pattern":"**/Makefile","domain":"infrastructure","reason":"Build","priority":100},
-    {"pattern":"**/*.sql","domain":"database","reason":"SQL","priority":100},
-    {"pattern":"**/*.prisma","domain":"database","reason":"Prisma","priority":100},
-    {"pattern":"**/migrations/**","domain":"database","reason":"Migrations","priority":100},
-    {"pattern":"**/alembic/**","domain":"database","reason":"Alembic","priority":100},
-    {"pattern":"**/*.md","domain":"documentation","reason":"Markdown","priority":100},
-    {"pattern":"**/*.rst","domain":"documentation","reason":"reST","priority":100},
-    {"pattern":"**/*.txt","domain":"documentation","reason":"Text","priority":100},
-    {"pattern":"**/README*","domain":"documentation","reason":"README","priority":100},
-    {"pattern":"**/license*","domain":"documentation","reason":"License","priority":100},
-    {"pattern":"**/LICENSE*","domain":"documentation","reason":"License","priority":100},
-    {"pattern":"**/terraform/**","domain":"infrastructure","reason":"Terraform dir","priority":100},
-    {"pattern":"**/kubernetes/**","domain":"infrastructure","reason":"K8s","priority":100},
-    {"pattern":"**/k8s/**","domain":"infrastructure","reason":"K8s","priority":100},
-    {"pattern":"**/helm/**","domain":"infrastructure","reason":"Helm","priority":100},
-    {"pattern":"**/.github/**","domain":"infrastructure","reason":"CI/CD","priority":100},
+    {"pattern": "**/*.py", "domain": "backend", "reason": "Python", "priority": 100},
+    {"pattern": "**/*.java", "domain": "backend", "reason": "Java", "priority": 100},
+    {"pattern": "**/*.kt", "domain": "backend", "reason": "Kotlin", "priority": 100},
+    {"pattern": "**/*.go", "domain": "backend", "reason": "Go", "priority": 100},
+    {"pattern": "**/*.rs", "domain": "backend", "reason": "Rust", "priority": 100},
+    {"pattern": "**/*.rb", "domain": "backend", "reason": "Ruby", "priority": 100},
+    {"pattern": "**/*.php", "domain": "backend", "reason": "PHP", "priority": 100},
+    {"pattern": "**/*.swift", "domain": "backend", "reason": "Swift", "priority": 100},
+    {"pattern": "**/*.c", "domain": "backend", "reason": "C", "priority": 100},
+    {"pattern": "**/*.h", "domain": "backend", "reason": "C header", "priority": 100},
+    {"pattern": "**/*.cpp", "domain": "backend", "reason": "C++", "priority": 100},
+    {"pattern": "**/*.dart", "domain": "backend", "reason": "Dart", "priority": 100},
+    {"pattern": "**/*.scala", "domain": "backend", "reason": "Scala", "priority": 100},
+    {"pattern": "**/*.ex", "domain": "backend", "reason": "Elixir", "priority": 100},
+    {"pattern": "**/*.r", "domain": "data-ml", "reason": "R", "priority": 100},
+    {"pattern": "**/*.js", "domain": "frontend", "reason": "JavaScript", "priority": 100},
+    {"pattern": "**/*.ts", "domain": "frontend", "reason": "TypeScript", "priority": 100},
+    {"pattern": "**/*.tsx", "domain": "frontend", "reason": "TSX", "priority": 100},
+    {"pattern": "**/*.jsx", "domain": "frontend", "reason": "JSX", "priority": 100},
+    {"pattern": "**/*.vue", "domain": "frontend", "reason": "Vue", "priority": 100},
+    {"pattern": "**/*.svelte", "domain": "frontend", "reason": "Svelte", "priority": 100},
+    {"pattern": "**/*.css", "domain": "frontend", "reason": "CSS", "priority": 100},
+    {"pattern": "**/*.scss", "domain": "frontend", "reason": "SCSS", "priority": 100},
+    {"pattern": "**/*.less", "domain": "frontend", "reason": "LESS", "priority": 100},
+    {"pattern": "**/*.html", "domain": "frontend", "reason": "HTML", "priority": 100},
+    {"pattern": "**/*.json", "domain": "backend", "reason": "JSON config", "priority": 100},
+    {"pattern": "**/*.xml", "domain": "frontend", "reason": "XML", "priority": 100},
+    {"pattern": "**/*.yaml", "domain": "infrastructure", "reason": "YAML", "priority": 100},
+    {"pattern": "**/*.yml", "domain": "infrastructure", "reason": "YAML", "priority": 100},
+    {"pattern": "**/*.toml", "domain": "infrastructure", "reason": "TOML", "priority": 100},
+    {"pattern": "**/*.png", "domain": "frontend", "reason": "Image", "priority": 100},
+    {"pattern": "**/*.jpg", "domain": "frontend", "reason": "Image", "priority": 100},
+    {"pattern": "**/*.svg", "domain": "frontend", "reason": "Image", "priority": 100},
+    {"pattern": "**/*.gradle", "domain": "infrastructure", "reason": "Gradle", "priority": 100},
+    {
+        "pattern": "**/*.properties",
+        "domain": "infrastructure",
+        "reason": "Properties",
+        "priority": 100,
+    },
+    {"pattern": "**/*.cfg", "domain": "infrastructure", "reason": "Config", "priority": 100},
+    {"pattern": "**/*.ini", "domain": "infrastructure", "reason": "Config", "priority": 100},
+    {"pattern": "**/*.env", "domain": "infrastructure", "reason": "Env", "priority": 100},
+    {"pattern": "**/*.tf", "domain": "infrastructure", "reason": "Terraform", "priority": 100},
+    {"pattern": "**/*.sh", "domain": "infrastructure", "reason": "Shell", "priority": 100},
+    {"pattern": "**/Dockerfile*", "domain": "infrastructure", "reason": "Docker", "priority": 100},
+    {"pattern": "**/Makefile", "domain": "infrastructure", "reason": "Build", "priority": 100},
+    {"pattern": "**/*.sql", "domain": "database", "reason": "SQL", "priority": 100},
+    {"pattern": "**/*.prisma", "domain": "database", "reason": "Prisma", "priority": 100},
+    {"pattern": "**/migrations/**", "domain": "database", "reason": "Migrations", "priority": 100},
+    {"pattern": "**/alembic/**", "domain": "database", "reason": "Alembic", "priority": 100},
+    {"pattern": "**/*.md", "domain": "documentation", "reason": "Markdown", "priority": 100},
+    {"pattern": "**/*.rst", "domain": "documentation", "reason": "reST", "priority": 100},
+    {"pattern": "**/*.txt", "domain": "documentation", "reason": "Text", "priority": 100},
+    {"pattern": "**/README*", "domain": "documentation", "reason": "README", "priority": 100},
+    {"pattern": "**/license*", "domain": "documentation", "reason": "License", "priority": 100},
+    {"pattern": "**/LICENSE*", "domain": "documentation", "reason": "License", "priority": 100},
+    {
+        "pattern": "**/terraform/**",
+        "domain": "infrastructure",
+        "reason": "Terraform dir",
+        "priority": 100,
+    },
+    {"pattern": "**/kubernetes/**", "domain": "infrastructure", "reason": "K8s", "priority": 100},
+    {"pattern": "**/k8s/**", "domain": "infrastructure", "reason": "K8s", "priority": 100},
+    {"pattern": "**/helm/**", "domain": "infrastructure", "reason": "Helm", "priority": 100},
+    {"pattern": "**/.github/**", "domain": "infrastructure", "reason": "CI/CD", "priority": 100},
 ]
 
 
-async def _extract_from_conversation(
-    conversation: list[dict], taxonomy: list[dict]
-) -> list[dict]:
+async def _extract_from_conversation(conversation: list[dict], taxonomy: list[dict]) -> list[dict]:
     """Given full agent conversation (tool results + analysis), produce JSON patterns.
 
     Takes all tool results (read_file, read_directory, glob, grep) plus any
@@ -275,30 +352,36 @@ async def _extract_from_conversation(
     resp = await client.chat.completions.create(
         model=model,
         messages=[
-            {"role": "system", "content": (
-                "You are a JSON classifier. Output ONLY a valid JSON object with a 'patterns' array. "
-                "No markdown fences, no prose, no analysis — ONLY the raw JSON starting with '{'."
-            )},
-            {"role": "user", "content": (
-                f"Based on this exploration data (tool results from an agent exploring a codebase), "
-                f"produce 25-35 path patterns (glob syntax: **/*.py, **/api/**, etc) classifying "
-                f"files into these domains: {names}.\n\n"
-                "Rules:\n"
-                "- Judge by CONTENT shown in tool results, not just extension.\n"
-                "- Frappe @frappe.whitelist API handlers → backend.\n"
-                "- Frappe doctype/dashboard JSON → backend (server-rendered config).\n"
-                "- Android Activities/Fragments/Adapters → frontend (UI layer).\n"
-                "- Android ViewModels/Services/Models → backend (business logic).\n"
-                "- Android res/layout/, res/drawable/ XML → frontend.\n"
-                "- Leaflet/React/Vue JS modules → frontend.\n"
-                "- CI/CD yml, Dockerfile, pre-commit → infrastructure.\n"
-                "- DB patches/migrations → database. README → documentation.\n"
-                "- Specific directory patterns first (low priority 1-10), broad catch-alls last (priority 90-100).\n"
-                "- Each pattern needs: pattern, domain, priority, reason.\n\n"
-                "Available categories:\n" + cats_block + "\n\n"
-                "EXPLORATION DATA:\n" + context_text[:trunc] + "\n\n"
-                'OUTPUT ONLY: {"patterns":[...]}'
-            )},
+            {
+                "role": "system",
+                "content": (
+                    "You are a JSON classifier. Output ONLY a valid JSON object with a 'patterns' array. "
+                    "No markdown fences, no prose, no analysis — ONLY the raw JSON starting with '{'."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Based on this exploration data (tool results from an agent exploring a codebase), "
+                    f"produce 25-35 path patterns (glob syntax: **/*.py, **/api/**, etc) classifying "
+                    f"files into these domains: {names}.\n\n"
+                    "Rules:\n"
+                    "- Judge by CONTENT shown in tool results, not just extension.\n"
+                    "- Frappe @frappe.whitelist API handlers → backend.\n"
+                    "- Frappe doctype/dashboard JSON → backend (server-rendered config).\n"
+                    "- Android Activities/Fragments/Adapters → frontend (UI layer).\n"
+                    "- Android ViewModels/Services/Models → backend (business logic).\n"
+                    "- Android res/layout/, res/drawable/ XML → frontend.\n"
+                    "- Leaflet/React/Vue JS modules → frontend.\n"
+                    "- CI/CD yml, Dockerfile, pre-commit → infrastructure.\n"
+                    "- DB patches/migrations → database. README → documentation.\n"
+                    "- Specific directory patterns first (low priority 1-10), broad catch-alls last (priority 90-100).\n"
+                    "- Each pattern needs: pattern, domain, priority, reason.\n\n"
+                    "Available categories:\n" + cats_block + "\n\n"
+                    "EXPLORATION DATA:\n" + context_text[:trunc] + "\n\n"
+                    'OUTPUT ONLY: {"patterns":[...]}'
+                ),
+            },
         ],
         temperature=0.0,
         max_tokens=2500,
@@ -313,13 +396,16 @@ async def run_categorization(workspace_id: str, project_id: str | None = None) -
     async with db_session() as s:
         cats = await CategoryRepository(s).list_all()
     taxonomy = [c.to_dict() for c in cats]
-    default_domain = next((c["name"] for c in taxonomy if c["name"] == "uncategorized"), "uncategorized")
+    default_domain = next(
+        (c["name"] for c in taxonomy if c["name"] == "uncategorized"), "uncategorized"
+    )
     priority_by_name = {c["name"]: c["priority"] for c in taxonomy}
 
     data_root = Path("/app/data/repos")
     repo_paths: list[Path] = []
     if project_id:
         from ecms.persistence.repositories.project import ProjectRepository
+
         async with db_session() as s:
             proj = await ProjectRepository(s).get_by_workspace(project_id)
             if proj and proj.connectors:
@@ -335,7 +421,9 @@ async def run_categorization(workspace_id: str, project_id: str | None = None) -
         repo_paths = [Path("/workspace")]
 
     tree = _pre_scan(repo_paths)
-    logger.info("[categorize] pre-scanned %d repos, tree=%d lines", len(repo_paths), tree.count("\n") + 1)
+    logger.info(
+        "[categorize] pre-scanned %d repos, tree=%d lines", len(repo_paths), tree.count("\n") + 1
+    )
 
     session_id = f"cat-{workspace_id[:20]}"
     settings = get_settings()
@@ -345,7 +433,8 @@ async def run_categorization(workspace_id: str, project_id: str | None = None) -
 
     try:
         loop = AgentLoop(
-            session_id, lightweight=True,
+            session_id,
+            lightweight=True,
             model=settings.categorize_model or settings.llm_model,
             api_key=settings.categorize_api_key or settings.openai_api_key,
             base_url=settings.categorize_base_url or settings.openai_base_url,
@@ -354,7 +443,9 @@ async def run_categorization(workspace_id: str, project_id: str | None = None) -
         answer, trace = await loop.run(prompt)
 
         iterations = trace.get("stats", {}).get("total_llm_calls", 0)
-        logger.info("[categorize] agent done | iterations=%d | answer_preview=%.200s", iterations, answer)
+        logger.info(
+            "[categorize] agent done | iterations=%d | answer_preview=%.200s", iterations, answer
+        )
 
         # Try extracting patterns directly from answer
         mapping = _extract_patterns(answer)
@@ -387,19 +478,26 @@ async def run_categorization(workspace_id: str, project_id: str | None = None) -
         logger.warning("[categorize] NO patterns extracted. Full answer: %.500s", answer)
 
     mapping_with_fallbacks = list(mapping) + list(_FALLBACK_PATTERNS)
-    logger.info("[categorize] patterns: %d LLM + %d fallback = %d total",
-                len(mapping), len(_FALLBACK_PATTERNS), len(mapping_with_fallbacks))
+    logger.info(
+        "[categorize] patterns: %d LLM + %d fallback = %d total",
+        len(mapping),
+        len(_FALLBACK_PATTERNS),
+        len(mapping_with_fallbacks),
+    )
 
     settings = get_settings()
     import falkordb
+
     db = falkordb.FalkorDB(
-        host=settings.falkordb_host, port=settings.falkordb_port,
+        host=settings.falkordb_host,
+        port=settings.falkordb_port,
         password=settings.falkordb_password or None,
     )
     graph = db.select_graph(settings.falkordb_database)
 
     group_id = workspace_id
     from ecms.persistence.repositories.project import ProjectRepository
+
     async with db_session() as s:
         repo = ProjectRepository(s)
         proj = await repo.get_by_workspace(project_id or workspace_id)
@@ -408,8 +506,11 @@ async def run_categorization(workspace_id: str, project_id: str | None = None) -
         else:
             all_projs = await repo.list_all()
             for p in all_projs:
-                if (p.workspace_id.startswith(workspace_id) or p.group_id == workspace_id
-                        or p.name == workspace_id):
+                if (
+                    p.workspace_id.startswith(workspace_id)
+                    or p.group_id == workspace_id
+                    or p.name == workspace_id
+                ):
                     group_id = p.group_id or p.workspace_id
                     break
 
@@ -444,8 +545,14 @@ async def run_categorization(workspace_id: str, project_id: str | None = None) -
     except Exception as exc:
         logger.error("[categorize] apply failed: %s", exc)
 
-    logger.info("[categorize] DONE workspace=%s group_id=%s nodes=%d counts=%s patterns=%d",
-                workspace_id, group_id, total, counts, len(mapping))
+    logger.info(
+        "[categorize] DONE workspace=%s group_id=%s nodes=%d counts=%s patterns=%d",
+        workspace_id,
+        group_id,
+        total,
+        counts,
+        len(mapping),
+    )
     if total:
         try:
             from ecms.visualization.graph_changed import graph_changed
@@ -457,5 +564,10 @@ async def run_categorization(workspace_id: str, project_id: str | None = None) -
             )
         except Exception as exc:
             logger.warning("[categorize] snapshot trigger failed: %s", exc)
-    return {"workspace_id": workspace_id, "group_id": group_id, "nodes": total, "counts": counts,
-            "patterns": len(mapping)}
+    return {
+        "workspace_id": workspace_id,
+        "group_id": group_id,
+        "nodes": total,
+        "counts": counts,
+        "patterns": len(mapping),
+    }

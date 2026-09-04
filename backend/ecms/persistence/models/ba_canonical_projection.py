@@ -71,9 +71,7 @@ class BACanonicalProjection(Base):
             "lifecycle_state IN ('active','retracted')",
             name="ck_ba_canonical_projection_lifecycle",
         ),
-        CheckConstraint(
-            "projection_version > 0", name="ck_ba_canonical_projection_version"
-        ),
+        CheckConstraint("projection_version > 0", name="ck_ba_canonical_projection_version"),
         Index(
             "ix_ba_canonical_projection_access",
             "organization_id",

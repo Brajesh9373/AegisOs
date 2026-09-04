@@ -21,29 +21,29 @@ definition, a manager. No title is privileged.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import BaseModel, Field, model_validator
 
 __all__ = [
-    "TeamAgent",
-    "OrgMapping",
     "AgentTeam",
+    "OrgMapping",
+    "TeamAgent",
 ]
 
 
 # ── Models ──────────────────────────────────────────────────────────────────
 
+
 class TeamAgent(BaseModel):
     """One agent in the designed org chart. Role/designation/department are free
-    text — the BA invents whatever titles the project actually needs."""
+    text — the BA invents whatever titles the project actually needs.
+    """
 
     key: str = Field(..., description="Stable slug, unique within the team; reports_to targets it.")
     name: str
     designation: str = ""
     role: str = ""
     department: str = ""
-    reports_to: Optional[str] = None
+    reports_to: str | None = None
     goal: str = ""
     instructions: str = ""
     skills: list[str] = Field(default_factory=list)
@@ -63,8 +63,12 @@ class PhaseUpdate(BaseModel):
 class OrgMapping(BaseModel):
     """Legacy mapping of a project position to a permanent organization member."""
 
-    project_agent_key: str = Field(..., description="The key of the project agent (references a TeamAgent.key).")
-    org_member_id: str = Field(..., description="The id of the permanent org member who oversees this agent.")
+    project_agent_key: str = Field(
+        ..., description="The key of the project agent (references a TeamAgent.key)."
+    )
+    org_member_id: str = Field(
+        ..., description="The id of the permanent org member who oversees this agent."
+    )
     responsibility: str = Field("primary_owner", description="primary_owner | monitor | approver")
 
 
@@ -82,7 +86,7 @@ class AgentTeam(BaseModel):
         allowed_models: tuple[str, ...] = (),
         allowed_tools: tuple[str, ...] = (),
         allowed_org_member_ids: tuple[str, ...] = (),
-    ) -> "AgentTeam":
+    ) -> AgentTeam:
         """Validate an emitted payload against the tree grammar + catalogs.
 
         Catalog membership is only enforced when the corresponding catalog is
@@ -94,7 +98,7 @@ class AgentTeam(BaseModel):
         return team
 
     @model_validator(mode="after")
-    def _check_structure(self) -> "AgentTeam":
+    def _check_structure(self) -> AgentTeam:
         agents = self.agents
         if not agents:
             raise ValueError("team must contain at least one agent")
@@ -119,9 +123,7 @@ class AgentTeam(BaseModel):
             if a.reports_to == a.key:
                 raise ValueError(f"agent '{a.key}' cannot report to itself")
             if a.reports_to not in key_set:
-                raise ValueError(
-                    f"agent '{a.key}' reports_to unknown key '{a.reports_to}'"
-                )
+                raise ValueError(f"agent '{a.key}' reports_to unknown key '{a.reports_to}'")
 
         # no cycles — walk each agent's parent chain to the root
         for a in agents:
@@ -141,22 +143,21 @@ class AgentTeam(BaseModel):
                     f"org_mapping references unknown agent key '{m.project_agent_key}'"
                 )
             if m.responsibility not in valid_responsibilities:
-                raise ValueError(
-                    f"org_mapping has invalid responsibility '{m.responsibility}'"
-                )
+                raise ValueError(f"org_mapping has invalid responsibility '{m.responsibility}'")
 
         return self
 
-    def _check_catalogs(self, allowed_models: tuple[str, ...], allowed_tools: tuple[str, ...]) -> None:
+    def _check_catalogs(
+        self, allowed_models: tuple[str, ...], allowed_tools: tuple[str, ...]
+    ) -> None:
         """Catalog-membership checks — the one place constraint earns its keep:
-        model/tools MUST be real so the designed team is instantiable later."""
+        model/tools MUST be real so the designed team is instantiable later.
+        """
         if allowed_models:
             allowed_m = set(allowed_models)
             for a in self.agents:
                 if a.model and a.model not in allowed_m:
-                    raise ValueError(
-                        f"agent '{a.key}' uses model '{a.model}' not in the catalog"
-                    )
+                    raise ValueError(f"agent '{a.key}' uses model '{a.model}' not in the catalog")
         if allowed_tools:
             allowed_t = set(allowed_tools)
             for a in self.agents:
@@ -178,11 +179,13 @@ class AgentTeam(BaseModel):
             )
 
         allowed_members = set(allowed_org_member_ids)
-        unknown_members = sorted({
-            mapping.org_member_id
-            for mapping in self.org_mappings
-            if mapping.org_member_id not in allowed_members
-        })
+        unknown_members = sorted(
+            {
+                mapping.org_member_id
+                for mapping in self.org_mappings
+                if mapping.org_member_id not in allowed_members
+            }
+        )
         if unknown_members:
             raise ValueError(
                 "org_mappings reference inactive or unknown organization members: "
@@ -199,28 +202,45 @@ class AgentTeam(BaseModel):
         Keys are namespaced by project to keep ids unique and scoped, and
         reports_to keys are resolved to the same namespaced ids.
         """
+
         def _id(key: str) -> str:
             return f"{project_id}:{key}"
 
         rows: list[dict] = []
-        default_automation = {"autoRetry": True, "maxRetries": 3, "retryDelaySeconds": 30, "escalateOnFailure": True, "heartbeatIntervalSeconds": 60}
-        default_features = {"memoryRetentionDays": 30, "dataQueryAccess": "read", "maxConcurrentTasks": 5, "rateLimitPerMinute": 60, "streamingEnabled": True, "auditLogging": True, "piiMasking": False}
+        default_automation = {
+            "autoRetry": True,
+            "maxRetries": 3,
+            "retryDelaySeconds": 30,
+            "escalateOnFailure": True,
+            "heartbeatIntervalSeconds": 60,
+        }
+        default_features = {
+            "memoryRetentionDays": 30,
+            "dataQueryAccess": "read",
+            "maxConcurrentTasks": 5,
+            "rateLimitPerMinute": 60,
+            "streamingEnabled": True,
+            "auditLogging": True,
+            "piiMasking": False,
+        }
         for a in self.agents:
-            rows.append({
-                "id": _id(a.key),
-                "project_id": project_id,
-                "name": a.name,
-                "role": a.role,
-                "designation": a.designation,
-                "role_description": a.goal,
-                "skills": a.skills,
-                "department": a.department,
-                "reports_to": _id(a.reports_to) if a.reports_to else None,
-                "model": a.model,
-                "tool_policy": {"allowed_tools": a.tools, "blocked_tools": []},
-                "system_prompt_addon": a.instructions,
-                "automation": default_automation,
-                "features": default_features,
-                "status": "active",
-            })
+            rows.append(
+                {
+                    "id": _id(a.key),
+                    "project_id": project_id,
+                    "name": a.name,
+                    "role": a.role,
+                    "designation": a.designation,
+                    "role_description": a.goal,
+                    "skills": a.skills,
+                    "department": a.department,
+                    "reports_to": _id(a.reports_to) if a.reports_to else None,
+                    "model": a.model,
+                    "tool_policy": {"allowed_tools": a.tools, "blocked_tools": []},
+                    "system_prompt_addon": a.instructions,
+                    "automation": default_automation,
+                    "features": default_features,
+                    "status": "active",
+                }
+            )
         return rows

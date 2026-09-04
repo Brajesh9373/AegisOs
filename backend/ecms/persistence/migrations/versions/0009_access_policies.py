@@ -58,7 +58,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["reviewed_by"], ["agents.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_policy_recommendations_project_id", "policy_recommendations", ["project_id"])
+    op.create_index(
+        "ix_policy_recommendations_project_id", "policy_recommendations", ["project_id"]
+    )
     op.create_index("ix_policy_recommendations_status", "policy_recommendations", ["status"])
 
 

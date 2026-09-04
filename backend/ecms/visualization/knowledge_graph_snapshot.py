@@ -159,8 +159,7 @@ def _with_source_hierarchy(
         hub_id = (
             source_group
             if re.fullmatch(r"connection:\d+", source_group)
-            else "knowledge-source:"
-            + hashlib.sha256(source_group.encode()).hexdigest()[:16]
+            else "knowledge-source:" + hashlib.sha256(source_group.encode()).hexdigest()[:16]
         )
         if hub_id not in existing_ids:
             augmented_nodes.append(

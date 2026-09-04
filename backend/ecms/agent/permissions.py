@@ -9,7 +9,9 @@ from __future__ import annotations
 from typing import Any
 
 
-def get_effective_tools_for_agent(all_tool_defs: list[dict], tool_policy: dict[str, Any]) -> list[dict]:
+def get_effective_tools_for_agent(
+    all_tool_defs: list[dict], tool_policy: dict[str, Any]
+) -> list[dict]:
     """Filter tool definitions based on agent's tool_policy JSON.
 
     tool_policy format: {"blocked_tools": ["kill_shell", "web_search"], "allowed_tools": ["*"]}
@@ -22,7 +24,8 @@ def get_effective_tools_for_agent(all_tool_defs: list[dict], tool_policy: dict[s
     if "*" in allowed:
         return [t for t in all_tool_defs if t["function"]["name"] not in blocked]
     return [
-        t for t in all_tool_defs
+        t
+        for t in all_tool_defs
         if t["function"]["name"] in allowed and t["function"]["name"] not in blocked
     ]
 

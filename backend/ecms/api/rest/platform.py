@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -23,8 +23,9 @@ router = APIRouter(prefix="/api")
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _uuid() -> str:
@@ -70,10 +71,12 @@ async def _hydrate_project_owner(session, project: dict) -> dict:
 
     from sqlalchemy import text
 
-    row = (await session.execute(
-        text("SELECT * FROM users WHERE id = :id"),
-        {"id": owner_id},
-    )).first()
+    row = (
+        await session.execute(
+            text("SELECT * FROM users WHERE id = :id"),
+            {"id": owner_id},
+        )
+    ).first()
     user = _row_to_dict(row) if row else {}
     display = user.get("name") or user.get("email") or "Project Owner"
     project["owner"] = display
@@ -87,11 +90,11 @@ def _parse_project_datetime(value) -> datetime:
         try:
             parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
             if parsed.tzinfo is not None:
-                parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+                parsed = parsed.astimezone(UTC).replace(tzinfo=None)
             return parsed
         except ValueError:
             pass
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def _next_weekday_after(base: datetime, weekday: int) -> datetime:
@@ -162,20 +165,22 @@ def _build_requirement_documents(project: dict) -> list[dict]:
         "name": f"{base}-requirements-package.md",
         "type": "Requirements",
         "category": "Requirements",
-        "content": "\n".join([
-            f"# {project_name} Requirements Package",
-            "",
-            f"Objective: {objective}",
-            "",
-            "## Functional Requirements",
-            functional or "No functional requirements were finalized.",
-            "",
-            "## Required Skills",
-            skills,
-            "",
-            "## Required Connectors",
-            connectors,
-        ]),
+        "content": "\n".join(
+            [
+                f"# {project_name} Requirements Package",
+                "",
+                f"Objective: {objective}",
+                "",
+                "## Functional Requirements",
+                functional or "No functional requirements were finalized.",
+                "",
+                "## Required Skills",
+                skills,
+                "",
+                "## Required Connectors",
+                connectors,
+            ]
+        ),
     }
 
     architecture_doc = {
@@ -183,17 +188,20 @@ def _build_requirement_documents(project: dict) -> list[dict]:
         "name": f"{base}-architecture-brief.md",
         "type": "Architecture",
         "category": "Architecture",
-        "content": "\n".join([
-            f"# {project_name} Architecture Brief",
-            "",
-            f"Tech stack: {tech_stack}",
-            "",
-            "## Infrastructure",
-            _format_detail_items(reqs.get("infrastructure") or []) or "Infrastructure not finalized.",
-            "",
-            "## Integrations",
-            connectors,
-        ]),
+        "content": "\n".join(
+            [
+                f"# {project_name} Architecture Brief",
+                "",
+                f"Tech stack: {tech_stack}",
+                "",
+                "## Infrastructure",
+                _format_detail_items(reqs.get("infrastructure") or [])
+                or "Infrastructure not finalized.",
+                "",
+                "## Integrations",
+                connectors,
+            ]
+        ),
     }
 
     delivery_doc = {
@@ -201,13 +209,15 @@ def _build_requirement_documents(project: dict) -> list[dict]:
         "name": f"{base}-phase-dependency-plan.md",
         "type": "Delivery Plan",
         "category": "Plan",
-        "content": "\n".join([
-            f"# {project_name} Phase Dependency Plan",
-            "",
-            "The first phase records what has happened so far and what is required before execution. Each later phase depends on the phase above it.",
-            "",
-            "\n".join(phase_lines),
-        ]),
+        "content": "\n".join(
+            [
+                f"# {project_name} Phase Dependency Plan",
+                "",
+                "The first phase records what has happened so far and what is required before execution. Each later phase depends on the phase above it.",
+                "",
+                "\n".join(phase_lines),
+            ]
+        ),
     }
 
     risk_doc = {
@@ -215,18 +225,20 @@ def _build_requirement_documents(project: dict) -> list[dict]:
         "name": f"{base}-risk-governance-register.md",
         "type": "Risk Register",
         "category": "Governance",
-        "content": "\n".join([
-            f"# {project_name} Risk & Governance Register",
-            "",
-            "## Risks",
-            "\n".join(f"- {risk}" for risk in reqs.get("risks") or []) or "No risks finalized.",
-            "",
-            "## Governance",
-            _format_detail_items(reqs.get("governance") or []) or "Governance not finalized.",
-            "",
-            "## Guardrails",
-            _format_detail_items(reqs.get("guardrails") or []) or "Guardrails not finalized.",
-        ]),
+        "content": "\n".join(
+            [
+                f"# {project_name} Risk & Governance Register",
+                "",
+                "## Risks",
+                "\n".join(f"- {risk}" for risk in reqs.get("risks") or []) or "No risks finalized.",
+                "",
+                "## Governance",
+                _format_detail_items(reqs.get("governance") or []) or "Governance not finalized.",
+                "",
+                "## Guardrails",
+                _format_detail_items(reqs.get("guardrails") or []) or "Guardrails not finalized.",
+            ]
+        ),
     }
 
     return [requirement_doc, architecture_doc, delivery_doc, risk_doc]
@@ -237,19 +249,22 @@ async def _ensure_project_documents(session, project: dict) -> None:
 
     for doc in _build_requirement_documents(project):
         content = doc["content"]
-        await session.execute(text(
-            "INSERT INTO artifacts (id, projectid, name, type, content, uri, storagepath, agentid, createdat, versionhistory) "
-            "VALUES (:id, :pid, :name, :type, :content, :uri, :uri, NULL, :t, '{}') "
-            "ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, content = EXCLUDED.content, uri = EXCLUDED.uri, storagepath = EXCLUDED.storagepath"
-        ), {
-            "id": doc["id"],
-            "pid": project["id"],
-            "name": doc["name"],
-            "type": doc["type"],
-            "content": content,
-            "uri": f"knowledge/{project['id']}/{doc['name']}",
-            "t": _now(),
-        })
+        await session.execute(
+            text(
+                "INSERT INTO artifacts (id, projectid, name, type, content, uri, storagepath, agentid, createdat, versionhistory) "
+                "VALUES (:id, :pid, :name, :type, :content, :uri, :uri, NULL, :t, '{}') "
+                "ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, content = EXCLUDED.content, uri = EXCLUDED.uri, storagepath = EXCLUDED.storagepath"
+            ),
+            {
+                "id": doc["id"],
+                "pid": project["id"],
+                "name": doc["name"],
+                "type": doc["type"],
+                "content": content,
+                "uri": f"knowledge/{project['id']}/{doc['name']}",
+                "t": _now(),
+            },
+        )
 
 
 def _artifact_to_workspace_doc(artifact: dict) -> dict:
@@ -281,39 +296,51 @@ def _compute_progress(nodes: list[dict], work_rows: list[dict], project: dict) -
     if nodes:
         return round(sum(_state_weight(n.get("state")) for n in nodes) / len(nodes) * 100)
     actionable_work = [w for w in work_rows if w.get("kind") in {"story", "bug"}]
-    if actionable_work and any(_normalize_work_status(w.get("status")) != "TO_DO" for w in actionable_work):
-        return round(sum(_state_weight(_normalize_work_status(w.get("status"))) for w in actionable_work) / len(actionable_work) * 100)
+    if actionable_work and any(
+        _normalize_work_status(w.get("status")) != "TO_DO" for w in actionable_work
+    ):
+        return round(
+            sum(_state_weight(_normalize_work_status(w.get("status"))) for w in actionable_work)
+            / len(actionable_work)
+            * 100
+        )
     status = (project.get("status") or "").lower()
     if status in {"completed", "done"}:
         return 100
     return None
 
 
-def _workspace_timeline(project: dict, reqs: dict, meetings: list[dict], agents: list[dict]) -> list[dict]:
+def _workspace_timeline(
+    project: dict, reqs: dict, meetings: list[dict], agents: list[dict]
+) -> list[dict]:
     timeline: list[dict] = []
     if project.get("createdat"):
-        timeline.append({
-            "event": "Project Created",
-            "date": str(project.get("createdat"))[:10],
-            "desc": f"{project.get('name')} project record was created.",
-        })
+        timeline.append(
+            {
+                "event": "Project Created",
+                "date": str(project.get("createdat"))[:10],
+                "desc": f"{project.get('name')} project record was created.",
+            }
+        )
     if reqs:
-        timeline.append({
-            "event": "Requirements Finalized",
-            "date": str(project.get("updatedat") or project.get("createdat") or "")[:10],
-            "desc": (
-                f"{len(reqs.get('functionalReqs') or [])} functional requirements, "
-                f"{len(reqs.get('phases') or [])} delivery phases, and "
-                f"{len(reqs.get('risks') or [])} risks captured from discovery."
-            ),
-        })
+        timeline.append(
+            {
+                "event": "Requirements Finalized",
+                "date": str(project.get("updatedat") or project.get("createdat") or "")[:10],
+                "desc": (
+                    f"{len(reqs.get('functionalReqs') or [])} functional requirements, "
+                    f"{len(reqs.get('phases') or [])} delivery phases, and "
+                    f"{len(reqs.get('risks') or [])} risks captured from discovery."
+                ),
+            }
+        )
         previous = "Discovery & Requirements"
         # Build a lookup: phase name → earliest meeting date (fallback)
         phase_dates: dict[str, str] = {}
         for m in meetings:
             mtitle = (m.get("title") or "").strip()
             mdate = m.get("meeting_date") or ""
-            for p in (reqs.get("phases") or []):
+            for p in reqs.get("phases") or []:
                 pname = p.get("name") if isinstance(p, dict) else ""
                 if pname and mtitle.startswith(pname) and mdate:
                     if pname not in phase_dates or mdate < phase_dates[pname]:
@@ -323,26 +350,37 @@ def _workspace_timeline(project: dict, reqs: dict, meetings: list[dict], agents:
                 name = phase.get("name") or f"Phase {idx}"
                 desc = phase.get("description") or ""
                 # Prefer agent-provided startDate, fall back to meeting date, then duration
-                date = phase.get("startDate") or phase_dates.get(name) or phase.get("duration") or f"Phase {idx}"
-                timeline.append({
-                    "event": name,
-                    "date": date,
-                    "desc": f"Depends on {previous}. {desc}".strip(),
-                })
+                date = (
+                    phase.get("startDate")
+                    or phase_dates.get(name)
+                    or phase.get("duration")
+                    or f"Phase {idx}"
+                )
+                timeline.append(
+                    {
+                        "event": name,
+                        "date": date,
+                        "desc": f"Depends on {previous}. {desc}".strip(),
+                    }
+                )
                 previous = name
     for meeting in meetings:
         if meeting.get("status") == "past":
-            timeline.append({
-                "event": meeting.get("title") or "Meeting",
-                "date": meeting.get("meeting_date") or "",
-                "desc": meeting.get("summary") or meeting.get("agenda") or "",
-            })
+            timeline.append(
+                {
+                    "event": meeting.get("title") or "Meeting",
+                    "date": meeting.get("meeting_date") or "",
+                    "desc": meeting.get("summary") or meeting.get("agenda") or "",
+                }
+            )
     if agents:
-        timeline.append({
-            "event": "Worker Hierarchy Created",
-            "date": str(project.get("updatedat") or "")[:10],
-            "desc": f"{len(agents)} project-specific AI workers assigned from the finalized requirements.",
-        })
+        timeline.append(
+            {
+                "event": "Worker Hierarchy Created",
+                "date": str(project.get("updatedat") or "")[:10],
+                "desc": f"{len(agents)} project-specific AI workers assigned from the finalized requirements.",
+            }
+        )
     timeline.sort(key=lambda t: t.get("date") or "")
     return timeline
 
@@ -350,7 +388,7 @@ def _workspace_timeline(project: dict, reqs: dict, meetings: list[dict], agents:
 def _meeting_to_workspace(meeting: dict) -> dict:
     meeting_date = meeting.get("meeting_date")
     status = meeting.get("status") or "upcoming"
-    if meeting_date and meeting_date < datetime.now(timezone.utc).date().isoformat():
+    if meeting_date and meeting_date < datetime.now(UTC).date().isoformat():
         status = "past"
     participants = _json_array(meeting.get("participants"))
     return {
@@ -382,34 +420,54 @@ def _meeting_to_workspace(meeting: dict) -> dict:
 async def _ensure_tbd_meeting_notifications(session, project_id: str) -> None:
     from sqlalchemy import text
 
-    rows = (await session.execute(text(
-        "SELECT id, title, meeting_date FROM meetings "
-        "WHERE project_id = :pid AND meeting_time = 'TBD' AND source = 'ba_scheduled'"
-    ), {"pid": project_id})).fetchall()
+    rows = (
+        await session.execute(
+            text(
+                "SELECT id, title, meeting_date FROM meetings "
+                "WHERE project_id = :pid AND meeting_time = 'TBD' AND source = 'ba_scheduled'"
+            ),
+            {"pid": project_id},
+        )
+    ).fetchall()
     for row in rows:
         meeting_id, title, meeting_date = row[0], row[1], row[2]
-        existing = (await session.execute(text(
-            "SELECT 1 FROM notifications "
-            "WHERE project_id = :pid AND meeting_id = :mid AND type = 'meeting_time_confirm' LIMIT 1"
-        ), {"pid": project_id, "mid": meeting_id})).first()
+        existing = (
+            await session.execute(
+                text(
+                    "SELECT 1 FROM notifications "
+                    "WHERE project_id = :pid AND meeting_id = :mid AND type = 'meeting_time_confirm' LIMIT 1"
+                ),
+                {"pid": project_id, "mid": meeting_id},
+            )
+        ).first()
         if existing:
             continue
-        await session.execute(text(
-            "INSERT INTO notifications "
-            "(id, project_id, meeting_id, type, title, message, status, action_type, action_data, created_at, updated_at) "
-            "VALUES (:id, :pid, :mid, 'meeting_time_confirm', :title, :msg, 'unread', 'confirm_time', '{}', :t, :t)"
-        ), {
-            "id": _uuid(),
-            "pid": project_id,
-            "mid": meeting_id,
-            "title": f"Set a time for: {title}",
-            "msg": f"This meeting is scheduled for {meeting_date} but has no time yet. Please confirm a time.",
-            "t": _now(),
-        })
+        await session.execute(
+            text(
+                "INSERT INTO notifications "
+                "(id, project_id, meeting_id, type, title, message, status, action_type, action_data, created_at, updated_at) "
+                "VALUES (:id, :pid, :mid, 'meeting_time_confirm', :title, :msg, 'unread', 'confirm_time', '{}', :t, :t)"
+            ),
+            {
+                "id": _uuid(),
+                "pid": project_id,
+                "mid": meeting_id,
+                "title": f"Set a time for: {title}",
+                "msg": f"This meeting is scheduled for {meeting_date} but has no time yet. Please confirm a time.",
+                "t": _now(),
+            },
+        )
 
 
-async def _ensure_project_meetings(session, project: dict, *, preferred_time: str | None = None, meeting_frequency: str | None = "weekly") -> None:
+async def _ensure_project_meetings(
+    session,
+    project: dict,
+    *,
+    preferred_time: str | None = None,
+    meeting_frequency: str | None = "weekly",
+) -> None:
     import logging
+
     _log = logging.getLogger(__name__)
     """Seed real workspace meetings from finalized requirements.
 
@@ -446,41 +504,53 @@ async def _ensure_project_meetings(session, project: dict, *, preferred_time: st
     if not decisions:
         decisions = [r for r in (reqs.get("functionalReqs") or [])[:5] if isinstance(r, str)]
 
-    await session.execute(text(
-        "INSERT INTO meetings "
-        "(id, project_id, title, meeting_date, meeting_time, duration, type, status, "
-        "participants, agenda, notes, summary, decisions, action_items, attachments, source, created_at, updated_at) "
-        "VALUES (:id, :pid, :title, :date, NULL, 'All day', 'both', 'past', "
-        ":participants, :agenda, NULL, :summary, :decisions, '[]', '[]', 'ba_discovery', :t, :t) "
-        "ON CONFLICT (id) DO NOTHING"
-    ), {
-        "id": f"ba-discovery-{project_id}",
-        "pid": project_id,
-        "title": "BA Discovery & Requirement Finalization",
-        "date": discovery_date,
-        "participants": json.dumps(["Project Owner", "Business Analyst Agent"]),
-        "agenda": f"Requirement discovery, clarification, and approval for {project_name}.",
-        "summary": summary,
-        "decisions": json.dumps(decisions),
-        "t": now,
-    })
+    await session.execute(
+        text(
+            "INSERT INTO meetings "
+            "(id, project_id, title, meeting_date, meeting_time, duration, type, status, "
+            "participants, agenda, notes, summary, decisions, action_items, attachments, source, created_at, updated_at) "
+            "VALUES (:id, :pid, :title, :date, NULL, 'All day', 'both', 'past', "
+            ":participants, :agenda, NULL, :summary, :decisions, '[]', '[]', 'ba_discovery', :t, :t) "
+            "ON CONFLICT (id) DO NOTHING"
+        ),
+        {
+            "id": f"ba-discovery-{project_id}",
+            "pid": project_id,
+            "title": "BA Discovery & Requirement Finalization",
+            "date": discovery_date,
+            "participants": json.dumps(["Project Owner", "Business Analyst Agent"]),
+            "agenda": f"Requirement discovery, clarification, and approval for {project_name}.",
+            "summary": summary,
+            "decisions": json.dumps(decisions),
+            "t": now,
+        },
+    )
 
-    scheduled_count = (await session.execute(text(
-        "SELECT count(1) FROM meetings WHERE project_id = :pid AND source = 'ba_scheduled'"
-    ), {"pid": project_id})).scalar() or 0
+    scheduled_count = (
+        await session.execute(
+            text(
+                "SELECT count(1) FROM meetings WHERE project_id = :pid AND source = 'ba_scheduled'"
+            ),
+            {"pid": project_id},
+        )
+    ).scalar() or 0
     if scheduled_count:
         await _ensure_tbd_meeting_notifications(session, project_id)
         return
 
     phases = [phase for phase in (reqs.get("phases") or []) if isinstance(phase, dict)]
     if not phases:
-        phases = [{
-            "name": "Phase 1 - Discovery, Governance, and Architecture",
-            "description": "Confirm scope, delivery governance, architecture, and project prerequisites.",
-        }]
+        phases = [
+            {
+                "name": "Phase 1 - Discovery, Governance, and Architecture",
+                "description": "Confirm scope, delivery governance, architecture, and project prerequisites.",
+            }
+        ]
 
     freq_days = {"daily": 1, "every2days": 2, "weekly": 7, "biweekly": 14, "monthly": 30}
-    participants = json.dumps(["Engagement Delivery Lead", "Engineering Manager", "Solution Architect"])
+    participants = json.dumps(
+        ["Engagement Delivery Lead", "Engineering Manager", "Solution Architect"]
+    )
 
     for phase_idx, phase in enumerate(phases[:8], start=1):
         phase_name = phase.get("name") or f"Phase {phase_idx}"
@@ -502,7 +572,9 @@ async def _ensure_project_meetings(session, project: dict, *, preferred_time: st
         if not agent_start or not agent_end:
             # Fallback: algorithmic generation for legacy requirements without dates
             cadence = max(freq_days.get(meeting_frequency or "weekly", 7), 7)
-            phase_start_dt = _next_weekday_after(base, 1) + timedelta(days=max(cadence * 4, 28) * (phase_idx - 1))
+            phase_start_dt = _next_weekday_after(base, 1) + timedelta(
+                days=max(cadence * 4, 28) * (phase_idx - 1)
+            )
             phase_duration_days = max(cadence * 4, 28)
             phase_end_dt = phase_start_dt + timedelta(days=phase_duration_days)
 
@@ -511,31 +583,52 @@ async def _ensure_project_meetings(session, project: dict, *, preferred_time: st
 
         # Generate meeting dates within the phase date range
         meetings = [
-            ("kickoff", "Kickoff", "both", 0, f"Align stakeholders, scope, dependencies, and readiness for {phase_name}."),
-            ("progress", "Progress Review", "agent", min(cadence, phase_duration_days // 2), f"Review agent progress, blockers, evidence, and next actions for {phase_name}."),
-            ("gate", "Gate Review", "human", phase_duration_days, f"Review deliverables, risks, approvals, and phase exit criteria for {phase_name}."),
+            (
+                "kickoff",
+                "Kickoff",
+                "both",
+                0,
+                f"Align stakeholders, scope, dependencies, and readiness for {phase_name}.",
+            ),
+            (
+                "progress",
+                "Progress Review",
+                "agent",
+                min(cadence, phase_duration_days // 2),
+                f"Review agent progress, blockers, evidence, and next actions for {phase_name}.",
+            ),
+            (
+                "gate",
+                "Gate Review",
+                "human",
+                phase_duration_days,
+                f"Review deliverables, risks, approvals, and phase exit criteria for {phase_name}.",
+            ),
         ]
         for key, label, meeting_type, day_offset, default_agenda in meetings:
             meeting_date = (phase_start_dt + timedelta(days=day_offset)).strftime("%Y-%m-%d")
-            await session.execute(text(
-                "INSERT INTO meetings "
-                "(id, project_id, title, meeting_date, meeting_time, duration, type, status, "
-                "participants, agenda, notes, summary, decisions, action_items, attachments, "
-                "recording_path, recording_name, source, created_at, updated_at) "
-                "VALUES (:id, :pid, :title, :date, :time, '1 hour', :type, 'upcoming', "
-                ":participants, :agenda, NULL, NULL, '[]', '[]', '[]', NULL, NULL, 'ba_scheduled', :t, :t) "
-                "ON CONFLICT (id) DO NOTHING"
-            ), {
-                "id": f"ba-scheduled-{project_id}-{phase_idx}-{key}",
-                "pid": project_id,
-                "title": f"{phase_name} - {label}",
-                "date": meeting_date,
-                "time": preferred_time or "TBD",
-                "type": meeting_type,
-                "participants": participants,
-                "agenda": phase_desc or default_agenda,
-                "t": now,
-            })
+            await session.execute(
+                text(
+                    "INSERT INTO meetings "
+                    "(id, project_id, title, meeting_date, meeting_time, duration, type, status, "
+                    "participants, agenda, notes, summary, decisions, action_items, attachments, "
+                    "recording_path, recording_name, source, created_at, updated_at) "
+                    "VALUES (:id, :pid, :title, :date, :time, '1 hour', :type, 'upcoming', "
+                    ":participants, :agenda, NULL, NULL, '[]', '[]', '[]', NULL, NULL, 'ba_scheduled', :t, :t) "
+                    "ON CONFLICT (id) DO NOTHING"
+                ),
+                {
+                    "id": f"ba-scheduled-{project_id}-{phase_idx}-{key}",
+                    "pid": project_id,
+                    "title": f"{phase_name} - {label}",
+                    "date": meeting_date,
+                    "time": preferred_time or "TBD",
+                    "type": meeting_type,
+                    "participants": participants,
+                    "agenda": phase_desc or default_agenda,
+                    "t": now,
+                },
+            )
 
     await _ensure_tbd_meeting_notifications(session, project_id)
 
@@ -574,24 +667,29 @@ async def _ensure_project_work_breakdown(session, project: dict) -> None:
 
     project_id = project["id"]
     now = _now()
-    existing = (await session.execute(
-        text("SELECT id FROM project_epics WHERE project_id = :pid LIMIT 1"),
-        {"pid": project_id},
-    )).first()
+    existing = (
+        await session.execute(
+            text("SELECT id FROM project_epics WHERE project_id = :pid LIMIT 1"),
+            {"pid": project_id},
+        )
+    ).first()
     if existing:
         return
 
     epic_id = f"epic-{project_id}"
-    await session.execute(text(
-        "INSERT INTO project_epics (id, project_id, title, description, status, sort_order, created_at, updated_at) "
-        "VALUES (:id, :pid, :title, :desc, 'TO_DO', 0, :t, :t) ON CONFLICT DO NOTHING"
-    ), {
-        "id": epic_id,
-        "pid": project_id,
-        "title": f"{project.get('name') or 'Project'} Delivery Epic",
-        "desc": project.get("businessgoal") or project.get("description") or "",
-        "t": now,
-    })
+    await session.execute(
+        text(
+            "INSERT INTO project_epics (id, project_id, title, description, status, sort_order, created_at, updated_at) "
+            "VALUES (:id, :pid, :title, :desc, 'TO_DO', 0, :t, :t) ON CONFLICT DO NOTHING"
+        ),
+        {
+            "id": epic_id,
+            "pid": project_id,
+            "title": f"{project.get('name') or 'Project'} Delivery Epic",
+            "desc": project.get("businessgoal") or project.get("description") or "",
+            "t": now,
+        },
+    )
 
     requirements = project.get("requirements") or {}
     if isinstance(requirements, str):
@@ -601,32 +699,38 @@ async def _ensure_project_work_breakdown(session, project: dict) -> None:
             requirements = {}
 
     for idx, story_title in enumerate((requirements.get("functionalReqs") or [])[:12]):
-        await session.execute(text(
-            "INSERT INTO project_stories (id, project_id, epic_id, title, description, status, sort_order, created_at, updated_at) "
-            "VALUES (:id, :pid, :eid, :title, :desc, 'TO_DO', :ord, :t, :t) ON CONFLICT DO NOTHING"
-        ), {
-            "id": f"story-{project_id}-{idx + 1}",
-            "pid": project_id,
-            "eid": epic_id,
-            "title": str(story_title),
-            "desc": "Feature story created from finalized project requirements.",
-            "ord": idx,
-            "t": now,
-        })
+        await session.execute(
+            text(
+                "INSERT INTO project_stories (id, project_id, epic_id, title, description, status, sort_order, created_at, updated_at) "
+                "VALUES (:id, :pid, :eid, :title, :desc, 'TO_DO', :ord, :t, :t) ON CONFLICT DO NOTHING"
+            ),
+            {
+                "id": f"story-{project_id}-{idx + 1}",
+                "pid": project_id,
+                "eid": epic_id,
+                "title": str(story_title),
+                "desc": "Feature story created from finalized project requirements.",
+                "ord": idx,
+                "t": now,
+            },
+        )
 
 
 async def _ensure_project_queue_items(session, project: dict) -> None:
     """Generate project-scoped human queue tickets from requirements, risks, and phases."""
-    from sqlalchemy import text
     from datetime import timedelta
+
+    from sqlalchemy import text
 
     project_id = project["id"]
     now = _now()
 
-    existing = (await session.execute(
-        text("SELECT id FROM human_queue WHERE projectId = :pid LIMIT 1"),
-        {"pid": project_id},
-    )).first()
+    existing = (
+        await session.execute(
+            text("SELECT id FROM human_queue WHERE projectId = :pid LIMIT 1"),
+            {"pid": project_id},
+        )
+    ).first()
     if existing:
         return
 
@@ -638,10 +742,14 @@ async def _ensure_project_queue_items(session, project: dict) -> None:
             requirements = {}
 
     project_name = requirements.get("projectName") or project.get("name") or "Project"
-    agents_rows = (await session.execute(
-        text("SELECT name FROM agents WHERE project_id = :pid AND status = 'active' ORDER BY id LIMIT 1"),
-        {"pid": project_id},
-    )).fetchall()
+    agents_rows = (
+        await session.execute(
+            text(
+                "SELECT name FROM agents WHERE project_id = :pid AND status = 'active' ORDER BY id LIMIT 1"
+            ),
+            {"pid": project_id},
+        )
+    ).fetchall()
     agent_name = (_row_to_dict(agents_rows[0])["name"] if agents_rows else None) or "BA Agent"
 
     tickets: list[dict] = []
@@ -652,19 +760,21 @@ async def _ensure_project_queue_items(session, project: dict) -> None:
         if not isinstance(risk, str) or not risk.strip():
             continue
         idx += 1
-        tickets.append({
-            "id": f"{project_id}-q-{idx}",
-            "projectId": project_id,
-            "title": f"Risk flagged: {risk[:80]}",
-            "type": "Escalation",
-            "priority": "Critical",
-            "confidence": 34,
-            "agent_name": agent_name,
-            "reason": f"Project risk identified during BA discovery for {project_name}: {risk} Requires mitigation plan approval before proceeding.",
-            "status": "Pending",
-            "submitted_at": now,
-            "due_by": (datetime.now(timezone.utc) + timedelta(days=3)).isoformat(),
-        })
+        tickets.append(
+            {
+                "id": f"{project_id}-q-{idx}",
+                "projectId": project_id,
+                "title": f"Risk flagged: {risk[:80]}",
+                "type": "Escalation",
+                "priority": "Critical",
+                "confidence": 34,
+                "agent_name": agent_name,
+                "reason": f"Project risk identified during BA discovery for {project_name}: {risk} Requires mitigation plan approval before proceeding.",
+                "status": "Pending",
+                "submitted_at": now,
+                "due_by": (datetime.now(UTC) + timedelta(days=3)).isoformat(),
+            }
+        )
 
     # Tickets from phases → Approval (gate reviews)
     for phase in (requirements.get("phases") or [])[:3]:
@@ -673,19 +783,21 @@ async def _ensure_project_queue_items(session, project: dict) -> None:
         phase_name = phase.get("name") or "Phase"
         phase_desc = phase.get("description") or ""
         idx += 1
-        tickets.append({
-            "id": f"{project_id}-q-{idx}",
-            "projectId": project_id,
-            "title": f"Phase gate: {phase_name} — approve deliverables",
-            "type": "Approval",
-            "priority": "High",
-            "confidence": 55,
-            "agent_name": agent_name,
-            "reason": f"Phase '{phase_name}' exit criteria for {project_name}. {phase_desc} Review deliverables and approve before next phase begins.",
-            "status": "Pending",
-            "submitted_at": now,
-            "due_by": (datetime.now(timezone.utc) + timedelta(days=5)).isoformat(),
-        })
+        tickets.append(
+            {
+                "id": f"{project_id}-q-{idx}",
+                "projectId": project_id,
+                "title": f"Phase gate: {phase_name} — approve deliverables",
+                "type": "Approval",
+                "priority": "High",
+                "confidence": 55,
+                "agent_name": agent_name,
+                "reason": f"Phase '{phase_name}' exit criteria for {project_name}. {phase_desc} Review deliverables and approve before next phase begins.",
+                "status": "Pending",
+                "submitted_at": now,
+                "due_by": (datetime.now(UTC) + timedelta(days=5)).isoformat(),
+            }
+        )
 
     # Tickets from governance → Review
     for gov in (requirements.get("governance") or [])[:2]:
@@ -694,71 +806,86 @@ async def _ensure_project_queue_items(session, project: dict) -> None:
         label = gov.get("label") or "Governance check"
         detail = gov.get("detail") or ""
         idx += 1
-        tickets.append({
-            "id": f"{project_id}-q-{idx}",
-            "projectId": project_id,
-            "title": f"Governance review: {label}",
-            "type": "Review",
-            "priority": "Medium",
-            "confidence": 62,
-            "agent_name": agent_name,
-            "reason": f"Governance requirement for {project_name}: {label}. {detail} Verify compliance before proceeding.",
-            "status": "Pending",
-            "submitted_at": now,
-            "due_by": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
-        })
+        tickets.append(
+            {
+                "id": f"{project_id}-q-{idx}",
+                "projectId": project_id,
+                "title": f"Governance review: {label}",
+                "type": "Review",
+                "priority": "Medium",
+                "confidence": 62,
+                "agent_name": agent_name,
+                "reason": f"Governance requirement for {project_name}: {label}. {detail} Verify compliance before proceeding.",
+                "status": "Pending",
+                "submitted_at": now,
+                "due_by": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
+            }
+        )
 
     # Ticket from connectors → Approval
     connectors = requirements.get("connectors") or []
     if connectors:
         idx += 1
         connector_list = ", ".join(str(c) for c in connectors[:4])
-        tickets.append({
-            "id": f"{project_id}-q-{idx}",
-            "projectId": project_id,
-            "title": f"Integration approval: {connector_list}",
-            "type": "Approval",
-            "priority": "High",
-            "confidence": 48,
-            "agent_name": agent_name,
-            "reason": f"The following integrations are required for {project_name}: {connector_list}. Confirm access credentials and API permissions before development begins.",
-            "status": "Pending",
-            "submitted_at": now,
-            "due_by": (datetime.now(timezone.utc) + timedelta(days=4)).isoformat(),
-        })
+        tickets.append(
+            {
+                "id": f"{project_id}-q-{idx}",
+                "projectId": project_id,
+                "title": f"Integration approval: {connector_list}",
+                "type": "Approval",
+                "priority": "High",
+                "confidence": 48,
+                "agent_name": agent_name,
+                "reason": f"The following integrations are required for {project_name}: {connector_list}. Confirm access credentials and API permissions before development begins.",
+                "status": "Pending",
+                "submitted_at": now,
+                "due_by": (datetime.now(UTC) + timedelta(days=4)).isoformat(),
+            }
+        )
 
     # Ticket from first functional req → Review (requirement sign-off)
     func_reqs = requirements.get("functionalReqs") or []
     if func_reqs:
         first_req = str(func_reqs[0])[:120]
         idx += 1
-        tickets.append({
-            "id": f"{project_id}-q-{idx}",
-            "projectId": project_id,
-            "title": f"Requirement sign-off: {first_req[:60]}",
-            "type": "Review",
-            "priority": "Medium",
-            "confidence": 70,
-            "agent_name": agent_name,
-            "reason": f"Primary functional requirement for {project_name}: {first_req} Confirm acceptance criteria and scope before implementation.",
-            "status": "Pending",
-            "submitted_at": now,
-            "due_by": (datetime.now(timezone.utc) + timedelta(days=6)).isoformat(),
-        })
+        tickets.append(
+            {
+                "id": f"{project_id}-q-{idx}",
+                "projectId": project_id,
+                "title": f"Requirement sign-off: {first_req[:60]}",
+                "type": "Review",
+                "priority": "Medium",
+                "confidence": 70,
+                "agent_name": agent_name,
+                "reason": f"Primary functional requirement for {project_name}: {first_req} Confirm acceptance criteria and scope before implementation.",
+                "status": "Pending",
+                "submitted_at": now,
+                "due_by": (datetime.now(UTC) + timedelta(days=6)).isoformat(),
+            }
+        )
 
     for t in tickets:
-        await session.execute(text(
-            "INSERT INTO human_queue "
-            "(id, projectId, agentId, reason, status, resolution, assignedTo, title, type, priority, confidence, agent_name, submitted_at, due_by, comment) "
-            "VALUES (:id, :pid, NULL, :reason, :status, NULL, NULL, :title, :type, :priority, :confidence, :agent_name, :submitted_at, :due_by, NULL) "
-            "ON CONFLICT (id) DO NOTHING"
-        ), {
-            "id": t["id"], "pid": t["projectId"], "reason": t["reason"],
-            "status": t["status"], "title": t["title"], "type": t["type"],
-            "priority": t["priority"], "confidence": t["confidence"],
-            "agent_name": t["agent_name"], "submitted_at": t["submitted_at"],
-            "due_by": t["due_by"],
-        })
+        await session.execute(
+            text(
+                "INSERT INTO human_queue "
+                "(id, projectId, agentId, reason, status, resolution, assignedTo, title, type, priority, confidence, agent_name, submitted_at, due_by, comment) "
+                "VALUES (:id, :pid, NULL, :reason, :status, NULL, NULL, :title, :type, :priority, :confidence, :agent_name, :submitted_at, :due_by, NULL) "
+                "ON CONFLICT (id) DO NOTHING"
+            ),
+            {
+                "id": t["id"],
+                "pid": t["projectId"],
+                "reason": t["reason"],
+                "status": t["status"],
+                "title": t["title"],
+                "type": t["type"],
+                "priority": t["priority"],
+                "confidence": t["confidence"],
+                "agent_name": t["agent_name"],
+                "submitted_at": t["submitted_at"],
+                "due_by": t["due_by"],
+            },
+        )
 
 
 async def _load_project_for_route(session, project_id: str) -> tuple[str, dict]:
@@ -773,10 +900,12 @@ async def _load_project_for_route(session, project_id: str) -> tuple[str, dict]:
         await _hydrate_project_owner(session, project)
         return project["id"], project
 
-    row = (await session.execute(
-        text("SELECT * FROM business_projects WHERE id = :id"),
-        {"id": target_id},
-    )).first()
+    row = (
+        await session.execute(
+            text("SELECT * FROM business_projects WHERE id = :id"),
+            {"id": target_id},
+        )
+    ).first()
     project = _row_to_dict(row) if row else None
     if not project:
         _error_response("NOT-FOUND", "Project not found", status=404)
@@ -793,10 +922,13 @@ async def _get_current_user(request: Request) -> dict:
 
     async with db_session() as session:
         from sqlalchemy import text
-        row = (await session.execute(
-            text("SELECT * FROM auth_sessions WHERE token = :token"),
-            {"token": token},
-        )).first()
+
+        row = (
+            await session.execute(
+                text("SELECT * FROM auth_sessions WHERE token = :token"),
+                {"token": token},
+            )
+        ).first()
         if not row:
             _error_response("AUTH-4012", "Invalid session", status=401)
         sess = _row_to_dict(row)
@@ -808,10 +940,12 @@ async def _get_current_user(request: Request) -> dict:
             )
             _error_response("AUTH-4013", "Session expired", status=401)
 
-        user_row = (await session.execute(
-            text("SELECT * FROM users WHERE id = :id"),
-            {"id": sess["userid"]},
-        )).first()
+        user_row = (
+            await session.execute(
+                text("SELECT * FROM users WHERE id = :id"),
+                {"id": sess["userid"]},
+            )
+        ).first()
         if not user_row:
             _error_response("AUTH-4013", "User not found", status=401)
         return _row_to_dict(user_row)
@@ -821,6 +955,7 @@ async def _get_current_user(request: Request) -> dict:
 # Health
 # ---------------------------------------------------------------------------
 
+
 @router.get("/health")
 async def health():
     return {"status": "ok"}
@@ -829,6 +964,7 @@ async def health():
 # ---------------------------------------------------------------------------
 # Install
 # ---------------------------------------------------------------------------
+
 
 class InstallBody(BaseModel):
     orgName: str
@@ -844,35 +980,55 @@ async def install(body: InstallBody):
     async with db_session() as session:
         from sqlalchemy import text
 
-        existing = (await session.execute(
-            text("SELECT * FROM organization WHERE setupComplete = 1")
-        )).first()
+        existing = (
+            await session.execute(text("SELECT * FROM organization WHERE setupComplete = 1"))
+        ).first()
         if existing:
-            _error_response("INSTALL-4031", "Installation locked", details="Already installed", status=403)
+            _error_response(
+                "INSTALL-4031", "Installation locked", details="Already installed", status=403
+            )
 
         domain = body.orgName.lower().replace(" ", "") + ".com"
         org_id = "org-1"
         admin_id = _uuid()
 
-        await session.execute(text(
-            "DELETE FROM organization"
-        ))
-        await session.execute(text(
-            "INSERT INTO organization (id, name, domain, setupcomplete, licensekey, aiprovider, aiapikey, aimodel, storage, database) "
-            "VALUES (:id, :name, :domain, 1, :lk, :aip, :aik, :aim, 'local', 'sqlite')"
-        ), {
-            "id": org_id, "name": body.orgName, "domain": domain,
-            "lk": "Demo", "aip": body.aiProvider, "aik": body.aiApiKey, "aim": body.aiModel,
-        })
+        await session.execute(text("DELETE FROM organization"))
+        await session.execute(
+            text(
+                "INSERT INTO organization (id, name, domain, setupcomplete, licensekey, aiprovider, aiapikey, aimodel, storage, database) "
+                "VALUES (:id, :name, :domain, 1, :lk, :aip, :aik, :aim, 'local', 'sqlite')"
+            ),
+            {
+                "id": org_id,
+                "name": body.orgName,
+                "domain": domain,
+                "lk": "Demo",
+                "aip": body.aiProvider,
+                "aik": body.aiApiKey,
+                "aim": body.aiModel,
+            },
+        )
 
-        await session.execute(text(
-            "INSERT INTO users (id, email, passwordhash, role, department, active) "
-            "VALUES (:id, :email, :pw, 'Super Admin', 'General', 1)"
-        ), {"id": admin_id, "email": body.adminEmail, "pw": body.adminPassword})
+        await session.execute(
+            text(
+                "INSERT INTO users (id, email, passwordhash, role, department, active) "
+                "VALUES (:id, :email, :pw, 'Super Admin', 'General', 1)"
+            ),
+            {"id": admin_id, "email": body.adminEmail, "pw": body.adminPassword},
+        )
 
-        await session.execute(text(
-            "INSERT INTO audit_logs (id, action, userid, details, timestamp) VALUES (:id, :a, :u, :d, :t)"
-        ), {"id": _uuid(), "a": "Installation Completed", "u": "system", "d": "Platform initialized", "t": _now()})
+        await session.execute(
+            text(
+                "INSERT INTO audit_logs (id, action, userid, details, timestamp) VALUES (:id, :a, :u, :d, :t)"
+            ),
+            {
+                "id": _uuid(),
+                "a": "Installation Completed",
+                "u": "system",
+                "d": "Platform initialized",
+                "t": _now(),
+            },
+        )
 
     return {"success": True}
 
@@ -881,6 +1037,7 @@ async def install(body: InstallBody):
 async def installation_status():
     async with db_session() as session:
         from sqlalchemy import text
+
         row = (await session.execute(text("SELECT * FROM organization LIMIT 1"))).first()
         org = _row_to_dict(row) if row else {}
         return {"locked": bool(org.get("setupcomplete"))}
@@ -895,6 +1052,7 @@ async def install_test_service(service: str):
 async def install_health():
     async with db_session() as session:
         from sqlalchemy import text
+
         row = (await session.execute(text("SELECT * FROM organization LIMIT 1"))).first()
         org = _row_to_dict(row) if row else {}
         return {
@@ -909,6 +1067,7 @@ async def install_health():
 # Auth
 # ---------------------------------------------------------------------------
 
+
 class LoginBody(BaseModel):
     email: str
     password: str
@@ -918,10 +1077,13 @@ class LoginBody(BaseModel):
 async def auth_login(body: LoginBody):
     async with db_session() as session:
         from sqlalchemy import text
-        row = (await session.execute(
-            text("SELECT * FROM users WHERE email = :email"),
-            {"email": body.email},
-        )).first()
+
+        row = (
+            await session.execute(
+                text("SELECT * FROM users WHERE email = :email"),
+                {"email": body.email},
+            )
+        ).first()
         if not row:
             _error_response("AUTH-4011", "Invalid credentials", status=401)
         user = _row_to_dict(row)
@@ -931,21 +1093,48 @@ async def auth_login(body: LoginBody):
 
         token = f"sess_{int(datetime.now().timestamp() * 1000)}"
         expires = str(int(datetime.now().timestamp() * 1000) + 86400000)
-        await session.execute(text(
-            "INSERT INTO auth_sessions (id, userid, token, expiresat) VALUES (:id, :uid, :tok, :exp)"
-        ), {"id": _uuid(), "uid": user["id"], "tok": token, "exp": expires})
+        await session.execute(
+            text(
+                "INSERT INTO auth_sessions (id, userid, token, expiresat) VALUES (:id, :uid, :tok, :exp)"
+            ),
+            {"id": _uuid(), "uid": user["id"], "tok": token, "exp": expires},
+        )
 
-        await session.execute(text(
-            "INSERT INTO audit_logs (id, action, userid, details, timestamp) VALUES (:id, :a, :u, :d, :t)"
-        ), {"id": _uuid(), "a": "User Login", "u": user["id"], "d": "Successful login", "t": _now()})
+        await session.execute(
+            text(
+                "INSERT INTO audit_logs (id, action, userid, details, timestamp) VALUES (:id, :a, :u, :d, :t)"
+            ),
+            {
+                "id": _uuid(),
+                "a": "User Login",
+                "u": user["id"],
+                "d": "Successful login",
+                "t": _now(),
+            },
+        )
 
-    return {"token": token, "user": {"id": user["id"], "email": user["email"], "role": user["role"], "name": user.get("name", "")}}
+    return {
+        "token": token,
+        "user": {
+            "id": user["id"],
+            "email": user["email"],
+            "role": user["role"],
+            "name": user.get("name", ""),
+        },
+    }
 
 
 @router.get("/auth/me")
 async def auth_me(request: Request):
     user = await _get_current_user(request)
-    return {"user": {"id": user["id"], "email": user["email"], "role": user["role"], "name": user.get("name", "")}}
+    return {
+        "user": {
+            "id": user["id"],
+            "email": user["email"],
+            "role": user["role"],
+            "name": user.get("name", ""),
+        }
+    }
 
 
 @router.post("/auth/logout")
@@ -954,7 +1143,10 @@ async def auth_logout(request: Request):
     token = auth.removeprefix("Bearer ").strip()
     async with db_session() as session:
         from sqlalchemy import text
-        await session.execute(text("DELETE FROM auth_sessions WHERE token = :token"), {"token": token})
+
+        await session.execute(
+            text("DELETE FROM auth_sessions WHERE token = :token"), {"token": token}
+        )
     return {"success": True}
 
 
@@ -971,13 +1163,16 @@ async def rbac_evaluate(body: RBACBody):
         required = "Org Admin"
     if body.resource == "installation":
         required = "Super Admin"
-    allowed = hierarchy.index(body.role) >= hierarchy.index(required) if body.role in hierarchy else False
+    allowed = (
+        hierarchy.index(body.role) >= hierarchy.index(required) if body.role in hierarchy else False
+    )
     return {"allowed": allowed}
 
 
 # ---------------------------------------------------------------------------
 # Users
 # ---------------------------------------------------------------------------
+
 
 class UserCreateBody(BaseModel):
     email: str
@@ -990,6 +1185,7 @@ class UserCreateBody(BaseModel):
 async def list_users():
     async with db_session() as session:
         from sqlalchemy import text
+
         rows = (await session.execute(text("SELECT * FROM users"))).fetchall()
         return [
             {"id": r["id"], "email": r["email"], "role": r["role"], "active": r["active"]}
@@ -1002,12 +1198,24 @@ async def create_user(body: UserCreateBody):
     uid = _uuid()
     async with db_session() as session:
         from sqlalchemy import text
-        await session.execute(text(
-            "INSERT INTO users (id, email, passwordHash, role, department, active) "
-            "VALUES (:id, :email, :pw, :role, :dept, 1)"
-        ), {"id": uid, "email": body.email, "pw": body.password or "password123",
-            "role": body.role or "Viewer", "dept": body.department or "General"})
-    return {"success": True, "user": {"id": uid, "email": body.email, "role": body.role, "active": 1}}
+
+        await session.execute(
+            text(
+                "INSERT INTO users (id, email, passwordHash, role, department, active) "
+                "VALUES (:id, :email, :pw, :role, :dept, 1)"
+            ),
+            {
+                "id": uid,
+                "email": body.email,
+                "pw": body.password or "password123",
+                "role": body.role or "Viewer",
+                "dept": body.department or "General",
+            },
+        )
+    return {
+        "success": True,
+        "user": {"id": uid, "email": body.email, "role": body.role, "active": 1},
+    }
 
 
 class UserActiveBody(BaseModel):
@@ -1018,15 +1226,18 @@ class UserActiveBody(BaseModel):
 async def update_user_active(user_id: str, body: UserActiveBody):
     async with db_session() as session:
         from sqlalchemy import text
-        await session.execute(text(
-            "UPDATE users SET active = :active WHERE id = :id"
-        ), {"active": 1 if body.active else 0, "id": user_id})
+
+        await session.execute(
+            text("UPDATE users SET active = :active WHERE id = :id"),
+            {"active": 1 if body.active else 0, "id": user_id},
+        )
     return {"success": True}
 
 
 # ---------------------------------------------------------------------------
 # Projects
 # ---------------------------------------------------------------------------
+
 
 class ProjectCreateBody(BaseModel):
     name: str
@@ -1044,34 +1255,53 @@ async def list_projects(request: Request):
     await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
+
         rows = (await session.execute(text("SELECT * FROM business_projects"))).fetchall()
         projects = [_row_to_dict(r) for r in rows]
         for project in projects:
             await _hydrate_project_owner(session, project)
             pid = project["id"]
-            node_rows = (await session.execute(
-                text("SELECT state FROM execution_nodes WHERE projectId = :pid"),
-                {"pid": pid},
-            )).fetchall()
+            node_rows = (
+                await session.execute(
+                    text("SELECT state FROM execution_nodes WHERE projectId = :pid"),
+                    {"pid": pid},
+                )
+            ).fetchall()
             nodes = [_row_to_dict(r) for r in node_rows]
-            story_rows = (await session.execute(
-                text("SELECT 'story' AS kind, status FROM project_stories WHERE project_id = :pid"),
-                {"pid": pid},
-            )).fetchall()
-            bug_rows = (await session.execute(
-                text("SELECT 'bug' AS kind, status FROM project_story_bugs WHERE project_id = :pid"),
-                {"pid": pid},
-            )).fetchall()
+            story_rows = (
+                await session.execute(
+                    text(
+                        "SELECT 'story' AS kind, status FROM project_stories WHERE project_id = :pid"
+                    ),
+                    {"pid": pid},
+                )
+            ).fetchall()
+            bug_rows = (
+                await session.execute(
+                    text(
+                        "SELECT 'bug' AS kind, status FROM project_story_bugs WHERE project_id = :pid"
+                    ),
+                    {"pid": pid},
+                )
+            ).fetchall()
             work_rows = [_row_to_dict(r) for r in story_rows + bug_rows]
             project["progress"] = _compute_progress(nodes, work_rows, project)
-            project["pendingapprovals"] = (await session.execute(
-                text("SELECT count(1) FROM human_queue WHERE projectId = :pid AND status = 'Pending'"),
-                {"pid": pid},
-            )).scalar() or 0
-            project["activeworkers"] = (await session.execute(
-                text("SELECT count(1) FROM agents WHERE project_id = :pid AND status IN ('active', 'running', 'executing')"),
-                {"pid": pid},
-            )).scalar() or 0
+            project["pendingapprovals"] = (
+                await session.execute(
+                    text(
+                        "SELECT count(1) FROM human_queue WHERE projectId = :pid AND status = 'Pending'"
+                    ),
+                    {"pid": pid},
+                )
+            ).scalar() or 0
+            project["activeworkers"] = (
+                await session.execute(
+                    text(
+                        "SELECT count(1) FROM agents WHERE project_id = :pid AND status IN ('active', 'running', 'executing')"
+                    ),
+                    {"pid": pid},
+                )
+            ).scalar() or 0
         return projects
 
 
@@ -1081,19 +1311,30 @@ async def create_project(body: ProjectCreateBody, request: Request):
     pid = _uuid()
     now = _now()
     import json
+
     try:
         async with db_session() as session:
             from sqlalchemy import text
-            await session.execute(text(
-                "INSERT INTO business_projects (id, name, description, businessgoal, ownerid, department, status, priority, tags, requirements, createdat, updatedat) "
-                "VALUES (:id, :name, :desc, :goal, :owner, :dept, :status, :pri, :tags, :req, :t, :t)"
-            ), {
-                "id": pid, "name": body.name, "desc": body.description or "",
-                "goal": body.businessGoal, "owner": user["id"],
-                "dept": body.department or "", "status": body.status or "Planning", "pri": body.priority or "Medium",
-                "tags": body.tags or "[]", "req": json.dumps(body.requirements) if body.requirements else None,
-                "t": now,
-            })
+
+            await session.execute(
+                text(
+                    "INSERT INTO business_projects (id, name, description, businessgoal, ownerid, department, status, priority, tags, requirements, createdat, updatedat) "
+                    "VALUES (:id, :name, :desc, :goal, :owner, :dept, :status, :pri, :tags, :req, :t, :t)"
+                ),
+                {
+                    "id": pid,
+                    "name": body.name,
+                    "desc": body.description or "",
+                    "goal": body.businessGoal,
+                    "owner": user["id"],
+                    "dept": body.department or "",
+                    "status": body.status or "Planning",
+                    "pri": body.priority or "Medium",
+                    "tags": body.tags or "[]",
+                    "req": json.dumps(body.requirements) if body.requirements else None,
+                    "t": now,
+                },
+            )
 
             # Store requirements in detail tables if provided
             if body.requirements:
@@ -1102,35 +1343,49 @@ async def create_project(body: ProjectCreateBody, request: Request):
 
                 # Functional requirements
                 for i, r in enumerate(reqs.get("functionalReqs", [])):
-                    await session.execute(text(
-                        "INSERT INTO project_requirements (id, project_id, text, type, status, source, version, created_at, updated_at) "
-                        "VALUES (:id, :pid, :text, 'functional', 'proposed', 'ba_agent', '1', :t, :t) ON CONFLICT DO NOTHING"
-                    ), {"id": f"{uid}-fr-{i}", "pid": pid, "text": r, "t": now})
+                    await session.execute(
+                        text(
+                            "INSERT INTO project_requirements (id, project_id, text, type, status, source, version, created_at, updated_at) "
+                            "VALUES (:id, :pid, :text, 'functional', 'proposed', 'ba_agent', '1', :t, :t) ON CONFLICT DO NOTHING"
+                        ),
+                        {"id": f"{uid}-fr-{i}", "pid": pid, "text": r, "t": now},
+                    )
 
                 # Skills
                 for i, s in enumerate(reqs.get("skills", [])):
-                    await session.execute(text(
-                        "INSERT INTO project_requirements (id, project_id, text, type, status, source, version, created_at, updated_at) "
-                        "VALUES (:id, :pid, :text, 'skill', 'proposed', 'ba_agent', '1', :t, :t) ON CONFLICT DO NOTHING"
-                    ), {"id": f"{uid}-sk-{i}", "pid": pid, "text": s, "t": now})
+                    await session.execute(
+                        text(
+                            "INSERT INTO project_requirements (id, project_id, text, type, status, source, version, created_at, updated_at) "
+                            "VALUES (:id, :pid, :text, 'skill', 'proposed', 'ba_agent', '1', :t, :t) ON CONFLICT DO NOTHING"
+                        ),
+                        {"id": f"{uid}-sk-{i}", "pid": pid, "text": s, "t": now},
+                    )
 
                 # Connectors
                 for i, c in enumerate(reqs.get("connectors", [])):
-                    await session.execute(text(
-                        "INSERT INTO project_requirements (id, project_id, text, type, status, source, version, created_at, updated_at) "
-                        "VALUES (:id, :pid, :text, 'connector', 'proposed', 'ba_agent', '1', :t, :t) ON CONFLICT DO NOTHING"
-                    ), {"id": f"{uid}-cn-{i}", "pid": pid, "text": c, "t": now})
+                    await session.execute(
+                        text(
+                            "INSERT INTO project_requirements (id, project_id, text, type, status, source, version, created_at, updated_at) "
+                            "VALUES (:id, :pid, :text, 'connector', 'proposed', 'ba_agent', '1', :t, :t) ON CONFLICT DO NOTHING"
+                        ),
+                        {"id": f"{uid}-cn-{i}", "pid": pid, "text": c, "t": now},
+                    )
 
                 # Risks
                 for i, r in enumerate(reqs.get("risks", [])):
-                    await session.execute(text(
-                        "INSERT INTO project_risks (id, project_id, risk, impact, mitigation, status, version, created_at) "
-                        "VALUES (:id, :pid, :risk, 'Medium', 'TBD', 'open', '1', :t) ON CONFLICT DO NOTHING"
-                    ), {"id": f"{uid}-rk-{i}", "pid": pid, "risk": r, "t": now})
+                    await session.execute(
+                        text(
+                            "INSERT INTO project_risks (id, project_id, risk, impact, mitigation, status, version, created_at) "
+                            "VALUES (:id, :pid, :risk, 'Medium', 'TBD', 'open', '1', :t) ON CONFLICT DO NOTHING"
+                        ),
+                        {"id": f"{uid}-rk-{i}", "pid": pid, "risk": r, "t": now},
+                    )
 
-            row = (await session.execute(
-                text("SELECT * FROM business_projects WHERE id = :id"), {"id": pid}
-            )).first()
+            row = (
+                await session.execute(
+                    text("SELECT * FROM business_projects WHERE id = :id"), {"id": pid}
+                )
+            ).first()
             project = _row_to_dict(row)
             await _ensure_project_work_breakdown(session, project)
             await _ensure_project_documents(session, project)
@@ -1138,18 +1393,27 @@ async def create_project(body: ProjectCreateBody, request: Request):
                 await _ensure_project_meetings(session, project)
             except Exception as meet_err:
                 import logging
+
                 logging.getLogger(__name__).warning("meetings seed failed: %s", meet_err)
             try:
                 await _ensure_project_queue_items(session, project)
             except Exception as q_err:
                 import logging
+
                 logging.getLogger(__name__).warning("queue items seed failed: %s", q_err)
             await _hydrate_project_owner(session, project)
         return project
     except Exception as exc:
         import logging
+
         logging.getLogger(__name__).error("create_project failed: %s", exc, exc_info=True)
-        raise HTTPException(status_code=500, detail={"success": False, "error": {"code": "PROJECT-CREATE-FAILED", "message": str(exc)}})
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "success": False,
+                "error": {"code": "PROJECT-CREATE-FAILED", "message": str(exc)},
+            },
+        )
 
 
 @router.get("/projects/{project_id}")
@@ -1165,15 +1429,24 @@ async def update_project(project_id: str, body: dict, request: Request):
     user = await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
-        await session.execute(text(
-            "UPDATE business_projects SET name=:name, description=:desc, businessgoal=:goal, "
-            "department=:dept, status=:status, priority=:pri, tags=:tags, updatedat=:t WHERE id=:id"
-        ), {
-            "id": project_id, "name": body.get("name", ""), "desc": body.get("description", ""),
-            "goal": body.get("businessGoal") or body.get("businessgoal") or "", "dept": body.get("department", ""),
-            "status": body.get("status", "Planning"), "pri": body.get("priority", "Medium"),
-            "tags": body.get("tags", "[]"), "t": _now(),
-        })
+
+        await session.execute(
+            text(
+                "UPDATE business_projects SET name=:name, description=:desc, businessgoal=:goal, "
+                "department=:dept, status=:status, priority=:pri, tags=:tags, updatedat=:t WHERE id=:id"
+            ),
+            {
+                "id": project_id,
+                "name": body.get("name", ""),
+                "desc": body.get("description", ""),
+                "goal": body.get("businessGoal") or body.get("businessgoal") or "",
+                "dept": body.get("department", ""),
+                "status": body.get("status", "Planning"),
+                "pri": body.get("priority", "Medium"),
+                "tags": body.get("tags", "[]"),
+                "t": _now(),
+            },
+        )
     return {"success": True}
 
 
@@ -1182,35 +1455,78 @@ async def delete_project(project_id: str, request: Request):
     user = await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
-        await session.execute(text("DELETE FROM execution_nodes WHERE projectId = :id"), {"id": project_id})
-        await session.execute(text("DELETE FROM project_agents WHERE projectId = :id"), {"id": project_id})
-        await session.execute(text("DELETE FROM project_agent_governance_assignments WHERE project_id = :id"), {"id": project_id})
+
+        await session.execute(
+            text("DELETE FROM execution_nodes WHERE projectId = :id"), {"id": project_id}
+        )
+        await session.execute(
+            text("DELETE FROM project_agents WHERE projectId = :id"), {"id": project_id}
+        )
+        await session.execute(
+            text("DELETE FROM project_agent_governance_assignments WHERE project_id = :id"),
+            {"id": project_id},
+        )
         await session.execute(text("DELETE FROM agents WHERE project_id = :id"), {"id": project_id})
-        await session.execute(text("DELETE FROM artifacts WHERE projectId = :id"), {"id": project_id})
-        await session.execute(text("DELETE FROM human_queue WHERE projectId = :id"), {"id": project_id})
-        await session.execute(text("DELETE FROM notifications WHERE project_id = :id"), {"id": project_id})
-        await session.execute(text("DELETE FROM meetings WHERE project_id = :id"), {"id": project_id})
-        await session.execute(text("DELETE FROM project_requirements WHERE project_id = :id"), {"id": project_id})
-        await session.execute(text("DELETE FROM project_constraints WHERE project_id = :id"), {"id": project_id})
-        await session.execute(text("DELETE FROM project_risks WHERE project_id = :id"), {"id": project_id})
-        await session.execute(text("DELETE FROM discovery_sessions WHERE project_id = :id"), {"id": project_id})
-        await session.execute(text("DELETE FROM sessions WHERE project_id = :id OR workspace_id = :id"), {"id": project_id})
-        await session.execute(text("DELETE FROM project_story_bugs WHERE project_id = :id"), {"id": project_id})
-        await session.execute(text("DELETE FROM project_stories WHERE project_id = :id"), {"id": project_id})
-        await session.execute(text("DELETE FROM project_epics WHERE project_id = :id"), {"id": project_id})
-        await session.execute(text("DELETE FROM project_human_assignments WHERE project_id = :id"), {"id": project_id})
-        await session.execute(text(
-            "DELETE FROM project_agent_assignments "
-            "WHERE position_id IN (SELECT id FROM project_agent_positions WHERE project_id = :id)"
-        ), {"id": project_id})
-        await session.execute(text("DELETE FROM project_agent_positions WHERE project_id = :id"), {"id": project_id})
-        await session.execute(text("DELETE FROM business_projects WHERE id = :id"), {"id": project_id})
+        await session.execute(
+            text("DELETE FROM artifacts WHERE projectId = :id"), {"id": project_id}
+        )
+        await session.execute(
+            text("DELETE FROM human_queue WHERE projectId = :id"), {"id": project_id}
+        )
+        await session.execute(
+            text("DELETE FROM notifications WHERE project_id = :id"), {"id": project_id}
+        )
+        await session.execute(
+            text("DELETE FROM meetings WHERE project_id = :id"), {"id": project_id}
+        )
+        await session.execute(
+            text("DELETE FROM project_requirements WHERE project_id = :id"), {"id": project_id}
+        )
+        await session.execute(
+            text("DELETE FROM project_constraints WHERE project_id = :id"), {"id": project_id}
+        )
+        await session.execute(
+            text("DELETE FROM project_risks WHERE project_id = :id"), {"id": project_id}
+        )
+        await session.execute(
+            text("DELETE FROM discovery_sessions WHERE project_id = :id"), {"id": project_id}
+        )
+        await session.execute(
+            text("DELETE FROM sessions WHERE project_id = :id OR workspace_id = :id"),
+            {"id": project_id},
+        )
+        await session.execute(
+            text("DELETE FROM project_story_bugs WHERE project_id = :id"), {"id": project_id}
+        )
+        await session.execute(
+            text("DELETE FROM project_stories WHERE project_id = :id"), {"id": project_id}
+        )
+        await session.execute(
+            text("DELETE FROM project_epics WHERE project_id = :id"), {"id": project_id}
+        )
+        await session.execute(
+            text("DELETE FROM project_human_assignments WHERE project_id = :id"), {"id": project_id}
+        )
+        await session.execute(
+            text(
+                "DELETE FROM project_agent_assignments "
+                "WHERE position_id IN (SELECT id FROM project_agent_positions WHERE project_id = :id)"
+            ),
+            {"id": project_id},
+        )
+        await session.execute(
+            text("DELETE FROM project_agent_positions WHERE project_id = :id"), {"id": project_id}
+        )
+        await session.execute(
+            text("DELETE FROM business_projects WHERE id = :id"), {"id": project_id}
+        )
     return {"success": True}
 
 
 # ---------------------------------------------------------------------------
 # Project Work Board
 # ---------------------------------------------------------------------------
+
 
 class WorkEpicBody(BaseModel):
     title: str
@@ -1242,36 +1558,50 @@ async def get_project_work_board(project_id: str, request: Request):
         target_id, project = await _load_project_for_route(session, project_id)
         await _ensure_project_work_breakdown(session, project)
 
-        epic_rows = (await session.execute(
-            text("SELECT * FROM project_epics WHERE project_id = :pid ORDER BY sort_order, created_at"),
-            {"pid": target_id},
-        )).fetchall()
-        story_rows = (await session.execute(
-            text("SELECT * FROM project_stories WHERE project_id = :pid ORDER BY sort_order, created_at"),
-            {"pid": target_id},
-        )).fetchall()
-        bug_rows = (await session.execute(
-            text("SELECT * FROM project_story_bugs WHERE project_id = :pid ORDER BY sort_order, created_at"),
-            {"pid": target_id},
-        )).fetchall()
+        epic_rows = (
+            await session.execute(
+                text(
+                    "SELECT * FROM project_epics WHERE project_id = :pid ORDER BY sort_order, created_at"
+                ),
+                {"pid": target_id},
+            )
+        ).fetchall()
+        story_rows = (
+            await session.execute(
+                text(
+                    "SELECT * FROM project_stories WHERE project_id = :pid ORDER BY sort_order, created_at"
+                ),
+                {"pid": target_id},
+            )
+        ).fetchall()
+        bug_rows = (
+            await session.execute(
+                text(
+                    "SELECT * FROM project_story_bugs WHERE project_id = :pid ORDER BY sort_order, created_at"
+                ),
+                {"pid": target_id},
+            )
+        ).fetchall()
 
     epics = [_row_to_dict(r) for r in epic_rows]
     stories = [_row_to_dict(r) for r in story_rows]
     bugs = [_row_to_dict(r) for r in bug_rows]
 
-    items = [
-        {"kind": "epic", **e, "status": _normalize_work_status(e.get("status"))}
-        for e in epics
-    ] + [
-        {"kind": "story", **s, "status": _normalize_work_status(s.get("status"))}
-        for s in stories
-    ] + [
-        {"kind": "bug", **b, "status": _normalize_work_status(b.get("status"))}
-        for b in bugs
-    ]
+    items = (
+        [{"kind": "epic", **e, "status": _normalize_work_status(e.get("status"))} for e in epics]
+        + [
+            {"kind": "story", **s, "status": _normalize_work_status(s.get("status"))}
+            for s in stories
+        ]
+        + [{"kind": "bug", **b, "status": _normalize_work_status(b.get("status"))} for b in bugs]
+    )
 
     return {
-        "project": {"id": project["id"], "name": project.get("name"), "status": project.get("status")},
+        "project": {
+            "id": project["id"],
+            "name": project.get("name"),
+            "status": project.get("status"),
+        },
         "columns": [
             {
                 **column,
@@ -1292,18 +1622,22 @@ async def create_project_epic(project_id: str, body: WorkEpicBody, request: Requ
     now = _now()
     async with db_session() as session:
         from sqlalchemy import text
+
         target_id, _project = await _load_project_for_route(session, project_id)
-        await session.execute(text(
-            "INSERT INTO project_epics (id, project_id, title, description, status, sort_order, created_at, updated_at) "
-            "VALUES (:id, :pid, :title, :desc, :status, 0, :t, :t)"
-        ), {
-            "id": eid,
-            "pid": target_id,
-            "title": body.title,
-            "desc": body.description or "",
-            "status": _normalize_work_status(body.status),
-            "t": now,
-        })
+        await session.execute(
+            text(
+                "INSERT INTO project_epics (id, project_id, title, description, status, sort_order, created_at, updated_at) "
+                "VALUES (:id, :pid, :title, :desc, :status, 0, :t, :t)"
+            ),
+            {
+                "id": eid,
+                "pid": target_id,
+                "title": body.title,
+                "desc": body.description or "",
+                "status": _normalize_work_status(body.status),
+                "t": now,
+            },
+        )
     return {"success": True, "epic": {"id": eid, "title": body.title}}
 
 
@@ -1314,58 +1648,74 @@ async def create_project_story(project_id: str, body: WorkStoryBody, request: Re
     now = _now()
     async with db_session() as session:
         from sqlalchemy import text
+
         target_id, project = await _load_project_for_route(session, project_id)
         await _ensure_project_work_breakdown(session, project)
         epic_id = body.epicId
         if not epic_id:
-            epic_row = (await session.execute(
-                text("SELECT id FROM project_epics WHERE project_id = :pid ORDER BY sort_order, created_at LIMIT 1"),
-                {"pid": target_id},
-            )).first()
+            epic_row = (
+                await session.execute(
+                    text(
+                        "SELECT id FROM project_epics WHERE project_id = :pid ORDER BY sort_order, created_at LIMIT 1"
+                    ),
+                    {"pid": target_id},
+                )
+            ).first()
             epic_id = _row_to_dict(epic_row).get("id") if epic_row else None
-        await session.execute(text(
-            "INSERT INTO project_stories (id, project_id, epic_id, title, description, status, story_points, sort_order, created_at, updated_at) "
-            "VALUES (:id, :pid, :eid, :title, :desc, :status, :points, 0, :t, :t)"
-        ), {
-            "id": sid,
-            "pid": target_id,
-            "eid": epic_id,
-            "title": body.title,
-            "desc": body.description or "",
-            "status": _normalize_work_status(body.status),
-            "points": body.storyPoints,
-            "t": now,
-        })
+        await session.execute(
+            text(
+                "INSERT INTO project_stories (id, project_id, epic_id, title, description, status, story_points, sort_order, created_at, updated_at) "
+                "VALUES (:id, :pid, :eid, :title, :desc, :status, :points, 0, :t, :t)"
+            ),
+            {
+                "id": sid,
+                "pid": target_id,
+                "eid": epic_id,
+                "title": body.title,
+                "desc": body.description or "",
+                "status": _normalize_work_status(body.status),
+                "points": body.storyPoints,
+                "t": now,
+            },
+        )
     return {"success": True, "story": {"id": sid, "title": body.title, "epicId": epic_id}}
 
 
 @router.post("/projects/{project_id}/work-board/stories/{story_id}/bugs")
-async def create_project_story_bug(project_id: str, story_id: str, body: WorkBugBody, request: Request):
+async def create_project_story_bug(
+    project_id: str, story_id: str, body: WorkBugBody, request: Request
+):
     await _get_current_user(request)
     bid = _uuid()
     now = _now()
     async with db_session() as session:
         from sqlalchemy import text
+
         target_id, _project = await _load_project_for_route(session, project_id)
-        story = (await session.execute(
-            text("SELECT id FROM project_stories WHERE id = :sid AND project_id = :pid"),
-            {"sid": story_id, "pid": target_id},
-        )).first()
+        story = (
+            await session.execute(
+                text("SELECT id FROM project_stories WHERE id = :sid AND project_id = :pid"),
+                {"sid": story_id, "pid": target_id},
+            )
+        ).first()
         if not story:
             _error_response("NOT-FOUND", "Story not found", status=404)
-        await session.execute(text(
-            "INSERT INTO project_story_bugs (id, project_id, story_id, title, description, severity, status, sort_order, created_at, updated_at) "
-            "VALUES (:id, :pid, :sid, :title, :desc, :severity, :status, 0, :t, :t)"
-        ), {
-            "id": bid,
-            "pid": target_id,
-            "sid": story_id,
-            "title": body.title,
-            "desc": body.description or "",
-            "severity": body.severity or "Medium",
-            "status": _normalize_work_status(body.status),
-            "t": now,
-        })
+        await session.execute(
+            text(
+                "INSERT INTO project_story_bugs (id, project_id, story_id, title, description, severity, status, sort_order, created_at, updated_at) "
+                "VALUES (:id, :pid, :sid, :title, :desc, :severity, :status, 0, :t, :t)"
+            ),
+            {
+                "id": bid,
+                "pid": target_id,
+                "sid": story_id,
+                "title": body.title,
+                "desc": body.description or "",
+                "severity": body.severity or "Medium",
+                "status": _normalize_work_status(body.status),
+                "t": now,
+            },
+        )
     return {"success": True, "bug": {"id": bid, "title": body.title, "storyId": story_id}}
 
 
@@ -1373,14 +1723,18 @@ async def create_project_story_bug(project_id: str, story_id: str, body: WorkBug
 # AI Analysis & Recommendations
 # ---------------------------------------------------------------------------
 
+
 @router.post("/projects/{project_id}/analyze")
 async def analyze_project(project_id: str, request: Request):
     user = await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
-        row = (await session.execute(
-            text("SELECT * FROM business_projects WHERE id = :id"), {"id": project_id}
-        )).first()
+
+        row = (
+            await session.execute(
+                text("SELECT * FROM business_projects WHERE id = :id"), {"id": project_id}
+            )
+        ).first()
         if not row:
             _error_response("NOT-FOUND", "Project not found", status=404)
         project = _row_to_dict(row)
@@ -1435,9 +1789,12 @@ async def recommend_project(project_id: str, request: Request):
     user = await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
-        row = (await session.execute(
-            text("SELECT * FROM business_projects WHERE id = :id"), {"id": project_id}
-        )).first()
+
+        row = (
+            await session.execute(
+                text("SELECT * FROM business_projects WHERE id = :id"), {"id": project_id}
+            )
+        ).first()
         if not row:
             _error_response("NOT-FOUND", "Project not found", status=404)
         project = _row_to_dict(row)
@@ -1446,9 +1803,14 @@ async def recommend_project(project_id: str, request: Request):
         org = _row_to_dict(org_row) if org_row else {}
 
     if not org.get("aiprovider") or org.get("aiprovider") == "none":
-        _error_response("AI-001", "AI Provider Not Configured", details="Configure an AI Provider to generate recommendations.")
+        _error_response(
+            "AI-001",
+            "AI Provider Not Configured",
+            details="Configure an AI Provider to generate recommendations.",
+        )
 
     import os
+
     try:
         api_key = os.environ.get("AI_API_KEY") or org.get("aiapikey") or "dummy"
         base_url = "https://api.openai.com/v1/chat/completions"
@@ -1460,7 +1822,7 @@ async def recommend_project(project_id: str, request: Request):
         elif org.get("aiprovider") == "ollama":
             base_url = "http://localhost:11434/api/generate"
 
-        system_prompt = f"""Analyze the business goal: {project.get('businessgoal')}.
+        system_prompt = f"""Analyze the business goal: {project.get("businessgoal")}.
 Return a valid JSON object matching this schema:
 {{
   "recommendedEmployees": [{{"name": "string", "role": "string", "purpose": "string", "reason": "string", "confidence": 85}}],
@@ -1475,27 +1837,40 @@ Return a valid JSON object matching this schema:
 }}"""
 
         import httpx
+
         async with httpx.AsyncClient(timeout=30) as client:
             if org.get("aiProvider") == "gemini":
-                resp = await client.post(base_url, headers=headers, json={
-                    "contents": [{"parts": [{"text": system_prompt}]}]
-                })
+                resp = await client.post(
+                    base_url,
+                    headers=headers,
+                    json={"contents": [{"parts": [{"text": system_prompt}]}]},
+                )
             else:
-                resp = await client.post(base_url, headers=headers, json={
-                    "model": org.get("aiModel", "gpt-4o"),
-                    "messages": [{"role": "user", "content": system_prompt}],
-                })
+                resp = await client.post(
+                    base_url,
+                    headers=headers,
+                    json={
+                        "model": org.get("aiModel", "gpt-4o"),
+                        "messages": [{"role": "user", "content": system_prompt}],
+                    },
+                )
 
         if resp.status_code != 200:
             _error_response("AI-502", "AI Provider Error", details=resp.text, status=502)
 
         data = resp.json()
-        raw_text = data.get("choices", [{}])[0].get("message", {}).get("content") or data.get("response") or json.dumps(data)
+        raw_text = (
+            data.get("choices", [{}])[0].get("message", {}).get("content")
+            or data.get("response")
+            or json.dumps(data)
+        )
         raw_text = raw_text.replace("```json", "").replace("```", "").strip()
         parsed = json.loads(raw_text)
 
     except json.JSONDecodeError:
-        _error_response("AI-501", "AI Provider Error", details="AI failed to return valid structured JSON")
+        _error_response(
+            "AI-501", "AI Provider Error", details="AI failed to return valid structured JSON"
+        )
     except Exception as e:
         _error_response("AI-500", "AI Connection Failed", details=str(e))
 
@@ -1524,9 +1899,13 @@ async def audit_recommendation(project_id: str, body: AuditBody, request: Reques
     user = await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
-        await session.execute(text(
-            "INSERT INTO audit_logs (id, action, userid, details, timestamp) VALUES (:id, :a, :u, :d, :t)"
-        ), {"id": _uuid(), "a": body.action, "u": user["id"], "d": body.detail, "t": _now()})
+
+        await session.execute(
+            text(
+                "INSERT INTO audit_logs (id, action, userid, details, timestamp) VALUES (:id, :a, :u, :d, :t)"
+            ),
+            {"id": _uuid(), "a": body.action, "u": user["id"], "d": body.detail, "t": _now()},
+        )
     return {"success": True}
 
 
@@ -1540,6 +1919,7 @@ async def generate_employees(project_id: str, request: Request):
 # Workspace
 # ---------------------------------------------------------------------------
 
+
 @router.get("/projects/{project_id}/workspace")
 async def get_workspace(project_id: str, request: Request):
     await _get_current_user(request)
@@ -1552,68 +1932,95 @@ async def get_workspace(project_id: str, request: Request):
         await _ensure_project_documents(session, project)
         await _ensure_project_meetings(session, project)
 
-        legacy_agent_rows = (await session.execute(
-            text("SELECT * FROM project_agents WHERE projectId = :id"), {"id": target_id}
-        )).fetchall()
+        legacy_agent_rows = (
+            await session.execute(
+                text("SELECT * FROM project_agents WHERE projectId = :id"), {"id": target_id}
+            )
+        ).fetchall()
         legacy_agents = [_row_to_dict(r) for r in legacy_agent_rows]
 
-        real_agent_rows = (await session.execute(
-            text("SELECT * FROM agents WHERE project_id = :id ORDER BY reports_to NULLS FIRST, role, name"),
-            {"id": target_id},
-        )).fetchall()
+        real_agent_rows = (
+            await session.execute(
+                text(
+                    "SELECT * FROM agents WHERE project_id = :id ORDER BY reports_to NULLS FIRST, role, name"
+                ),
+                {"id": target_id},
+            )
+        ).fetchall()
         real_agents = [_row_to_dict(r) for r in real_agent_rows]
 
-        assigned_agent_rows = (await session.execute(text(
-            "SELECT "
-            "a.*, "
-            "p.id AS position_id, "
-            "p.name AS position_name, "
-            "p.role AS position_role, "
-            "p.designation AS position_designation, "
-            "p.reports_to AS position_reports_to, "
-            "p.role_description AS position_role_description "
-            "FROM project_agent_positions p "
-            "JOIN project_agent_assignments pa ON pa.position_id = p.id "
-            "JOIN agents a ON a.id = pa.agent_id "
-            "WHERE p.project_id = :id "
-            "ORDER BY p.reports_to NULLS FIRST, p.role, p.name"
-        ), {"id": target_id})).fetchall()
+        assigned_agent_rows = (
+            await session.execute(
+                text(
+                    "SELECT "
+                    "a.*, "
+                    "p.id AS position_id, "
+                    "p.name AS position_name, "
+                    "p.role AS position_role, "
+                    "p.designation AS position_designation, "
+                    "p.reports_to AS position_reports_to, "
+                    "p.role_description AS position_role_description "
+                    "FROM project_agent_positions p "
+                    "JOIN project_agent_assignments pa ON pa.position_id = p.id "
+                    "JOIN agents a ON a.id = pa.agent_id "
+                    "WHERE p.project_id = :id "
+                    "ORDER BY p.reports_to NULLS FIRST, p.role, p.name"
+                ),
+                {"id": target_id},
+            )
+        ).fetchall()
         assigned_reusable_agents = [_row_to_dict(r) for r in assigned_agent_rows]
 
-        artifacts_rows = (await session.execute(
-            text("SELECT * FROM artifacts WHERE projectId = :id"), {"id": target_id}
-        )).fetchall()
+        artifacts_rows = (
+            await session.execute(
+                text("SELECT * FROM artifacts WHERE projectId = :id"), {"id": target_id}
+            )
+        ).fetchall()
         artifacts_list = [_row_to_dict(r) for r in artifacts_rows]
 
-        nodes_rows = (await session.execute(
-            text("SELECT * FROM execution_nodes WHERE projectId = :id"), {"id": target_id}
-        )).fetchall()
+        nodes_rows = (
+            await session.execute(
+                text("SELECT * FROM execution_nodes WHERE projectId = :id"), {"id": target_id}
+            )
+        ).fetchall()
         nodes = [_row_to_dict(r) for r in nodes_rows]
 
-        queue_rows = (await session.execute(
-            text("SELECT * FROM human_queue WHERE projectId = :id ORDER BY id"),
-            {"id": target_id},
-        )).fetchall()
+        queue_rows = (
+            await session.execute(
+                text("SELECT * FROM human_queue WHERE projectId = :id ORDER BY id"),
+                {"id": target_id},
+            )
+        ).fetchall()
         queue_items = [_row_to_dict(r) for r in queue_rows]
 
-        meetings_rows = (await session.execute(
-            text("SELECT * FROM meetings WHERE project_id = :id ORDER BY meeting_date NULLS LAST, created_at"),
-            {"id": target_id},
-        )).fetchall()
+        meetings_rows = (
+            await session.execute(
+                text(
+                    "SELECT * FROM meetings WHERE project_id = :id ORDER BY meeting_date NULLS LAST, created_at"
+                ),
+                {"id": target_id},
+            )
+        ).fetchall()
         meetings = [_row_to_dict(r) for r in meetings_rows]
 
-        epic_rows = (await session.execute(
-            text("SELECT id, status FROM project_epics WHERE project_id = :pid"),
-            {"pid": target_id},
-        )).fetchall()
-        story_rows = (await session.execute(
-            text("SELECT id, status FROM project_stories WHERE project_id = :pid"),
-            {"pid": target_id},
-        )).fetchall()
-        bug_rows = (await session.execute(
-            text("SELECT id, status FROM project_story_bugs WHERE project_id = :pid"),
-            {"pid": target_id},
-        )).fetchall()
+        epic_rows = (
+            await session.execute(
+                text("SELECT id, status FROM project_epics WHERE project_id = :pid"),
+                {"pid": target_id},
+            )
+        ).fetchall()
+        story_rows = (
+            await session.execute(
+                text("SELECT id, status FROM project_stories WHERE project_id = :pid"),
+                {"pid": target_id},
+            )
+        ).fetchall()
+        bug_rows = (
+            await session.execute(
+                text("SELECT id, status FROM project_story_bugs WHERE project_id = :pid"),
+                {"pid": target_id},
+            )
+        ).fetchall()
 
     work_rows = (
         [{"kind": "epic", **_row_to_dict(r)} for r in epic_rows]
@@ -1622,12 +2029,17 @@ async def get_workspace(project_id: str, request: Request):
     )
     progress = _compute_progress(nodes, work_rows, project)
     current_phase = project.get("status") or ""
-    pending_approvals = len([q for q in queue_items if (q.get("status") or "").lower() == "pending"])
+    pending_approvals = len(
+        [q for q in queue_items if (q.get("status") or "").lower() == "pending"]
+    )
     workspace_agents = real_agents + assigned_reusable_agents
-    active_workers = len([
-        a for a in workspace_agents
-        if (a.get("status") or "").lower() in {"active", "running", "executing"}
-    ])
+    active_workers = len(
+        [
+            a
+            for a in workspace_agents
+            if (a.get("status") or "").lower() in {"active", "running", "executing"}
+        ]
+    )
 
     kpis: list[dict] = []
     if current_phase:
@@ -1635,9 +2047,17 @@ async def get_workspace(project_id: str, request: Request):
     if progress is not None:
         kpis.append({"key": "progress", "label": "Progress", "value": f"{progress}%"})
     if pending_approvals:
-        kpis.append({"key": "pendingApprovals", "label": "Pending Approvals", "value": str(pending_approvals)})
+        kpis.append(
+            {
+                "key": "pendingApprovals",
+                "label": "Pending Approvals",
+                "value": str(pending_approvals),
+            }
+        )
     if active_workers:
-        kpis.append({"key": "activeWorkers", "label": "Active Workers", "value": str(active_workers)})
+        kpis.append(
+            {"key": "activeWorkers", "label": "Active Workers", "value": str(active_workers)}
+        )
 
     legacy_by_id = {a.get("id"): a for a in legacy_agents}
     events = [
@@ -1682,7 +2102,9 @@ async def get_workspace(project_id: str, request: Request):
                     "skills": a.get("skills") or [],
                     "knowledge": [d["name"] for d in documents],
                     "connectors": reqs.get("connectors") or [],
-                    "tools": (a.get("tool_policy") or {}).get("allowed_tools", []) if isinstance(a.get("tool_policy"), dict) else [],
+                    "tools": (a.get("tool_policy") or {}).get("allowed_tools", [])
+                    if isinstance(a.get("tool_policy"), dict)
+                    else [],
                 },
             }
             for a in workspace_agents
@@ -1723,18 +2145,19 @@ async def get_project_document(project_id: str, document_id: str, request: Reque
         from sqlalchemy import text
 
         target_id, _project = await _load_project_for_route(session, project_id)
-        row = (await session.execute(
-            text(
-                "SELECT * FROM artifacts "
-                "WHERE id = :doc_id AND projectId = :project_id"
-            ),
-            {"doc_id": document_id, "project_id": target_id},
-        )).first()
+        row = (
+            await session.execute(
+                text("SELECT * FROM artifacts WHERE id = :doc_id AND projectId = :project_id"),
+                {"doc_id": document_id, "project_id": target_id},
+            )
+        ).first()
         if not row:
             _error_response("NOT-FOUND", "Document not found", status=404)
         artifact = _row_to_dict(row)
         content = artifact.get("content") or ""
-        name = artifact.get("name") or artifact.get("storagepath") or artifact.get("uri") or "Document"
+        name = (
+            artifact.get("name") or artifact.get("storagepath") or artifact.get("uri") or "Document"
+        )
         return {
             "id": artifact.get("id"),
             "projectId": target_id,
@@ -1762,53 +2185,75 @@ async def workspace_chat(project_id: str, body: dict, request: Request):
         target_id, project = await _load_project_for_route(session, project_id)
         ts = int(datetime.now().timestamp() * 1000)
         node_id = f"node-user-{ts}"
-        agent_row = (await session.execute(text(
-            "SELECT id, name FROM agents WHERE project_id = :pid ORDER BY reports_to NULLS FIRST, role, name LIMIT 1"
-        ), {"pid": target_id})).first()
+        agent_row = (
+            await session.execute(
+                text(
+                    "SELECT id, name FROM agents WHERE project_id = :pid ORDER BY reports_to NULLS FIRST, role, name LIMIT 1"
+                ),
+                {"pid": target_id},
+            )
+        ).first()
         agent = _row_to_dict(agent_row) if agent_row else {}
         agent_id = agent.get("id")
 
-        await session.execute(text(
-            "INSERT INTO execution_nodes (id, projectId, agentId, state, dependencies, outputs, reasoning) VALUES (:id,:pid,:aid,:s,:dep,:out,:r)"
-        ), {
-            "id": node_id,
-            "pid": target_id,
-            "aid": agent_id,
-            "s": "Running" if agent_id else "Queued",
-            "dep": "[]",
-            "out": "[]",
-            "r": f"User requested workspace action: {message.strip()}",
-        })
-        await session.execute(text(
-            "UPDATE business_projects SET status = 'Execution', updatedAt = :t WHERE id = :id"
-        ), {"t": _now(), "id": target_id})
-        await session.execute(text(
-            "INSERT INTO audit_logs (id, projectid, userid, action, details, timestamp) "
-            "VALUES (:id, :pid, :uid, :action, :details, :t)"
-        ), {
-            "id": _uuid(),
-            "pid": target_id,
-            "uid": user.get("id"),
-            "action": "Workspace instruction",
-            "details": message.strip(),
-            "t": _now(),
-        })
+        await session.execute(
+            text(
+                "INSERT INTO execution_nodes (id, projectId, agentId, state, dependencies, outputs, reasoning) VALUES (:id,:pid,:aid,:s,:dep,:out,:r)"
+            ),
+            {
+                "id": node_id,
+                "pid": target_id,
+                "aid": agent_id,
+                "s": "Running" if agent_id else "Queued",
+                "dep": "[]",
+                "out": "[]",
+                "r": f"User requested workspace action: {message.strip()}",
+            },
+        )
+        await session.execute(
+            text(
+                "UPDATE business_projects SET status = 'Execution', updatedAt = :t WHERE id = :id"
+            ),
+            {"t": _now(), "id": target_id},
+        )
+        await session.execute(
+            text(
+                "INSERT INTO audit_logs (id, projectid, userid, action, details, timestamp) "
+                "VALUES (:id, :pid, :uid, :action, :details, :t)"
+            ),
+            {
+                "id": _uuid(),
+                "pid": target_id,
+                "uid": user.get("id"),
+                "action": "Workspace instruction",
+                "details": message.strip(),
+                "t": _now(),
+            },
+        )
 
-    understanding = f'Recorded workspace instruction for "{project.get("name", "Project")}": {message.strip()}'
+    understanding = (
+        f'Recorded workspace instruction for "{project.get("name", "Project")}": {message.strip()}'
+    )
     reasoning = "The instruction is now represented as a real execution node for this project."
-    decision = "Queued the work against the current project worker hierarchy." if agent_id else "Queued the work until a project worker hierarchy is available."
+    decision = (
+        "Queued the work against the current project worker hierarchy."
+        if agent_id
+        else "Queued the work until a project worker hierarchy is available."
+    )
     plan_update = "Workspace KPIs will update from the recorded execution node."
     worker_actions = f"Assigned to {agent.get('name')}." if agent_id else "No worker assigned yet."
     required_approvals = ""
     expected_outcome = "Execution state can now be tracked from backend records."
-    reply = "\n".join([
-        "[Workspace Update]",
-        f"Understanding: {understanding}",
-        f"Reasoning: {reasoning}",
-        f"Decision: {decision}",
-        f"Plan Update: {plan_update}",
-        f"Worker Actions: {worker_actions}",
-    ])
+    reply = "\n".join(
+        [
+            "[Workspace Update]",
+            f"Understanding: {understanding}",
+            f"Reasoning: {reasoning}",
+            f"Decision: {decision}",
+            f"Plan Update: {plan_update}",
+            f"Worker Actions: {worker_actions}",
+        ]
+    )
 
     return {
         "success": True,
@@ -1820,7 +2265,16 @@ async def workspace_chat(project_id: str, body: dict, request: Request):
         "workerActions": worker_actions,
         "requiredApprovals": required_approvals,
         "expectedOutcome": expected_outcome,
-        "newEvent": {"delay": 0, "agent": agent.get("name") or "Workspace", "type": "info", "phase": "Execution", "title": "Instruction Queued", "desc": reply, "conf": 99, "dur": "0.1s"},
+        "newEvent": {
+            "delay": 0,
+            "agent": agent.get("name") or "Workspace",
+            "type": "info",
+            "phase": "Execution",
+            "title": "Instruction Queued",
+            "desc": reply,
+            "conf": 99,
+            "dur": "0.1s",
+        },
         "newProgress": 50 if agent_id else 0,
         "newPhase": "Execution",
     }
@@ -1830,11 +2284,13 @@ async def workspace_chat(project_id: str, body: dict, request: Request):
 # Employees / Workers
 # ---------------------------------------------------------------------------
 
+
 @router.get("/employees")
 async def list_employees(request: Request):
     await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
+
         rows = (await session.execute(text("SELECT * FROM project_agents"))).fetchall()
         return [_row_to_dict(r) for r in rows]
 
@@ -1844,9 +2300,12 @@ async def get_employee(employee_id: str, request: Request):
     await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
-        row = (await session.execute(
-            text("SELECT * FROM project_agents WHERE id = :id"), {"id": employee_id}
-        )).first()
+
+        row = (
+            await session.execute(
+                text("SELECT * FROM project_agents WHERE id = :id"), {"id": employee_id}
+            )
+        ).first()
         if not row:
             _error_response("NOT-FOUND", "Employee not found", status=404)
         return _row_to_dict(row)
@@ -1861,9 +2320,11 @@ async def update_employee_status(employee_id: str, body: EmployeeStatusBody, req
     await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
-        await session.execute(text(
-            "UPDATE project_agents SET status = :s WHERE id = :id"
-        ), {"s": body.status, "id": employee_id})
+
+        await session.execute(
+            text("UPDATE project_agents SET status = :s WHERE id = :id"),
+            {"s": body.status, "id": employee_id},
+        )
     return {"success": True}
 
 
@@ -1880,10 +2341,20 @@ async def create_worker(project_id: str, body: WorkerCreateBody, request: Reques
     wid = str(uuid.uuid4().int)[:12]
     async with db_session() as session:
         from sqlalchemy import text
-        await session.execute(text(
-            "INSERT INTO project_agents (id, projectId, name, status, config, systemPrompt) VALUES (:id,:pid,:n,:s,:c,:sp)"
-        ), {"id": wid, "pid": project_id, "n": body.name, "s": body.status or "Running",
-            "c": json.dumps(body.config or {}), "sp": body.purpose or ""})
+
+        await session.execute(
+            text(
+                "INSERT INTO project_agents (id, projectId, name, status, config, systemPrompt) VALUES (:id,:pid,:n,:s,:c,:sp)"
+            ),
+            {
+                "id": wid,
+                "pid": project_id,
+                "n": body.name,
+                "s": body.status or "Running",
+                "c": json.dumps(body.config or {}),
+                "sp": body.purpose or "",
+            },
+        )
     return {"success": True, "workerId": wid}
 
 
@@ -1892,9 +2363,15 @@ async def update_worker(project_id: str, worker_id: str, body: dict, request: Re
     await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
-        await session.execute(text(
-            "UPDATE project_agents SET config = :c, systemPrompt = :sp WHERE id = :id"
-        ), {"c": json.dumps(body.get("config", {})), "sp": body.get("purpose", ""), "id": worker_id})
+
+        await session.execute(
+            text("UPDATE project_agents SET config = :c, systemPrompt = :sp WHERE id = :id"),
+            {
+                "c": json.dumps(body.get("config", {})),
+                "sp": body.get("purpose", ""),
+                "id": worker_id,
+            },
+        )
     return {"success": True}
 
 
@@ -1903,6 +2380,7 @@ async def delete_worker(project_id: str, worker_id: str, request: Request):
     await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
+
         await session.execute(text("DELETE FROM project_agents WHERE id = :id"), {"id": worker_id})
     return {"success": True}
 
@@ -1912,13 +2390,17 @@ class WorkerStatusBody(BaseModel):
 
 
 @router.post("/projects/{project_id}/workers/{worker_id}/status")
-async def update_worker_status(project_id: str, worker_id: str, body: WorkerStatusBody, request: Request):
+async def update_worker_status(
+    project_id: str, worker_id: str, body: WorkerStatusBody, request: Request
+):
     await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
-        await session.execute(text(
-            "UPDATE project_agents SET status = :s WHERE id = :id"
-        ), {"s": body.status, "id": worker_id})
+
+        await session.execute(
+            text("UPDATE project_agents SET status = :s WHERE id = :id"),
+            {"s": body.status, "id": worker_id},
+        )
     return {"success": True}
 
 
@@ -1926,32 +2408,42 @@ async def update_worker_status(project_id: str, worker_id: str, body: WorkerStat
 # Human Queue
 # ---------------------------------------------------------------------------
 
+
 @router.get("/queue")
 async def list_queue(request: Request):
     await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
-        rows = (await session.execute(
-            text("SELECT * FROM human_queue ORDER BY CASE WHEN status = 'Pending' THEN 0 WHEN status = 'In Review' THEN 1 ELSE 2 END, submitted_at DESC NULLS LAST, id")
-        )).fetchall()
+
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT * FROM human_queue ORDER BY CASE WHEN status = 'Pending' THEN 0 WHEN status = 'In Review' THEN 1 ELSE 2 END, submitted_at DESC NULLS LAST, id"
+                )
+            )
+        ).fetchall()
         result = []
         for r in [_row_to_dict(row) for row in rows]:
             submitted = r.get("submitted_at")
             due = r.get("due_by")
-            result.append({
-                "id": r["id"],
-                "title": r.get("title") or r.get("reason") or "",
-                "type": r.get("type") or "Approval",
-                "priority": r.get("priority") or "Medium",
-                "reason": r.get("reason") or "",
-                "confidence": r.get("confidence") or 50,
-                "status": r["status"],
-                "agent": r.get("agent_name") or r.get("agentid") or "System",
-                "project": r.get("projectid"),
-                "submittedAt": submitted.isoformat() if hasattr(submitted, "isoformat") else (submitted or ""),
-                "dueBy": due.isoformat() if hasattr(due, "isoformat") else (due or ""),
-                "comment": r.get("comment"),
-            })
+            result.append(
+                {
+                    "id": r["id"],
+                    "title": r.get("title") or r.get("reason") or "",
+                    "type": r.get("type") or "Approval",
+                    "priority": r.get("priority") or "Medium",
+                    "reason": r.get("reason") or "",
+                    "confidence": r.get("confidence") or 50,
+                    "status": r["status"],
+                    "agent": r.get("agent_name") or r.get("agentid") or "System",
+                    "project": r.get("projectid"),
+                    "submittedAt": submitted.isoformat()
+                    if hasattr(submitted, "isoformat")
+                    else (submitted or ""),
+                    "dueBy": due.isoformat() if hasattr(due, "isoformat") else (due or ""),
+                    "comment": r.get("comment"),
+                }
+            )
         return result
 
 
@@ -1963,37 +2455,68 @@ class QueueActionBody(BaseModel):
 @router.post("/queue/{queue_id}/action")
 async def queue_action(queue_id: str, body: QueueActionBody, request: Request):
     user = await _get_current_user(request)
-    status = "Approved" if body.action == "approve" else "Rejected" if body.action == "reject" else "Pending"
+    status = (
+        "Approved"
+        if body.action == "approve"
+        else "Rejected"
+        if body.action == "reject"
+        else "Pending"
+    )
     resolution = body.comment or body.action
 
     async with db_session() as session:
         from sqlalchemy import text
-        await session.execute(text(
-            "UPDATE human_queue SET status = :s, resolution = :r WHERE id = :id"
-        ), {"s": status, "r": resolution, "id": queue_id})
 
-        item_row = (await session.execute(
-            text("SELECT * FROM human_queue WHERE id = :id"), {"id": queue_id}
-        )).first()
+        await session.execute(
+            text("UPDATE human_queue SET status = :s, resolution = :r WHERE id = :id"),
+            {"s": status, "r": resolution, "id": queue_id},
+        )
+
+        item_row = (
+            await session.execute(
+                text("SELECT * FROM human_queue WHERE id = :id"), {"id": queue_id}
+            )
+        ).first()
         item = _row_to_dict(item_row) if item_row else {}
 
         if item.get("agentid"):
-            await session.execute(text(
-                "UPDATE execution_nodes SET state = 'Completed', reasoning = :r WHERE agentId = :aid AND state = 'Blocked'"
-            ), {"r": f"Human intervened: {body.action}. {resolution}", "aid": item["agentid"]})
-            await session.execute(text(
-                "UPDATE project_agents SET status = 'Running' WHERE id = :aid"
-            ), {"aid": item["agentid"]})
+            await session.execute(
+                text(
+                    "UPDATE execution_nodes SET state = 'Completed', reasoning = :r WHERE agentId = :aid AND state = 'Blocked'"
+                ),
+                {"r": f"Human intervened: {body.action}. {resolution}", "aid": item["agentid"]},
+            )
+            await session.execute(
+                text("UPDATE project_agents SET status = 'Running' WHERE id = :aid"),
+                {"aid": item["agentid"]},
+            )
 
             if body.action == "approve":
                 ts = int(datetime.now().timestamp() * 1000)
-                await session.execute(text(
-                    "INSERT INTO artifacts (id, projectid, type, storagepath, versionhistory) VALUES (:id,:pid,:t,:u,'{}')"
-                ), {"id": f"art-mapping-{ts}", "pid": item.get("projectid"), "t": "SQL Script", "u": "data/artifacts/Schema_Mapping_Validation.sql"})
+                await session.execute(
+                    text(
+                        "INSERT INTO artifacts (id, projectid, type, storagepath, versionhistory) VALUES (:id,:pid,:t,:u,'{}')"
+                    ),
+                    {
+                        "id": f"art-mapping-{ts}",
+                        "pid": item.get("projectid"),
+                        "t": "SQL Script",
+                        "u": "data/artifacts/Schema_Mapping_Validation.sql",
+                    },
+                )
 
-        await session.execute(text(
-            "INSERT INTO audit_logs (id, userid, action, details, timestamp) VALUES (:id,:u,:a,:d,:t)"
-        ), {"id": _uuid(), "u": user.get("id"), "a": f"Queue {body.action}", "d": f"Item {queue_id}: {resolution}", "t": _now()})
+        await session.execute(
+            text(
+                "INSERT INTO audit_logs (id, userid, action, details, timestamp) VALUES (:id,:u,:a,:d,:t)"
+            ),
+            {
+                "id": _uuid(),
+                "u": user.get("id"),
+                "a": f"Queue {body.action}",
+                "d": f"Item {queue_id}: {resolution}",
+                "t": _now(),
+            },
+        )
 
     return {"success": True}
 
@@ -2002,35 +2525,46 @@ async def queue_action(queue_id: str, body: QueueActionBody, request: Request):
 # Operations Summary
 # ---------------------------------------------------------------------------
 
+
 @router.get("/operations/summary")
 async def operations_summary(request: Request):
     await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
 
-        projects_rows = (await session.execute(
-            text("SELECT * FROM business_projects ORDER BY updatedAt DESC LIMIT 5")
-        )).fetchall()
+        projects_rows = (
+            await session.execute(
+                text("SELECT * FROM business_projects ORDER BY updatedAt DESC LIMIT 5")
+            )
+        ).fetchall()
         projects = [_row_to_dict(r) for r in projects_rows]
 
-        running = (await session.execute(
-            text("SELECT count(1) as c FROM business_projects WHERE status = 'Execution'")
-        )).scalar()
-        active_workers = (await session.execute(
-            text("SELECT count(1) as c FROM agents WHERE status IN ('active', 'running', 'executing')")
-        )).scalar()
-        pending = (await session.execute(
-            text("SELECT count(1) as c FROM human_queue WHERE status = 'Pending'")
-        )).scalar()
+        running = (
+            await session.execute(
+                text("SELECT count(1) as c FROM business_projects WHERE status = 'Execution'")
+            )
+        ).scalar()
+        active_workers = (
+            await session.execute(
+                text(
+                    "SELECT count(1) as c FROM agents WHERE status IN ('active', 'running', 'executing')"
+                )
+            )
+        ).scalar()
+        pending = (
+            await session.execute(
+                text("SELECT count(1) as c FROM human_queue WHERE status = 'Pending'")
+            )
+        ).scalar()
 
-        activities_rows = (await session.execute(
-            text("SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT 5")
-        )).fetchall()
+        activities_rows = (
+            await session.execute(text("SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT 5"))
+        ).fetchall()
         activities = [_row_to_dict(r) for r in activities_rows]
 
-        artifacts_rows = (await session.execute(
-            text("SELECT * FROM artifacts ORDER BY id DESC LIMIT 5")
-        )).fetchall()
+        artifacts_rows = (
+            await session.execute(text("SELECT * FROM artifacts ORDER BY id DESC LIMIT 5"))
+        ).fetchall()
         artifacts_list = [_row_to_dict(r) for r in artifacts_rows]
 
     return {
@@ -2041,8 +2575,14 @@ async def operations_summary(request: Request):
             "pendingApprovals": pending or 0,
         },
         "projects": [
-            {"key": p["id"], "project": p["name"], "status": p["status"],
-             "phase": p["status"], "ai": "General AI", "updated": p.get("updatedat")}
+            {
+                "key": p["id"],
+                "project": p["name"],
+                "status": p["status"],
+                "phase": p["status"],
+                "ai": "General AI",
+                "updated": p.get("updatedat"),
+            }
             for p in projects
         ],
         "providers": [
@@ -2057,8 +2597,7 @@ async def operations_summary(request: Request):
             for a in activities
         ],
         "artifacts": [
-            {"name": a.get("storagepath", ""), "type": a.get("type", "")}
-            for a in artifacts_list
+            {"name": a.get("storagepath", ""), "type": a.get("type", "")} for a in artifacts_list
         ],
     }
 
@@ -2071,7 +2610,15 @@ _LEGACY_PROVIDERS = [
     {
         "name": "git",
         "version": "0.2.0",
-        "capabilities": ["discover", "sync", "files", "commits", "github-url", "bitbucket-url", "python-structure"],
+        "capabilities": [
+            "discover",
+            "sync",
+            "files",
+            "commits",
+            "github-url",
+            "bitbucket-url",
+            "python-structure",
+        ],
     },
     {
         "name": "jira",
@@ -2081,7 +2628,15 @@ _LEGACY_PROVIDERS = [
     {
         "name": "mysql",
         "version": "0.2.0",
-        "capabilities": ["discover", "sync", "live-connection", "schemas", "tables", "columns", "foreign-keys"],
+        "capabilities": [
+            "discover",
+            "sync",
+            "live-connection",
+            "schemas",
+            "tables",
+            "columns",
+            "foreign-keys",
+        ],
     },
 ]
 
@@ -2113,6 +2668,7 @@ async def list_connectors(request: Request):
     # Also include any DB-stored project_connectors
     async with db_session() as session:
         from sqlalchemy import text
+
         rows = (await session.execute(text("SELECT * FROM project_connectors"))).fetchall()
         db_connectors = [
             {
@@ -2140,16 +2696,24 @@ async def get_connector(connector_id: str, request: Request):
     # Fall back to DB
     async with db_session() as session:
         from sqlalchemy import text
-        row = (await session.execute(
-            text("SELECT * FROM project_connectors WHERE id = :id"), {"id": connector_id.replace("db-", "")}
-        )).first()
+
+        row = (
+            await session.execute(
+                text("SELECT * FROM project_connectors WHERE id = :id"),
+                {"id": connector_id.replace("db-", "")},
+            )
+        ).first()
         if not row:
             _error_response("NOT-FOUND", "Connector not found", status=404)
         r = _row_to_dict(row)
         return {
-            "id": f"db-{r['id']}", "name": r.get("connector_type", "").capitalize(),
-            "type": r.get("connector_type", ""), "category": "Project Connector",
-            "status": "Active", "config": r.get("config", {}), "schemaData": None,
+            "id": f"db-{r['id']}",
+            "name": r.get("connector_type", "").capitalize(),
+            "type": r.get("connector_type", ""),
+            "category": "Project Connector",
+            "status": "Active",
+            "config": r.get("config", {}),
+            "schemaData": None,
         }
 
 
@@ -2176,13 +2740,17 @@ async def discover_connector(connector_id: str, request: Request):
 # Knowledge — proxies ECMS graph nodes + categories
 # ---------------------------------------------------------------------------
 
+
 @router.get("/knowledge/categories")
 async def knowledge_categories(request: Request):
     """Return categories for the Knowledge tab."""
     await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
-        rows = (await session.execute(text("SELECT * FROM categories ORDER BY priority"))).fetchall()
+
+        rows = (
+            await session.execute(text("SELECT * FROM categories ORDER BY priority"))
+        ).fetchall()
         return [
             {
                 "id": _row_to_dict(r)["id"],
@@ -2207,19 +2775,21 @@ async def list_knowledge(request: Request):
             stats = await cognitive.graph.statistics()
             all_nodes = await cognitive.graph._store.all_nodes()
             nodes = []
-            for node in (all_nodes if isinstance(all_nodes, list) else all_nodes.get("nodes", [])):
+            for node in all_nodes if isinstance(all_nodes, list) else all_nodes.get("nodes", []):
                 n = node if isinstance(node, dict) else node.__dict__
-                nodes.append({
-                    "id": n.get("node_id", n.get("id", "")),
-                    "title": n.get("display_name", n.get("canonical_name", n.get("name", ""))),
-                    "type": n.get("ontology_type", n.get("type", "unknown")),
-                    "version": "1.0",
-                    "tags": [n.get("ontology_type", "")] if n.get("ontology_type") else [],
-                    "status": n.get("lifecycle_state", "active"),
-                    "isBuiltIn": 0,
-                    "confidence": n.get("confidence", 0),
-                    "description": n.get("description", ""),
-                })
+                nodes.append(
+                    {
+                        "id": n.get("node_id", n.get("id", "")),
+                        "title": n.get("display_name", n.get("canonical_name", n.get("name", ""))),
+                        "type": n.get("ontology_type", n.get("type", "unknown")),
+                        "version": "1.0",
+                        "tags": [n.get("ontology_type", "")] if n.get("ontology_type") else [],
+                        "status": n.get("lifecycle_state", "active"),
+                        "isBuiltIn": 0,
+                        "confidence": n.get("confidence", 0),
+                        "description": n.get("description", ""),
+                    }
+                )
             if nodes:
                 return nodes
     except Exception:
@@ -2228,6 +2798,7 @@ async def list_knowledge(request: Request):
     # Fall back to aggregates table
     async with db_session() as session:
         from sqlalchemy import text
+
         rows = (await session.execute(text("SELECT * FROM aggregates LIMIT 100"))).fetchall()
         results = []
         for r in rows:
@@ -2235,19 +2806,26 @@ async def list_knowledge(request: Request):
             data = {}
             try:
                 import json as _json
-                data = _json.loads(d.get("data", "{}")) if isinstance(d.get("data"), str) else d.get("data", {})
+
+                data = (
+                    _json.loads(d.get("data", "{}"))
+                    if isinstance(d.get("data"), str)
+                    else d.get("data", {})
+                )
             except Exception:
                 pass
-            results.append({
-                "id": d["id"],
-                "title": data.get("display_name", data.get("name", d["id"])),
-                "type": d.get("aggregate_type", "unknown"),
-                "version": str(d.get("version", 1)),
-                "tags": data.get("tags", []),
-                "status": d.get("lifecycle_state", "active"),
-                "isBuiltIn": 0,
-                "description": data.get("description", ""),
-            })
+            results.append(
+                {
+                    "id": d["id"],
+                    "title": data.get("display_name", data.get("name", d["id"])),
+                    "type": d.get("aggregate_type", "unknown"),
+                    "version": str(d.get("version", 1)),
+                    "tags": data.get("tags", []),
+                    "status": d.get("lifecycle_state", "active"),
+                    "isBuiltIn": 0,
+                    "description": data.get("description", ""),
+                }
+            )
         return results
 
 
@@ -2263,7 +2841,11 @@ async def get_knowledge(knowledge_id: str, request: Request):
             node = cognitive.graph.find_node(knowledge_id)
             if node:
                 n = node if isinstance(node, dict) else node.__dict__
-                edges = cognitive.graph.edges_of(knowledge_id) if hasattr(cognitive.graph, 'edges_of') else []
+                edges = (
+                    cognitive.graph.edges_of(knowledge_id)
+                    if hasattr(cognitive.graph, "edges_of")
+                    else []
+                )
                 return {
                     "id": n.get("node_id", knowledge_id),
                     "title": n.get("display_name", n.get("canonical_name", "")),
@@ -2274,12 +2856,17 @@ async def get_knowledge(knowledge_id: str, request: Request):
                     "isBuiltIn": 0,
                     "confidence": n.get("confidence", 0),
                     "description": n.get("description", ""),
-                    "source": n.get("knowledge_sources", ["graph"])[0] if n.get("knowledge_sources") else "graph",
+                    "source": n.get("knowledge_sources", ["graph"])[0]
+                    if n.get("knowledge_sources")
+                    else "graph",
                     "owner": "system",
                     "createdAt": n.get("created_at", ""),
                     "metadata": n,
                     "relationships": [
-                        {"target": e.get("target_name", e.get("target", "")), "type": e.get("relationship_type", e.get("type", ""))}
+                        {
+                            "target": e.get("target_name", e.get("target", "")),
+                            "type": e.get("relationship_type", e.get("type", "")),
+                        }
                         for e in (edges if isinstance(edges, list) else [])
                     ],
                 }
@@ -2289,16 +2876,24 @@ async def get_knowledge(knowledge_id: str, request: Request):
     # Fall back to aggregates
     async with db_session() as session:
         from sqlalchemy import text
-        row = (await session.execute(
-            text("SELECT * FROM aggregates WHERE id = :id"), {"id": knowledge_id}
-        )).first()
+
+        row = (
+            await session.execute(
+                text("SELECT * FROM aggregates WHERE id = :id"), {"id": knowledge_id}
+            )
+        ).first()
         if not row:
             _error_response("NOT-FOUND", "Knowledge item not found", status=404)
         d = _row_to_dict(row)
         data = {}
         try:
             import json as _json
-            data = _json.loads(d.get("data", "{}")) if isinstance(d.get("data"), str) else d.get("data", {})
+
+            data = (
+                _json.loads(d.get("data", "{}"))
+                if isinstance(d.get("data"), str)
+                else d.get("data", {})
+            )
         except Exception:
             pass
         return {
@@ -2322,15 +2917,31 @@ async def get_knowledge(knowledge_id: str, request: Request):
 # Skills
 # ---------------------------------------------------------------------------
 
+
 @router.get("/skills")
 async def list_skills(request: Request):
     await _get_current_user(request)
     return [
         {"id": "skill-1", "name": "Data Mapping", "category": "Technical", "status": "active"},
-        {"id": "skill-2", "name": "SQL Query Generation", "category": "Technical", "status": "active"},
-        {"id": "skill-3", "name": "OCR Text Extraction", "category": "Technical", "status": "active"},
+        {
+            "id": "skill-2",
+            "name": "SQL Query Generation",
+            "category": "Technical",
+            "status": "active",
+        },
+        {
+            "id": "skill-3",
+            "name": "OCR Text Extraction",
+            "category": "Technical",
+            "status": "active",
+        },
         {"id": "skill-4", "name": "Anomaly Detection", "category": "Analytics", "status": "active"},
-        {"id": "skill-5", "name": "Compliance Verification", "category": "Compliance", "status": "active"},
+        {
+            "id": "skill-5",
+            "name": "Compliance Verification",
+            "category": "Compliance",
+            "status": "active",
+        },
     ]
 
 
@@ -2344,6 +2955,7 @@ async def get_skill(skill_id: str, request: Request):
 # AI Models — manage OpenAI-compatible model configurations
 # ---------------------------------------------------------------------------
 
+
 class AIModelCreateBody(BaseModel):
     name: str
     provider: str
@@ -2353,13 +2965,19 @@ class AIModelCreateBody(BaseModel):
     is_default: bool = False
     is_ba_agent: bool = False
 
+
 @router.get("/ai-models")
 async def list_ai_models(request: Request):
     """List all AI model configurations."""
     await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
-        rows = (await session.execute(text("SELECT * FROM ai_models ORDER BY is_default DESC, created_at DESC"))).fetchall()
+
+        rows = (
+            await session.execute(
+                text("SELECT * FROM ai_models ORDER BY is_default DESC, created_at DESC")
+            )
+        ).fetchall()
         return [_row_to_dict(r) for r in rows]
 
 
@@ -2371,18 +2989,30 @@ async def create_ai_model(body: AIModelCreateBody, request: Request):
     now = _now()
     async with db_session() as session:
         from sqlalchemy import text
+
         # Unset previous default if this is default
         if body.is_default:
             await session.execute(text("UPDATE ai_models SET is_default = 0"))
         # Unset previous BA agent flag if this is flagged
         if body.is_ba_agent:
             await session.execute(text("UPDATE ai_models SET is_ba_agent = 0"))
-        await session.execute(text(
-            "INSERT INTO ai_models (id, name, provider, model_id, api_key, base_url, is_default, is_ba_agent, created_at) "
-            "VALUES (:id, :name, :provider, :mid, :key, :url, :def, :ba, :t)"
-        ), {"id": mid, "name": body.name, "provider": body.provider, "mid": body.model_id,
-            "key": body.api_key, "url": body.base_url,
-            "def": 1 if body.is_default else 0, "ba": 1 if body.is_ba_agent else 0, "t": now})
+        await session.execute(
+            text(
+                "INSERT INTO ai_models (id, name, provider, model_id, api_key, base_url, is_default, is_ba_agent, created_at) "
+                "VALUES (:id, :name, :provider, :mid, :key, :url, :def, :ba, :t)"
+            ),
+            {
+                "id": mid,
+                "name": body.name,
+                "provider": body.provider,
+                "mid": body.model_id,
+                "key": body.api_key,
+                "url": body.base_url,
+                "def": 1 if body.is_default else 0,
+                "ba": 1 if body.is_ba_agent else 0,
+                "t": now,
+            },
+        )
     return {"success": True, "id": mid}
 
 
@@ -2392,17 +3022,27 @@ async def update_ai_model(model_id: str, body: dict, request: Request):
     await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
+
         if body.get("is_default"):
             await session.execute(text("UPDATE ai_models SET is_default = 0"))
         if body.get("is_ba_agent"):
             await session.execute(text("UPDATE ai_models SET is_ba_agent = 0"))
-        await session.execute(text(
-            "UPDATE ai_models SET name=:name, provider=:provider, model_id=:mid, api_key=:key, "
-            "base_url=:url, is_default=:def, is_ba_agent=:ba WHERE id=:id"
-        ), {"id": model_id, "name": body.get("name"), "provider": body.get("provider"),
-            "mid": body.get("model_id"), "key": body.get("api_key", ""),
-            "url": body.get("base_url", ""), "def": 1 if body.get("is_default") else 0,
-            "ba": 1 if body.get("is_ba_agent") else 0})
+        await session.execute(
+            text(
+                "UPDATE ai_models SET name=:name, provider=:provider, model_id=:mid, api_key=:key, "
+                "base_url=:url, is_default=:def, is_ba_agent=:ba WHERE id=:id"
+            ),
+            {
+                "id": model_id,
+                "name": body.get("name"),
+                "provider": body.get("provider"),
+                "mid": body.get("model_id"),
+                "key": body.get("api_key", ""),
+                "url": body.get("base_url", ""),
+                "def": 1 if body.get("is_default") else 0,
+                "ba": 1 if body.get("is_ba_agent") else 0,
+            },
+        )
     return {"success": True}
 
 
@@ -2412,6 +3052,7 @@ async def delete_ai_model(model_id: str, request: Request):
     await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
+
         await session.execute(text("DELETE FROM ai_models WHERE id = :id"), {"id": model_id})
     return {"success": True}
 
@@ -2420,12 +3061,14 @@ async def delete_ai_model(model_id: str, request: Request):
 # Organizations — multi-org support
 # ---------------------------------------------------------------------------
 
+
 @router.get("/organizations")
 async def list_organizations(request: Request):
     """Return all organizations (read from existing organization table)."""
     await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
+
         rows = (await session.execute(text("SELECT * FROM organization"))).fetchall()
         return [_row_to_dict(r) for r in rows]
 
@@ -2434,76 +3077,163 @@ async def list_organizations(request: Request):
 # Project Finalization — store requirements after discovery
 # ---------------------------------------------------------------------------
 
+
 class FinalizeRequest(BaseModel):
     requirements: dict
+
 
 @router.post("/projects/{project_id}/finalize")
 async def finalize_project(project_id: str, body: FinalizeRequest, request: Request):
     """Store discovery requirements in DB + knowledge graph."""
     await _get_current_user(request)
-    import uuid, json
-    from datetime import datetime, timezone
+    import json
+    import uuid
+    from datetime import datetime
+
     from sqlalchemy import text
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     req = body.requirements
 
     async with db_session() as session:
         # 1. Store full JSON in business_projects
-        await session.execute(text(
-            "UPDATE business_projects SET requirements = :req, status = 'Planning' WHERE id = :pid"
-        ), {"req": json.dumps(req), "now": now, "pid": project_id})
+        await session.execute(
+            text(
+                "UPDATE business_projects SET requirements = :req, status = 'Planning' WHERE id = :pid"
+            ),
+            {"req": json.dumps(req), "now": now, "pid": project_id},
+        )
 
         # 2. Store each requirement
-        for r in (req.get("requirements") or []):
-            await session.execute(text(
-                "INSERT INTO project_requirements (id, project_id, text, type, status, source, version, created_at, updated_at) "
-                "VALUES (:id, :pid, :text, 'requirement', 'confirmed', :source, 1, :now, :now)"
-            ), {"id": str(uuid.uuid4()), "pid": project_id, "text": r, "source": "discovery", "now": now})
+        for r in req.get("requirements") or []:
+            await session.execute(
+                text(
+                    "INSERT INTO project_requirements (id, project_id, text, type, status, source, version, created_at, updated_at) "
+                    "VALUES (:id, :pid, :text, 'requirement', 'confirmed', :source, 1, :now, :now)"
+                ),
+                {
+                    "id": str(uuid.uuid4()),
+                    "pid": project_id,
+                    "text": r,
+                    "source": "discovery",
+                    "now": now,
+                },
+            )
 
         # 3. Store recommended skills as requirements
-        for s in (req.get("recommended_skills") or []):
-            await session.execute(text(
-                "INSERT INTO project_requirements (id, project_id, text, type, status, source, version, created_at, updated_at) "
-                "VALUES (:id, :pid, :text, 'skill', 'confirmed', :source, 1, :now, :now)"
-            ), {"id": str(uuid.uuid4()), "pid": project_id, "text": s, "source": "discovery", "now": now})
+        for s in req.get("recommended_skills") or []:
+            await session.execute(
+                text(
+                    "INSERT INTO project_requirements (id, project_id, text, type, status, source, version, created_at, updated_at) "
+                    "VALUES (:id, :pid, :text, 'skill', 'confirmed', :source, 1, :now, :now)"
+                ),
+                {
+                    "id": str(uuid.uuid4()),
+                    "pid": project_id,
+                    "text": s,
+                    "source": "discovery",
+                    "now": now,
+                },
+            )
 
         # 4. Store recommended connectors as requirements
-        for c in (req.get("recommended_connectors") or []):
-            await session.execute(text(
-                "INSERT INTO project_requirements (id, project_id, text, type, status, source, version, created_at, updated_at) "
-                "VALUES (:id, :pid, :text, 'connector', 'confirmed', :source, 1, :now, :now)"
-            ), {"id": str(uuid.uuid4()), "pid": project_id, "text": c, "source": "discovery", "now": now})
+        for c in req.get("recommended_connectors") or []:
+            await session.execute(
+                text(
+                    "INSERT INTO project_requirements (id, project_id, text, type, status, source, version, created_at, updated_at) "
+                    "VALUES (:id, :pid, :text, 'connector', 'confirmed', :source, 1, :now, :now)"
+                ),
+                {
+                    "id": str(uuid.uuid4()),
+                    "pid": project_id,
+                    "text": c,
+                    "source": "discovery",
+                    "now": now,
+                },
+            )
 
         # 5. Store constraints
         constraints = req.get("constraints") or {}
         for ctype in ["timeline", "budget", "compliance"]:
             val = constraints.get(ctype)
             if val and val != "Not specified":
-                await session.execute(text(
+                await session.execute(
+                    text(
+                        "INSERT INTO project_constraints (id, project_id, type, value, mandatory, source, version, created_at) "
+                        "VALUES (:id, :pid, :type, :value, true, :source, 1, :now)"
+                    ),
+                    {
+                        "id": str(uuid.uuid4()),
+                        "pid": project_id,
+                        "type": ctype,
+                        "value": val,
+                        "source": "discovery",
+                        "now": now,
+                    },
+                )
+        for val in constraints.get("other") or []:
+            await session.execute(
+                text(
                     "INSERT INTO project_constraints (id, project_id, type, value, mandatory, source, version, created_at) "
-                    "VALUES (:id, :pid, :type, :value, true, :source, 1, :now)"
-                ), {"id": str(uuid.uuid4()), "pid": project_id, "type": ctype, "value": val, "source": "discovery", "now": now})
-        for val in (constraints.get("other") or []):
-            await session.execute(text(
-                "INSERT INTO project_constraints (id, project_id, type, value, mandatory, source, version, created_at) "
-                "VALUES (:id, :pid, 'other', :value, false, :source, 1, :now)"
-            ), {"id": str(uuid.uuid4()), "pid": project_id, "value": val, "source": "discovery", "now": now})
+                    "VALUES (:id, :pid, 'other', :value, false, :source, 1, :now)"
+                ),
+                {
+                    "id": str(uuid.uuid4()),
+                    "pid": project_id,
+                    "value": val,
+                    "source": "discovery",
+                    "now": now,
+                },
+            )
 
         # 6. Store risks
-        for r in (req.get("risks") or []):
-            await session.execute(text(
-                "INSERT INTO project_risks (id, project_id, risk, impact, mitigation, status, version, created_at) "
-                "VALUES (:id, :pid, :risk, :impact, :mitigation, 'open', 1, :now)"
-            ), {"id": str(uuid.uuid4()), "pid": project_id, "risk": r.get("risk", ""), "impact": r.get("impact", "medium"), "mitigation": r.get("mitigation", ""), "now": now})
+        for r in req.get("risks") or []:
+            await session.execute(
+                text(
+                    "INSERT INTO project_risks (id, project_id, risk, impact, mitigation, status, version, created_at) "
+                    "VALUES (:id, :pid, :risk, :impact, :mitigation, 'open', 1, :now)"
+                ),
+                {
+                    "id": str(uuid.uuid4()),
+                    "pid": project_id,
+                    "risk": r.get("risk", ""),
+                    "impact": r.get("impact", "medium"),
+                    "mitigation": r.get("mitigation", ""),
+                    "now": now,
+                },
+            )
 
         # 7. Write event
-        await session.execute(text(
-            "INSERT INTO event_store (event_id, event_type, event_category, correlation_id, payload, created_at) "
-            "VALUES (:eid, 'DiscoveryFinalized', 'project', :cid, :payload, NOW())"
-        ), {"eid": str(uuid.uuid4()), "cid": project_id, "payload": json.dumps({"project_id": project_id, "version": 1, "summary": req.get("goal", "")})})
+        await session.execute(
+            text(
+                "INSERT INTO event_store (event_id, event_type, event_category, correlation_id, payload, created_at) "
+                "VALUES (:eid, 'DiscoveryFinalized', 'project', :cid, :payload, NOW())"
+            ),
+            {
+                "eid": str(uuid.uuid4()),
+                "cid": project_id,
+                "payload": json.dumps(
+                    {"project_id": project_id, "version": 1, "summary": req.get("goal", "")}
+                ),
+            },
+        )
 
-    return {"success": True, "project_id": project_id, "stored": {"requirements": len(req.get("requirements") or []), "skills": len(req.get("recommended_skills") or []), "connectors": len(req.get("recommended_connectors") or []), "constraints": len(constraints.get("other") or []) + sum(1 for c in ["timeline","budget","compliance"] if constraints.get(c) and constraints.get(c) != "Not specified"), "risks": len(req.get("risks") or [])}}
+    return {
+        "success": True,
+        "project_id": project_id,
+        "stored": {
+            "requirements": len(req.get("requirements") or []),
+            "skills": len(req.get("recommended_skills") or []),
+            "connectors": len(req.get("recommended_connectors") or []),
+            "constraints": len(constraints.get("other") or [])
+            + sum(
+                1
+                for c in ["timeline", "budget", "compliance"]
+                if constraints.get(c) and constraints.get(c) != "Not specified"
+            ),
+            "risks": len(req.get("risks") or []),
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -2511,19 +3241,23 @@ async def finalize_project(project_id: str, body: FinalizeRequest, request: Requ
 # ---------------------------------------------------------------------------
 
 import hashlib
-import os as _os
-from fastapi import UploadFile, File as FastAPIFile
 from pathlib import Path as _Path
+
+from fastapi import File as FastAPIFile
+from fastapi import UploadFile
 
 BASE_UPLOAD_DIR = _Path("/workspace/uploads")
 
+
 @router.post("/projects/{project_id}/upload")
-async def upload_project_document(project_id: str, file: UploadFile = FastAPIFile(...), request: Request = None):
+async def upload_project_document(
+    project_id: str, file: UploadFile = FastAPIFile(...), request: Request = None
+):
     """Upload a discovery document — stored in /workspace/uploads/{project_id}/."""
     await _get_current_user(request)
     content = await file.read()
     hash_digest = hashlib.sha256(content).hexdigest()[:12]
-    ext = file.filename.rsplit('.', 1)[-1] if '.' in (file.filename or '') else 'bin'
+    ext = file.filename.rsplit(".", 1)[-1] if "." in (file.filename or "") else "bin"
     filename = f"{hash_digest}.{ext}"
     project_dir = BASE_UPLOAD_DIR / project_id / "documents"
     project_dir.mkdir(parents=True, exist_ok=True)
@@ -2532,16 +3266,23 @@ async def upload_project_document(project_id: str, file: UploadFile = FastAPIFil
 
     text_content = ""
     try:
-        text_content = content.decode('utf-8', errors='ignore')[:50_000]
+        text_content = content.decode("utf-8", errors="ignore")[:50_000]
     except Exception:
         text_content = f"[Binary file: {file.filename}]"
 
-    return {"success": True, "path": str(filepath), "relative_path": f"uploads/{project_id}/documents/{filename}", "filename": file.filename, "text_content": text_content}
+    return {
+        "success": True,
+        "path": str(filepath),
+        "relative_path": f"uploads/{project_id}/documents/{filename}",
+        "filename": file.filename,
+        "text_content": text_content,
+    }
 
 
 # ---------------------------------------------------------------------------
 # Connections — user sync connections management
 # ---------------------------------------------------------------------------
+
 
 @router.get("/connections")
 async def list_connections(request: Request):
@@ -2549,25 +3290,32 @@ async def list_connections(request: Request):
     user = await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
-        rows = (await session.execute(
-            text("SELECT * FROM connections WHERE user_id = :uid AND status != 'deleted' ORDER BY number"),
-            {"uid": user["id"]}
-        )).fetchall()
+
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT * FROM connections WHERE user_id = :uid AND status != 'deleted' ORDER BY number"
+                ),
+                {"uid": user["id"]},
+            )
+        ).fetchall()
         connections = []
         for row in rows:
             item = _row_to_dict(row)
-            connections.append({
-                "number": item.get("number"),
-                "user_id": item.get("user_id"),
-                "name": item.get("name"),
-                "provider": item.get("provider"),
-                "repo_url": item.get("repo_url"),
-                "config": _json_value(item.get("config"), {}),
-                "status": item.get("status"),
-                "node_count": item.get("node_count"),
-                "created_at": item.get("created_at"),
-                "updated_at": item.get("updated_at"),
-            })
+            connections.append(
+                {
+                    "number": item.get("number"),
+                    "user_id": item.get("user_id"),
+                    "name": item.get("name"),
+                    "provider": item.get("provider"),
+                    "repo_url": item.get("repo_url"),
+                    "config": _json_value(item.get("config"), {}),
+                    "status": item.get("status"),
+                    "node_count": item.get("node_count"),
+                    "created_at": item.get("created_at"),
+                    "updated_at": item.get("updated_at"),
+                }
+            )
         return connections
 
 
@@ -2588,7 +3336,11 @@ def _repo_delete_markers(repo_url: str, config: dict) -> dict[str, str]:
     parsed = urlparse(normalized)
     path_parts = [part for part in parsed.path.removesuffix(".git").split("/") if part]
     owner_repo = "/".join(path_parts[:2]).lower() if len(path_parts) >= 2 else ""
-    repo_name = path_parts[1].lower() if len(path_parts) >= 2 else (path_parts[0].lower() if path_parts else "")
+    repo_name = (
+        path_parts[1].lower()
+        if len(path_parts) >= 2
+        else (path_parts[0].lower() if path_parts else "")
+    )
     clone_dir = ""
     if parsed.hostname and path_parts:
         readable = "-".join([parsed.hostname.lower(), *path_parts])[:80]
@@ -2604,7 +3356,9 @@ def _repo_delete_markers(repo_url: str, config: dict) -> dict[str, str]:
     }
 
 
-def _delete_source_control_graph_data(connection: dict, delete_all_git: bool = False) -> dict[str, int | bool | str]:
+def _delete_source_control_graph_data(
+    connection: dict, delete_all_git: bool = False
+) -> dict[str, int | bool | str]:
     repo_url = str(connection.get("repo_url") or "")
     config = _json_value(connection.get("config"), {})
     if not repo_url and not config.get("resource_id") and not delete_all_git:
@@ -2642,68 +3396,86 @@ async def upsert_source_control_connection(body: SourceControlConnectionBody, re
     user = await _get_current_user(request)
     provider = (body.provider or "").strip().lower()
     if provider not in {"git", "github", "gitlab", "bitbucket"}:
-        _error_response("CONNECTION-4001", "Only source-control connections are supported here", status=400)
+        _error_response(
+            "CONNECTION-4001", "Only source-control connections are supported here", status=400
+        )
 
     repo_url = body.repo_url.strip()
     if not repo_url:
         _error_response("CONNECTION-4002", "Repository URL is required", status=400)
 
     import json as _json
+
     now = _now()
     config_json = _json.dumps(body.config or {})
     async with db_session() as session:
         from sqlalchemy import text
 
-        existing = (await session.execute(
-            text(
-                "SELECT * FROM connections "
-                "WHERE user_id = :uid AND lower(provider) = :provider AND repo_url = :repo_url "
-                "ORDER BY number LIMIT 1"
-            ),
-            {"uid": user["id"], "provider": provider, "repo_url": repo_url},
-        )).first()
+        existing = (
+            await session.execute(
+                text(
+                    "SELECT * FROM connections "
+                    "WHERE user_id = :uid AND lower(provider) = :provider AND repo_url = :repo_url "
+                    "ORDER BY number LIMIT 1"
+                ),
+                {"uid": user["id"], "provider": provider, "repo_url": repo_url},
+            )
+        ).first()
 
         if existing:
-            await session.execute(text(
-                "UPDATE connections SET name = :name, config = :config, status = :status, "
-                "node_count = :node_count, updated_at = :t WHERE number = :number"
-            ), {
-                "number": _row_to_dict(existing)["number"],
-                "name": body.name,
-                "config": config_json,
-                "status": body.status or "connected",
-                "node_count": body.node_count or 0,
-                "t": now,
-            })
-            row = (await session.execute(
-                text("SELECT * FROM connections WHERE number = :number"),
-                {"number": _row_to_dict(existing)["number"]},
-            )).first()
+            await session.execute(
+                text(
+                    "UPDATE connections SET name = :name, config = :config, status = :status, "
+                    "node_count = :node_count, updated_at = :t WHERE number = :number"
+                ),
+                {
+                    "number": _row_to_dict(existing)["number"],
+                    "name": body.name,
+                    "config": config_json,
+                    "status": body.status or "connected",
+                    "node_count": body.node_count or 0,
+                    "t": now,
+                },
+            )
+            row = (
+                await session.execute(
+                    text("SELECT * FROM connections WHERE number = :number"),
+                    {"number": _row_to_dict(existing)["number"]},
+                )
+            ).first()
         else:
-            row = (await session.execute(text(
-                "INSERT INTO connections (user_id, name, provider, repo_url, config, status, node_count, created_at, updated_at) "
-                "VALUES (:uid, :name, :provider, :repo_url, :config, :status, :node_count, :t, :t) "
-                "RETURNING *"
-            ), {
-                "uid": user["id"],
-                "name": body.name,
-                "provider": provider,
-                "repo_url": repo_url,
-                "config": config_json,
-                "status": body.status or "connected",
-                "node_count": body.node_count or 0,
-                "t": now,
-            })).first()
+            row = (
+                await session.execute(
+                    text(
+                        "INSERT INTO connections (user_id, name, provider, repo_url, config, status, node_count, created_at, updated_at) "
+                        "VALUES (:uid, :name, :provider, :repo_url, :config, :status, :node_count, :t, :t) "
+                        "RETURNING *"
+                    ),
+                    {
+                        "uid": user["id"],
+                        "name": body.name,
+                        "provider": provider,
+                        "repo_url": repo_url,
+                        "config": config_json,
+                        "status": body.status or "connected",
+                        "node_count": body.node_count or 0,
+                        "t": now,
+                    },
+                )
+            ).first()
 
-        await session.execute(text(
-            "INSERT INTO audit_logs (id, action, userid, details, timestamp) VALUES (:id, :a, :u, :d, :t)"
-        ), {
-            "id": _uuid(),
-            "a": "Source Control Knowledge Graph Created",
-            "u": user["id"],
-            "d": f"{body.provider} repository indexed: {repo_url}",
-            "t": now,
-        })
+        await session.execute(
+            text(
+                "INSERT INTO audit_logs (id, action, userid, details, timestamp) VALUES (:id, :a, :u, :d, :t)"
+            ),
+            {
+                "id": _uuid(),
+                "a": "Source Control Knowledge Graph Created",
+                "u": user["id"],
+                "d": f"{body.provider} repository indexed: {repo_url}",
+                "t": now,
+            },
+        )
 
     saved = _row_to_dict(row)
     return {
@@ -2728,10 +3500,12 @@ async def delete_connection(number: int, request: Request):
         from sqlalchemy import text
 
         # Get the connection
-        conn_row = (await session.execute(
-            text("SELECT * FROM connections WHERE number = :num AND user_id = :uid"),
-            {"num": number, "uid": user["id"]}
-        )).first()
+        conn_row = (
+            await session.execute(
+                text("SELECT * FROM connections WHERE number = :num AND user_id = :uid"),
+                {"num": number, "uid": user["id"]},
+            )
+        ).first()
 
         if not conn_row:
             _error_response("NOT-FOUND", "Connection not found", status=404)
@@ -2739,19 +3513,27 @@ async def delete_connection(number: int, request: Request):
 
         # Mark as reindexing
         await session.execute(
-            text("UPDATE connections SET status = 'reindexing', updated_at = :t WHERE number = :num"),
-            {"num": number, "t": _now()}
+            text(
+                "UPDATE connections SET status = 'reindexing', updated_at = :t WHERE number = :num"
+            ),
+            {"num": number, "t": _now()},
         )
 
-        remaining_source_connections = (await session.execute(
-            text(
-                "SELECT count(*) FROM connections "
-                "WHERE user_id = :uid AND number != :num AND repo_url IS NOT NULL AND status != 'deleted'"
-            ),
-            {"uid": user["id"], "num": number},
-        )).scalar_one()
+        remaining_source_connections = (
+            await session.execute(
+                text(
+                    "SELECT count(*) FROM connections "
+                    "WHERE user_id = :uid AND number != :num AND repo_url IS NOT NULL AND status != 'deleted'"
+                ),
+                {"uid": user["id"], "num": number},
+            )
+        ).scalar_one()
         graph_delete = {"attempted": False, "deleted": 0}
-        if conn.get("repo_url") or (conn.get("provider") or "").lower() in {"git", "github", "bitbucket"}:
+        if conn.get("repo_url") or (conn.get("provider") or "").lower() in {
+            "git",
+            "github",
+            "bitbucket",
+        }:
             try:
                 graph_delete = _delete_source_control_graph_data(
                     conn,
@@ -2761,34 +3543,44 @@ async def delete_connection(number: int, request: Request):
                 _error_response("CONNECTION-5001", f"Graph cleanup failed: {exc}", status=500)
 
         # Delete the connection
-        await session.execute(
-            text("DELETE FROM connections WHERE number = :num"),
-            {"num": number}
-        )
+        await session.execute(text("DELETE FROM connections WHERE number = :num"), {"num": number})
 
         # Shift higher connections down
         await session.execute(
             text("UPDATE connections SET number = number - 1, updated_at = :t WHERE number > :num"),
-            {"num": number, "t": _now()}
+            {"num": number, "t": _now()},
         )
 
         # Log the deletion
-        await session.execute(text(
-            "INSERT INTO audit_logs (id, action, userid, details, timestamp) VALUES (:id, :a, :u, :d, :t)"
-        ), {"id": _uuid(), "a": "Connection Deleted", "u": user["id"],
-            "d": f"Connection #{number} deleted; graph nodes removed: {graph_delete.get('deleted', 0)}", "t": _now()})
+        await session.execute(
+            text(
+                "INSERT INTO audit_logs (id, action, userid, details, timestamp) VALUES (:id, :a, :u, :d, :t)"
+            ),
+            {
+                "id": _uuid(),
+                "a": "Connection Deleted",
+                "u": user["id"],
+                "d": f"Connection #{number} deleted; graph nodes removed: {graph_delete.get('deleted', 0)}",
+                "t": _now(),
+            },
+        )
 
     if graph_delete.get("deleted"):
         from ecms.visualization.graph_changed import graph_changed
 
         await graph_changed("default", source="connection-delete", revision=str(number))
 
-    return {"success": True, "message": f"Connection #{number} deleted", "graph_delete": graph_delete}
+    return {
+        "success": True,
+        "message": f"Connection #{number} deleted",
+        "graph_delete": graph_delete,
+    }
 
 
 # ---------------------------------------------------------------------------
 # Graph — FalkorDB queries via redis-cli subprocess
 # ---------------------------------------------------------------------------
+
 
 @router.get("/graph/nodes")
 async def graph_nodes(request: Request):
@@ -2801,15 +3593,17 @@ async def graph_nodes(request: Request):
         if cognitive and cognitive.graph:
             all_nodes = await cognitive.graph._store.all_nodes()
             nodes = []
-            for node in (all_nodes if isinstance(all_nodes, list) else all_nodes.get("nodes", [])):
+            for node in all_nodes if isinstance(all_nodes, list) else all_nodes.get("nodes", []):
                 n = node if isinstance(node, dict) else node.__dict__
-                nodes.append({
-                    "id": n.get("node_id", n.get("id", "")),
-                    "label": n.get("display_name", n.get("canonical_name", n.get("name", ""))),
-                    "type": n.get("ontology_type", n.get("type", "unknown")),
-                    "domain": n.get("domain", "uncategorized"),
-                    "confidence": round((n.get("confidence", 0.5)) * 100),
-                })
+                nodes.append(
+                    {
+                        "id": n.get("node_id", n.get("id", "")),
+                        "label": n.get("display_name", n.get("canonical_name", n.get("name", ""))),
+                        "type": n.get("ontology_type", n.get("type", "unknown")),
+                        "domain": n.get("domain", "uncategorized"),
+                        "confidence": round((n.get("confidence", 0.5)) * 100),
+                    }
+                )
             if nodes:
                 return nodes
     except Exception:
@@ -2817,14 +3611,26 @@ async def graph_nodes(request: Request):
 
     # Query FalkorDB via redis-cli subprocess
     try:
-        import subprocess, os
+        import os
+        import subprocess
+
         url = os.environ.get("ECMS_FALKORDB_URL", "redis://falkordb:6379")
         host = url.replace("redis://", "").split(":")[0]
         port = url.replace("redis://", "").split(":")[1].split("/")[0]
         result = subprocess.run(
-            ["redis-cli", "-h", host, "-p", port, "GRAPH.QUERY", "ecms",
-             "MATCH (n) RETURN n.id, n.name, n.type LIMIT 500"],
-            capture_output=True, text=True, timeout=60
+            [
+                "redis-cli",
+                "-h",
+                host,
+                "-p",
+                port,
+                "GRAPH.QUERY",
+                "ecms",
+                "MATCH (n) RETURN n.id, n.name, n.type LIMIT 500",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
         if result.returncode == 0 and result.stdout:
             lines = result.stdout.strip().split("\n")
@@ -2835,13 +3641,15 @@ async def graph_nodes(request: Request):
                     continue
                 parts = [p.strip() for p in line.split("\t") if p.strip()]
                 if len(parts) >= 3:
-                    nodes.append({
-                        "id": parts[0],
-                        "label": parts[1] or parts[0],
-                        "type": parts[2] or "unknown",
-                        "domain": "uncategorized",
-                        "confidence": 50,
-                    })
+                    nodes.append(
+                        {
+                            "id": parts[0],
+                            "label": parts[1] or parts[0],
+                            "type": parts[2] or "unknown",
+                            "domain": "uncategorized",
+                            "confidence": 50,
+                        }
+                    )
             return nodes
     except Exception:
         pass
@@ -2859,14 +3667,16 @@ async def graph_edges(request: Request):
         if cognitive and cognitive.graph:
             all_edges = cognitive.graph._store.all_edges()
             edges = []
-            for edge in (all_edges if isinstance(all_edges, list) else all_edges.get("edges", [])):
+            for edge in all_edges if isinstance(all_edges, list) else all_edges.get("edges", []):
                 e = edge if isinstance(edge, dict) else edge.__dict__
-                edges.append({
-                    "id": e.get("edge_id", e.get("id", "")),
-                    "source": e.get("source_id", e.get("source", "")),
-                    "target": e.get("target_id", e.get("target", "")),
-                    "relationship": e.get("relationship_type", e.get("type", "related")),
-                })
+                edges.append(
+                    {
+                        "id": e.get("edge_id", e.get("id", "")),
+                        "source": e.get("source_id", e.get("source", "")),
+                        "target": e.get("target_id", e.get("target", "")),
+                        "relationship": e.get("relationship_type", e.get("type", "related")),
+                    }
+                )
             if edges:
                 return edges
     except Exception:
@@ -2874,14 +3684,26 @@ async def graph_edges(request: Request):
 
     # Query FalkorDB via redis-cli subprocess
     try:
-        import subprocess, os
+        import os
+        import subprocess
+
         url = os.environ.get("ECMS_FALKORDB_URL", "redis://falkordb:6379")
         host = url.replace("redis://", "").split(":")[0]
         port = url.replace("redis://", "").split(":")[1].split("/")[0]
         result = subprocess.run(
-            ["redis-cli", "-h", host, "-p", port, "GRAPH.QUERY", "ecms",
-             "MATCH (a)-[r]->(b) RETURN a.id, b.id, type(r) LIMIT 2000"],
-            capture_output=True, text=True, timeout=60
+            [
+                "redis-cli",
+                "-h",
+                host,
+                "-p",
+                port,
+                "GRAPH.QUERY",
+                "ecms",
+                "MATCH (a)-[r]->(b) RETURN a.id, b.id, type(r) LIMIT 2000",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
         if result.returncode == 0 and result.stdout:
             lines = result.stdout.strip().split("\n")
@@ -2892,12 +3714,14 @@ async def graph_edges(request: Request):
                     continue
                 parts = [p.strip() for p in line.split("\t") if p.strip()]
                 if len(parts) >= 3:
-                    edges.append({
-                        "id": f"{parts[0]}-{parts[1]}",
-                        "source": parts[0],
-                        "target": parts[1],
-                        "relationship": parts[2] or "related",
-                    })
+                    edges.append(
+                        {
+                            "id": f"{parts[0]}-{parts[1]}",
+                            "source": parts[0],
+                            "target": parts[1],
+                            "relationship": parts[2] or "related",
+                        }
+                    )
             return edges
     except Exception:
         pass
@@ -2910,13 +3734,26 @@ async def graph_statistics(request: Request):
     await _get_current_user(request)
 
     try:
-        import subprocess, os
+        import os
+        import subprocess
+
         url = os.environ.get("ECMS_FALKORDB_URL", "redis://falkordb:6379")
         host = url.replace("redis://", "").split(":")[0]
         port = url.replace("redis://", "").split(":")[1].split("/")[0]
         result = subprocess.run(
-            ["redis-cli", "-h", host, "-p", port, "GRAPH.QUERY", "ecms", "MATCH (n) RETURN count(n)"],
-            capture_output=True, text=True, timeout=60
+            [
+                "redis-cli",
+                "-h",
+                host,
+                "-p",
+                port,
+                "GRAPH.QUERY",
+                "ecms",
+                "MATCH (n) RETURN count(n)",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
         if result.returncode == 0 and result.stdout:
             lines = result.stdout.strip().split("\n")

@@ -50,9 +50,7 @@ async def run_worker() -> None:
             if not await queue.acquire_lock(job.organization_id):
                 await asyncio.sleep(1)
                 continue
-            lock_maintenance = asyncio.create_task(
-                _maintain_lock(queue, job.organization_id)
-            )
+            lock_maintenance = asyncio.create_task(_maintain_lock(queue, job.organization_id))
             build_started = perf_counter()
             try:
                 async with asyncio.timeout(1_800):

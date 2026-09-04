@@ -38,7 +38,9 @@ logger = logging.getLogger("ecms.ba.agent")
 
 
 def _is_unconfigured_ba(exc: BaseException) -> bool:
-    return isinstance(exc, LlmProviderError) and getattr(exc, "code", "") == "ba_model_not_configured"
+    return (
+        isinstance(exc, LlmProviderError) and getattr(exc, "code", "") == "ba_model_not_configured"
+    )
 
 
 def _source_mentions(text: str, *terms: str) -> bool:
@@ -60,10 +62,14 @@ def _project_name_from_source(source_text: str) -> str:
 
 
 def _conversation_text(conversation: list[dict] | None) -> str:
-    return "\n".join(str(m.get("content") or "") for m in (conversation or []) if isinstance(m, dict))
+    return "\n".join(
+        str(m.get("content") or "") for m in (conversation or []) if isinstance(m, dict)
+    )
 
 
-def _fallback_requirements(source_text: str, conversation: list[dict] | None = None) -> FinalizedRequirements:
+def _fallback_requirements(
+    source_text: str, conversation: list[dict] | None = None
+) -> FinalizedRequirements:
     """Deterministic requirements package for dev/test when no BA model is configured.
 
     The fallback is deliberately conservative: it derives content from the source
@@ -151,27 +157,77 @@ def _fallback_requirements(source_text: str, conversation: list[dict] | None = N
             ),
         ],
         governance=[
-            DetailItem(label="Data Privacy", detail="Protect source documents and operational data with least-privilege access and audit logs."),
-            DetailItem(label="Access Control", detail="Restrict administration, approval, and reporting actions by role and department."),
-            DetailItem(label="Approval Workflow", detail="Enforce approval bands, exception review, and traceable decision history."),
-            DetailItem(label="Compliance", detail="Retain evidence for audits and flag policy exceptions for human review."),
-            DetailItem(label="Change Management", detail="Version business rules and require approval before production changes."),
+            DetailItem(
+                label="Data Privacy",
+                detail="Protect source documents and operational data with least-privilege access and audit logs.",
+            ),
+            DetailItem(
+                label="Access Control",
+                detail="Restrict administration, approval, and reporting actions by role and department.",
+            ),
+            DetailItem(
+                label="Approval Workflow",
+                detail="Enforce approval bands, exception review, and traceable decision history.",
+            ),
+            DetailItem(
+                label="Compliance",
+                detail="Retain evidence for audits and flag policy exceptions for human review.",
+            ),
+            DetailItem(
+                label="Change Management",
+                detail="Version business rules and require approval before production changes.",
+            ),
         ],
         guardrails=[
-            DetailItem(label="Data Validation", detail="Validate extracted fields, required references, and duplicate indicators before routing."),
-            DetailItem(label="Rollback Procedure", detail="Allow failed syncs or incorrect decisions to be reversed with audit notes."),
-            DetailItem(label="Sync Safety", detail="Use idempotent outbound updates to avoid duplicate ERP writes."),
-            DetailItem(label="Rate Limiting", detail="Throttle connector calls and queue retries to protect external systems."),
-            DetailItem(label="Monitoring Alerts", detail="Alert on connector failures, stuck approvals, and abnormal exception spikes."),
-            DetailItem(label="Cutover Safety", detail="Run pilot validation before enabling full automated routing."),
+            DetailItem(
+                label="Data Validation",
+                detail="Validate extracted fields, required references, and duplicate indicators before routing.",
+            ),
+            DetailItem(
+                label="Rollback Procedure",
+                detail="Allow failed syncs or incorrect decisions to be reversed with audit notes.",
+            ),
+            DetailItem(
+                label="Sync Safety",
+                detail="Use idempotent outbound updates to avoid duplicate ERP writes.",
+            ),
+            DetailItem(
+                label="Rate Limiting",
+                detail="Throttle connector calls and queue retries to protect external systems.",
+            ),
+            DetailItem(
+                label="Monitoring Alerts",
+                detail="Alert on connector failures, stuck approvals, and abnormal exception spikes.",
+            ),
+            DetailItem(
+                label="Cutover Safety",
+                detail="Run pilot validation before enabling full automated routing.",
+            ),
         ],
         infrastructure=[
-            DetailItem(label="Compute", detail="Run backend workers and API services in Docker-managed services."),
-            DetailItem(label="Database", detail="Use PostgreSQL for project data, workflow state, and audit metadata."),
-            DetailItem(label="Networking", detail="Expose API and connector traffic through controlled service routes."),
-            DetailItem(label="Storage", detail="Store documents and derived artifacts in object storage."),
-            DetailItem(label="Messaging", detail="Use queue/notification mechanisms for approvals and connector retries."),
-            DetailItem(label="Monitoring", detail="Track health, workflow latency, connector errors, and audit events."),
+            DetailItem(
+                label="Compute",
+                detail="Run backend workers and API services in Docker-managed services.",
+            ),
+            DetailItem(
+                label="Database",
+                detail="Use PostgreSQL for project data, workflow state, and audit metadata.",
+            ),
+            DetailItem(
+                label="Networking",
+                detail="Expose API and connector traffic through controlled service routes.",
+            ),
+            DetailItem(
+                label="Storage", detail="Store documents and derived artifacts in object storage."
+            ),
+            DetailItem(
+                label="Messaging",
+                detail="Use queue/notification mechanisms for approvals and connector retries.",
+            ),
+            DetailItem(
+                label="Monitoring",
+                detail="Track health, workflow latency, connector errors, and audit events.",
+            ),
         ],
     )
 
@@ -196,6 +252,7 @@ async def retrieve_knowledge(source_text: str, conversation: list[dict] | None =
     """Retrieve relevant knowledge for a project. Returns empty string on failure."""
     try:
         from ecms.agent.ba.knowledge.retrieval import retrieve_for_project
+
         return await retrieve_for_project(source_text, conversation)
     except Exception as exc:
         logger.warning("[ba.agent] knowledge retrieval failed, proceeding without: %s", exc)
@@ -259,7 +316,9 @@ async def clarify(source_text: str, knowledge_context: str = "") -> dict[str, st
     return _parse_clarification(resp)
 
 
-async def assess_coverage(source_text: str, conversation: list[dict], knowledge_context: str = "") -> dict:
+async def assess_coverage(
+    source_text: str, conversation: list[dict], knowledge_context: str = ""
+) -> dict:
     """Score every requirement dimension across the full conversation."""
     llm = await get_ba_llm_client()
     try:
@@ -297,7 +356,10 @@ async def chat_reply(
     resp = await llm.chat(
         messages=[
             {"role": "system", "content": build_system_prompt(knowledge_context)},
-            {"role": "user", "content": build_reply_prompt(source_text, conversation, user_message, coverage)},
+            {
+                "role": "user",
+                "content": build_reply_prompt(source_text, conversation, user_message, coverage),
+            },
         ],
         tools=[CLARIFICATION_TOOL],
         tool_choice={"type": "function", "function": {"name": "emit_clarification"}},
@@ -307,7 +369,9 @@ async def chat_reply(
     return _parse_clarification(resp)
 
 
-async def finalize(source_text: str, conversation: list[dict], knowledge_context: str = "") -> FinalizedRequirements:
+async def finalize(
+    source_text: str, conversation: list[dict], knowledge_context: str = ""
+) -> FinalizedRequirements:
     """Stage 3 — the FinalizedRequirements object (validated / repaired)."""
     from ecms.agent.ba.llm_client import LlmCallOpts
 
@@ -326,16 +390,18 @@ async def finalize(source_text: str, conversation: list[dict], knowledge_context
     last_error: str | None = None
     for attempt in range(2):
         if last_error:
-            messages.append({
-                "role": "user",
-                "content": (
-                    f"Your previous emit_requirements call was invalid: {last_error}. "
-                    "Call emit_requirements again with the corrected object. The "
-                    "governance/guardrails/infrastructure labels must match exactly, "
-                    "and phases must start with Discovery & Requirements Baseline "
-                    "followed by descriptions that start with Depends on <previous phase name>:."
-                ),
-            })
+            messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        f"Your previous emit_requirements call was invalid: {last_error}. "
+                        "Call emit_requirements again with the corrected object. The "
+                        "governance/guardrails/infrastructure labels must match exactly, "
+                        "and phases must start with Discovery & Requirements Baseline "
+                        "followed by descriptions that start with Depends on <previous phase name>:."
+                    ),
+                }
+            )
         resp = await llm.chat(
             messages=messages,
             tools=[FINALIZE_TOOL],
@@ -356,21 +422,27 @@ async def finalize(source_text: str, conversation: list[dict], knowledge_context
         except (json.JSONDecodeError, ValidationError) as exc:
             last_error = str(exc)
             logger.warning("[ba.finalize] attempt %d validation failed: %s", attempt, exc)
-            messages.append({
-                "role": "assistant",
-                # The Anthropic-compatible gateway rejects null message content.
-                "content": "",
-                "tool_calls": [{
-                    "id": tool_calls[0].id,
-                    "type": "function",
-                    "function": {"name": "emit_requirements", "arguments": raw},
-                }],
-            })
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tool_calls[0].id,
-                "content": f"validation error: {last_error}",
-            })
+            messages.append(
+                {
+                    "role": "assistant",
+                    # The Anthropic-compatible gateway rejects null message content.
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "id": tool_calls[0].id,
+                            "type": "function",
+                            "function": {"name": "emit_requirements", "arguments": raw},
+                        }
+                    ],
+                }
+            )
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tool_calls[0].id,
+                    "content": f"validation error: {last_error}",
+                }
+            )
 
     raise ValueError(f"BA finalize failed after retries: {last_error}")
 
@@ -389,27 +461,30 @@ async def design_team(
     allowed_models = tuple(model_ids)
     allowed_tools = tuple(tool_names)
     allowed_org_member_ids = tuple(
-        str(member["id"])
-        for member in (org_roster or [])
-        if member.get("id")
+        str(member["id"]) for member in (org_roster or []) if member.get("id")
     )
     messages = [
         {"role": "system", "content": build_system_prompt(knowledge_context)},
-        {"role": "user", "content": build_team_prompt(requirements, conversation, org_roster=org_roster)},
+        {
+            "role": "user",
+            "content": build_team_prompt(requirements, conversation, org_roster=org_roster),
+        },
     ]
 
     last_error: str | None = None
     for attempt in range(2):
         if last_error:
-            messages.append({
-                "role": "user",
-                "content": (
-                    f"Your previous emit_team call was invalid: {last_error}. "
-                    "Call emit_team again with the corrected required-position org "
-                    "chart. It must have exactly one root (reports_to=null), every "
-                    "reports_to must reference an existing key, and there must be no cycles."
-                ),
-            })
+            messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        f"Your previous emit_team call was invalid: {last_error}. "
+                        "Call emit_team again with the corrected required-position org "
+                        "chart. It must have exactly one root (reports_to=null), every "
+                        "reports_to must reference an existing key, and there must be no cycles."
+                    ),
+                }
+            )
         resp = await llm.chat(
             messages=messages,
             tools=[team_tool],
@@ -435,20 +510,26 @@ async def design_team(
         except (json.JSONDecodeError, ValidationError, ValueError) as exc:
             last_error = str(exc)
             logger.warning("[ba.design_team] attempt %d validation failed: %s", attempt, exc)
-            messages.append({
-                "role": "assistant",
-                # The Anthropic-compatible gateway rejects null message content.
-                "content": "",
-                "tool_calls": [{
-                    "id": tool_calls[0].id,
-                    "type": "function",
-                    "function": {"name": "emit_team", "arguments": raw},
-                }],
-            })
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tool_calls[0].id,
-                "content": f"validation error: {last_error}",
-            })
+            messages.append(
+                {
+                    "role": "assistant",
+                    # The Anthropic-compatible gateway rejects null message content.
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "id": tool_calls[0].id,
+                            "type": "function",
+                            "function": {"name": "emit_team", "arguments": raw},
+                        }
+                    ],
+                }
+            )
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tool_calls[0].id,
+                    "content": f"validation error: {last_error}",
+                }
+            )
 
     raise ValueError(f"BA design_team failed after retries: {last_error}")

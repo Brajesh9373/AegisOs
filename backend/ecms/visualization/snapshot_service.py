@@ -79,9 +79,7 @@ class GraphSnapshotService:
         )
         uploaded_keys: list[str] = []
         try:
-            qualification_delay = (
-                get_settings().knowledge_graph_build_start_delay_seconds
-            )
+            qualification_delay = get_settings().knowledge_graph_build_start_delay_seconds
             if qualification_delay:
                 await asyncio.sleep(qualification_delay)
             nodes, edges = await self._source.load()

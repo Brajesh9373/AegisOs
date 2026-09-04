@@ -7,9 +7,9 @@ only intrinsic attributes. Root agents (reports_to IS NULL) bypass all checks.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, JSON, Text
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ecms.persistence.models.base import Base
@@ -26,28 +26,30 @@ class AccessPolicy(Base):
     effect: Mapped[str] = mapped_column(String(16), nullable=False)  # 'allow' | 'deny'
 
     # Subject matching
-    agent_id: Mapped[Optional[str]] = mapped_column(
+    agent_id: Mapped[str | None] = mapped_column(
         String(128), ForeignKey("agents.id", ondelete="CASCADE"), nullable=True, index=True
     )
-    department: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
-    role_level_min: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=1)
+    department: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    role_level_min: Mapped[int | None] = mapped_column(Integer, nullable=True, default=1)
 
     # Resource matching
-    resource_type: Mapped[Optional[str]] = mapped_column(
+    resource_type: Mapped[str | None] = mapped_column(
         String(32), nullable=True
     )  # 'memory_atom' | 'graph_node' | 'file' | None = all
-    path_pattern: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
-    source_type: Mapped[Optional[str]] = mapped_column(
+    path_pattern: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    source_type: Mapped[str | None] = mapped_column(
         String(64), nullable=True
     )  # 'git' | 'mysql' | 'jira' | None = all
     resource_attrs: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
     # Actions
-    action: Mapped[str] = mapped_column(String(16), nullable=False)  # 'read' | 'write' | 'delete' | '*'
+    action: Mapped[str] = mapped_column(
+        String(16), nullable=False
+    )  # 'read' | 'write' | 'delete' | '*'
 
     # Metadata
     priority: Mapped[int] = mapped_column(Integer, default=100)
-    created_by: Mapped[Optional[str]] = mapped_column(
+    created_by: Mapped[str | None] = mapped_column(
         String(128), ForeignKey("agents.id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -80,17 +82,17 @@ class PolicyRecommendation(Base):
 
     id: Mapped[str] = mapped_column(String(128), primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    project_id: Mapped[Optional[str]] = mapped_column(
-        String(128), nullable=True, index=True
-    )
+    project_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     policies_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    org_snapshot: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
-    status: Mapped[str] = mapped_column(String(32), default="pending", index=True)  # pending|approved|rejected|modified
-    reviewed_by: Mapped[Optional[str]] = mapped_column(
+    org_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(32), default="pending", index=True
+    )  # pending|approved|rejected|modified
+    reviewed_by: Mapped[str | None] = mapped_column(
         String(128), ForeignKey("agents.id", ondelete="SET NULL"), nullable=True
     )
-    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_by: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     def to_dict(self) -> dict[str, Any]:

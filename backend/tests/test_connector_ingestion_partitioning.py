@@ -32,12 +32,8 @@ def test_partitioning_is_deterministic_balanced_and_complete() -> None:
     assert first == second
     assert [partition.total_weight for partition in first] == [100, 60, 41]
     validate_partition_coverage(manifest, first)
-    assigned = [
-        entry.relative_path for partition in first for entry in partition.entries
-    ]
-    assert sorted(assigned) == sorted(
-        entry.relative_path for entry in manifest.entries
-    )
+    assigned = [entry.relative_path for partition in first for entry in partition.entries]
+    assert sorted(assigned) == sorted(entry.relative_path for entry in manifest.entries)
 
 
 def test_partitioning_has_stable_tie_breakers() -> None:

@@ -7,6 +7,7 @@ Revises: 0011
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import UTC
 
 import sqlalchemy as sa
 from alembic import op
@@ -32,8 +33,9 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True)),
     )
     # Seed defaults
-    from datetime import datetime, timezone
-    now = datetime.now(timezone.utc)
+    from datetime import datetime
+
+    now = datetime.now(UTC)
     for c in DEFAULT_CATEGORIES:
         op.execute(
             sa.text(

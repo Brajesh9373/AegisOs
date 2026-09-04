@@ -21,8 +21,9 @@ class ProcedureStore:
     def __init__(self, root: Path = Path("/app/memory")) -> None:
         self._path = root / "procedures.ndjson"
 
-    def learn(self, name: str, description: str, steps: list[str],
-              tools_used: list[str] | None = None) -> str:
+    def learn(
+        self, name: str, description: str, steps: list[str], tools_used: list[str] | None = None
+    ) -> str:
         """Register a new procedure. Returns procedure id."""
         slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
         proc = {
@@ -47,7 +48,7 @@ class ProcedureStore:
         if not self._path.exists():
             return results
 
-        with open(self._path, "r", encoding="utf-8") as f:
+        with open(self._path, encoding="utf-8") as f:
             for line in f:
                 if not line.strip():
                     continue
@@ -61,13 +62,15 @@ class ProcedureStore:
                 overlap = len(query_terms & proc_terms)
 
                 if overlap >= 2:
-                    results.append({
-                        "id": proc.get("id", ""),
-                        "name": proc.get("name", ""),
-                        "description": proc.get("description", ""),
-                        "steps": proc.get("steps", []),
-                        "success_count": proc.get("success_count", 0),
-                    })
+                    results.append(
+                        {
+                            "id": proc.get("id", ""),
+                            "name": proc.get("name", ""),
+                            "description": proc.get("description", ""),
+                            "steps": proc.get("steps", []),
+                            "success_count": proc.get("success_count", 0),
+                        }
+                    )
 
             results.sort(key=lambda r: r["success_count"], reverse=True)
         return results[:limit]
@@ -77,17 +80,19 @@ class ProcedureStore:
         results: list[dict] = []
         if not self._path.exists():
             return results
-        with open(self._path, "r", encoding="utf-8") as f:
+        with open(self._path, encoding="utf-8") as f:
             for line in f:
                 if not line.strip():
                     continue
                 try:
                     proc = json.loads(line)
-                    results.append({
-                        "id": proc.get("id", ""),
-                        "name": proc.get("name", ""),
-                        "description": proc.get("description", ""),
-                    })
+                    results.append(
+                        {
+                            "id": proc.get("id", ""),
+                            "name": proc.get("name", ""),
+                            "description": proc.get("description", ""),
+                        }
+                    )
                 except json.JSONDecodeError:
                     continue
         return results

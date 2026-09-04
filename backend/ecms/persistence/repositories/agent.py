@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import select, delete, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ecms.persistence.models.agent import Agent
@@ -59,10 +59,14 @@ class AgentRepository:
         Project staffing assignments do not mutate project_id, so these agents
         stay reusable across projects.
         """
-        stmt = select(Agent).where(
-            Agent.project_id.is_(None),
-            Agent.status == "active",
-        ).order_by(Agent.department, Agent.role, Agent.name)
+        stmt = (
+            select(Agent)
+            .where(
+                Agent.project_id.is_(None),
+                Agent.status == "active",
+            )
+            .order_by(Agent.department, Agent.role, Agent.name)
+        )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
@@ -143,11 +147,7 @@ class AgentRepository:
             return False
         # Reassign all direct reports to this agent's manager
         mgr_id = agent.reports_to
-        stmt = (
-            update(Agent)
-            .where(Agent.reports_to == agent_id)
-            .values(reports_to=mgr_id)
-        )
+        stmt = update(Agent).where(Agent.reports_to == agent_id).values(reports_to=mgr_id)
         await self._session.execute(stmt)
         await self._session.delete(agent)
         await self._session.flush()

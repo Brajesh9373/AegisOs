@@ -7,12 +7,10 @@ org chart departments, generates allow/deny policies. Runs in <1 second.
 from __future__ import annotations
 
 import asyncio
-import fnmatch
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-
 
 _FILE_TYPE_MAP = {
     ".py": "backend",
@@ -47,7 +45,10 @@ def _classify_path(repo_path: Path) -> dict[str, int]:
     for path in repo_path.rglob("*"):
         if not path.is_file():
             continue
-        if any(p in (".git", "node_modules", "__pycache__", ".venv", "dist", "build") for p in path.parts):
+        if any(
+            p in (".git", "node_modules", "__pycache__", ".venv", "dist", "build")
+            for p in path.parts
+        ):
             continue
         name = path.name.lower()
         ext = path.suffix.lower()
@@ -56,10 +57,12 @@ def _classify_path(repo_path: Path) -> dict[str, int]:
     return counts
 
 
-async def recommend_policies_for_project(project_id: str, created_by: str = "policy-agent") -> dict[str, Any]:
+async def recommend_policies_for_project(
+    project_id: str, created_by: str = "policy-agent"
+) -> dict[str, Any]:
     from ecms.persistence.database.rest_session import db_session
-    from ecms.persistence.repositories.agent import AgentRepository
     from ecms.persistence.models.access_policy import PolicyRecommendation
+    from ecms.persistence.repositories.agent import AgentRepository
 
     async with db_session() as s:
         agents = await AgentRepository(s).list_all()
@@ -95,102 +98,157 @@ async def recommend_policies_for_project(project_id: str, created_by: str = "pol
                 best_dept = max(counts, key=counts.get) if counts else None
                 if best_dept and best_dept != "unknown" and best_dept in dept_agents:
                     agents_in = dept_agents[best_dept]
-                    policies.append({
-                        "effect": "allow",
-                        "name": f"Git: {repo_path.name} → {best_dept}",
-                        "department": best_dept,
-                        "path_pattern": f"{persist_path}/**",
-                        "resource_type": "graph_node", "source_type": "git", "action": "read",
-                        "agent_ids": [x["id"] for x in agents_in],
-                        "agent_names": [x["name"] for x in agents_in],
-                        "confidence": min(0.80 + (counts[best_dept] * 0.02), 0.95),
-                        "evidence": [f"{counts[best_dept]} {best_dept} files found out of {sum(counts.values())} total"],
-                    })
+                    policies.append(
+                        {
+                            "effect": "allow",
+                            "name": f"Git: {repo_path.name} → {best_dept}",
+                            "department": best_dept,
+                            "path_pattern": f"{persist_path}/**",
+                            "resource_type": "graph_node",
+                            "source_type": "git",
+                            "action": "read",
+                            "agent_ids": [x["id"] for x in agents_in],
+                            "agent_names": [x["name"] for x in agents_in],
+                            "confidence": min(0.80 + (counts[best_dept] * 0.02), 0.95),
+                            "evidence": [
+                                f"{counts[best_dept]} {best_dept} files found out of {sum(counts.values())} total"
+                            ],
+                        }
+                    )
                     # Deny for other departments
                     for dep in departments:
                         if dep != best_dept and dep in dept_agents:
                             agents_in_dep = dept_agents[dep]
-                            policies.append({
-                                "effect": "deny",
-                                "name": f"Block {dep} from {repo_path.name}",
-                                "department": dep,
-                                "path_pattern": f"{persist_path}/**",
-                                "resource_type": "graph_node", "source_type": "git", "action": "read",
-                                "agent_ids": [x["id"] for x in agents_in_dep],
-                                "agent_names": [x["name"] for x in agents_in_dep],
-                                "confidence": 0.85,
-                                "evidence": [f"Repo contains {counts.get(best_dept, 0)} {best_dept} files. {dep} has no ownership."],
-                            })
+                            policies.append(
+                                {
+                                    "effect": "deny",
+                                    "name": f"Block {dep} from {repo_path.name}",
+                                    "department": dep,
+                                    "path_pattern": f"{persist_path}/**",
+                                    "resource_type": "graph_node",
+                                    "source_type": "git",
+                                    "action": "read",
+                                    "agent_ids": [x["id"] for x in agents_in_dep],
+                                    "agent_names": [x["name"] for x in agents_in_dep],
+                                    "confidence": 0.85,
+                                    "evidence": [
+                                        f"Repo contains {counts.get(best_dept, 0)} {best_dept} files. {dep} has no ownership."
+                                    ],
+                                }
+                            )
 
         elif ctype == "mysql":
             db_name = cfg.get("database", "")
             if db_name:
                 db_lower = db_name.lower()
-                sensitive = any(kw in db_lower for kw in ["salary", "payroll", "hr", "secret", "token", "credential"])
+                sensitive = any(
+                    kw in db_lower
+                    for kw in ["salary", "payroll", "hr", "secret", "token", "credential"]
+                )
                 if sensitive:
-                    root_agents = [a for agts in dept_agents.values() for a in agts if a.get("reports_to") is None]
+                    root_agents = [
+                        a
+                        for agts in dept_agents.values()
+                        for a in agts
+                        if a.get("reports_to") is None
+                    ]
                     if root_agents:
-                        policies.append({
-                            "effect": "allow", "name": f"MySQL: {db_name} → C-suite only",
-                            "agent_ids": [x["id"] for x in root_agents],
-                            "agent_names": [x["name"] for x in root_agents],
-                            "resource_type": "graph_node", "source_type": "mysql",
-                            "resource_attrs": {"source": "mysql", "db_name": db_name}, "action": "read",
-                            "confidence": 0.94,
-                            "evidence": [f"Database '{db_name}' contains sensitive keywords."],
-                        })
+                        policies.append(
+                            {
+                                "effect": "allow",
+                                "name": f"MySQL: {db_name} → C-suite only",
+                                "agent_ids": [x["id"] for x in root_agents],
+                                "agent_names": [x["name"] for x in root_agents],
+                                "resource_type": "graph_node",
+                                "source_type": "mysql",
+                                "resource_attrs": {"source": "mysql", "db_name": db_name},
+                                "action": "read",
+                                "confidence": 0.94,
+                                "evidence": [f"Database '{db_name}' contains sensitive keywords."],
+                            }
+                        )
                 else:
-                    matched = next((d for d in departments if d.lower() in db_lower or db_lower in d.lower()), departments[0])
+                    matched = next(
+                        (d for d in departments if d.lower() in db_lower or db_lower in d.lower()),
+                        departments[0],
+                    )
                     if matched in dept_agents:
                         agents_in = dept_agents[matched]
-                        policies.append({
-                            "effect": "allow", "name": f"MySQL: {db_name} → {matched}",
-                            "department": matched,
-                            "agent_ids": [x["id"] for x in agents_in],
-                            "agent_names": [x["name"] for x in agents_in],
-                            "resource_type": "graph_node", "source_type": "mysql",
-                            "resource_attrs": {"source": "mysql", "db_name": db_name}, "action": "read",
-                            "confidence": 0.88,
-                            "evidence": [f"Database '{db_name}' matched to department '{matched}'."],
-                        })
+                        policies.append(
+                            {
+                                "effect": "allow",
+                                "name": f"MySQL: {db_name} → {matched}",
+                                "department": matched,
+                                "agent_ids": [x["id"] for x in agents_in],
+                                "agent_names": [x["name"] for x in agents_in],
+                                "resource_type": "graph_node",
+                                "source_type": "mysql",
+                                "resource_attrs": {"source": "mysql", "db_name": db_name},
+                                "action": "read",
+                                "confidence": 0.88,
+                                "evidence": [
+                                    f"Database '{db_name}' matched to department '{matched}'."
+                                ],
+                            }
+                        )
 
     # Save
-    rec_id = f"rec-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+    rec_id = f"rec-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
     analysis = {
-        "directories_found": [c.get("persist_path", "") for c in connectors if c.get("persist_path")],
+        "directories_found": [
+            c.get("persist_path", "") for c in connectors if c.get("persist_path")
+        ],
         "policies": len(policies),
     }
 
     async with db_session() as s:
         org_tree = await AgentRepository(s).get_org_tree()
-        s.add(PolicyRecommendation(
-            id=rec_id, name=f"Deep Analysis: {project_id}", project_id=project_id,
-            policies_json={
-                "project_id": project_id, "connectors_scanned": len(connectors),
-                "policies_generated": len(policies), "policies": policies,
-                "analysis": analysis,
-            },
-            org_snapshot=org_tree, status="pending", created_by=created_by,
-        ))
+        s.add(
+            PolicyRecommendation(
+                id=rec_id,
+                name=f"Deep Analysis: {project_id}",
+                project_id=project_id,
+                policies_json={
+                    "project_id": project_id,
+                    "connectors_scanned": len(connectors),
+                    "policies_generated": len(policies),
+                    "policies": policies,
+                    "analysis": analysis,
+                },
+                org_snapshot=org_tree,
+                status="pending",
+                created_by=created_by,
+            )
+        )
 
-    return {"id": rec_id, "policies": len(policies), "connectors": len(connectors), "analysis": analysis}
+    return {
+        "id": rec_id,
+        "policies": len(policies),
+        "connectors": len(connectors),
+        "analysis": analysis,
+    }
 
 
 async def _get_project_connectors(project_id: str) -> list[dict]:
-    from ecms.persistence.database.rest_session import db_session
     from sqlalchemy import select
+
+    from ecms.persistence.database.rest_session import db_session
     from ecms.persistence.models.project import ProjectConnector
 
     async with db_session() as s:
         stmt = select(ProjectConnector).where(ProjectConnector.project_id == f"proj:{project_id}")
         result = await s.execute(stmt)
-        return [{"connector_type": c.connector_type, "config": c.config, "persist_path": c.persist_path} for c in result.scalars().all()]
+        return [
+            {"connector_type": c.connector_type, "config": c.config, "persist_path": c.persist_path}
+            for c in result.scalars().all()
+        ]
 
 
 async def approve_recommendation(rec_id: str, reviewer_id: str) -> dict[str, Any]:
+    from sqlalchemy import select
+
     from ecms.persistence.database.rest_session import db_session
     from ecms.persistence.models.access_policy import AccessPolicy, PolicyRecommendation
-    from sqlalchemy import select
 
     async with db_session() as s:
         stmt = select(PolicyRecommendation).where(PolicyRecommendation.id == rec_id)
@@ -220,6 +278,6 @@ async def approve_recommendation(rec_id: str, reviewer_id: str) -> dict[str, Any
 
         rec.status = "approved"
         rec.reviewed_by = reviewer_id
-        rec.reviewed_at = datetime.now(timezone.utc)
+        rec.reviewed_at = datetime.now(UTC)
 
     return {"approved": True, "policies_created": created}

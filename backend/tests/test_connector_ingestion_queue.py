@@ -23,4 +23,3 @@ async def test_queue_payload_contains_identifiers_only() -> None:
 
     await queue.acknowledge(job)
     assert (await redis.xpending(STREAM, GROUP))["pending"] == 0
-

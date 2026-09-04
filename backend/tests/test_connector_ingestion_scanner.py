@@ -37,9 +37,7 @@ async def test_scanner_stops_when_cancelled(tmp_path: Path) -> None:
     cancel.set()
 
     with pytest.raises(IngestionCancelledError):
-        async for _ in scan_repository(
-            tmp_path, limits=ScanLimits(), cancel=cancel
-        ):
+        async for _ in scan_repository(tmp_path, limits=ScanLimits(), cancel=cancel):
             pass
 
 

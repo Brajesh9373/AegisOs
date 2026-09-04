@@ -8,11 +8,10 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
-from ecms.agent.ba.knowledge.models import KnowledgeEntry, KnowledgeSearchResult
 from ecms.agent.ba.knowledge.embeddings import cosine_similarity
+from ecms.agent.ba.knowledge.models import KnowledgeEntry, KnowledgeSearchResult
 
 logger = logging.getLogger("ecms.knowledge.store")
 
@@ -50,43 +49,65 @@ async def create_entry(
     entry_id: str | None = None,
 ) -> KnowledgeEntry:
     """Insert a knowledge entry and return it."""
-    from ecms.persistence.database.rest_session import db_session
     from sqlalchemy import text
 
+    from ecms.persistence.database.rest_session import db_session
+
     eid = entry_id or str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     async with db_session() as session:
-        await session.execute(text(
-            "INSERT INTO knowledge_entries "
-            "(id, category, domain, tags, content, embedding, source, "
-            " contributor, project_id, chunk_index, parent_id, created_at, updated_at) "
-            "VALUES (:id, :cat, :dom, :tags, :content, :emb, :src, "
-            " :contrib, :pid, :ci, :parent, :t, :t)"
-        ), {
-            "id": eid, "cat": category, "dom": domain,
-            "tags": tags or [], "content": content,
-            "emb": embedding, "src": source, "contrib": contributor,
-            "pid": project_id, "ci": chunk_index, "parent": parent_id, "t": now,
-        })
+        await session.execute(
+            text(
+                "INSERT INTO knowledge_entries "
+                "(id, category, domain, tags, content, embedding, source, "
+                " contributor, project_id, chunk_index, parent_id, created_at, updated_at) "
+                "VALUES (:id, :cat, :dom, :tags, :content, :emb, :src, "
+                " :contrib, :pid, :ci, :parent, :t, :t)"
+            ),
+            {
+                "id": eid,
+                "cat": category,
+                "dom": domain,
+                "tags": tags or [],
+                "content": content,
+                "emb": embedding,
+                "src": source,
+                "contrib": contributor,
+                "pid": project_id,
+                "ci": chunk_index,
+                "parent": parent_id,
+                "t": now,
+            },
+        )
 
     return KnowledgeEntry(
-        id=eid, category=category, domain=domain, tags=tags or [],
-        content=content, embedding=embedding, source=source,
-        contributor=contributor, project_id=project_id,
-        chunk_index=chunk_index, parent_id=parent_id,
+        id=eid,
+        category=category,
+        domain=domain,
+        tags=tags or [],
+        content=content,
+        embedding=embedding,
+        source=source,
+        contributor=contributor,
+        project_id=project_id,
+        chunk_index=chunk_index,
+        parent_id=parent_id,
     )
 
 
-async def get_entry(entry_id: str) -> Optional[KnowledgeEntry]:
+async def get_entry(entry_id: str) -> KnowledgeEntry | None:
     """Fetch a single entry by ID."""
-    from ecms.persistence.database.rest_session import db_session
     from sqlalchemy import text
 
+    from ecms.persistence.database.rest_session import db_session
+
     async with db_session() as session:
-        row = (await session.execute(text(
-            "SELECT * FROM knowledge_entries WHERE id = :id"
-        ), {"id": entry_id})).first()
+        row = (
+            await session.execute(
+                text("SELECT * FROM knowledge_entries WHERE id = :id"), {"id": entry_id}
+            )
+        ).first()
     return _row_to_entry(row) if row else None
 
 
@@ -98,8 +119,9 @@ async def search_by_text(
     top_k: int = 10,
 ) -> list[KnowledgeSearchResult]:
     """Full-text search using Postgres tsvector ranking."""
-    from ecms.persistence.database.rest_session import db_session
     from sqlalchemy import text
+
+    from ecms.persistence.database.rest_session import db_session
 
     filters = []
     params: dict = {"q": query, "limit": top_k}
@@ -113,16 +135,22 @@ async def search_by_text(
     where = ("WHERE " + " AND ".join(filters)) if filters else ""
 
     async with db_session() as session:
-        rows = (await session.execute(text(
-            f"SELECT *, ts_rank(to_tsvector('english', content), "
-            f"plainto_tsquery('english', :q)) AS rank "
-            f"FROM knowledge_entries {where} "
-            f"ORDER BY rank DESC LIMIT :limit"
-        ), params)).fetchall()
+        rows = (
+            await session.execute(
+                text(
+                    f"SELECT *, ts_rank(to_tsvector('english', content), "
+                    f"plainto_tsquery('english', :q)) AS rank "
+                    f"FROM knowledge_entries {where} "
+                    f"ORDER BY rank DESC LIMIT :limit"
+                ),
+                params,
+            )
+        ).fetchall()
 
     return [
         KnowledgeSearchResult(entry=_row_to_entry(r), score=r._mapping["rank"], match_type="text")
-        for r in rows if r._mapping["rank"] > 0
+        for r in rows
+        if r._mapping["rank"] > 0
     ]
 
 
@@ -135,8 +163,9 @@ async def search_by_embedding(
     threshold: float = 0.3,
 ) -> list[KnowledgeSearchResult]:
     """Semantic search: compute cosine similarity in Python over all entries."""
-    from ecms.persistence.database.rest_session import db_session
     from sqlalchemy import text
+
+    from ecms.persistence.database.rest_session import db_session
 
     filters = ["embedding IS NOT NULL"]
     params: dict = {}
@@ -150,9 +179,9 @@ async def search_by_embedding(
     where = "WHERE " + " AND ".join(filters)
 
     async with db_session() as session:
-        rows = (await session.execute(text(
-            f"SELECT * FROM knowledge_entries {where}"
-        ), params)).fetchall()
+        rows = (
+            await session.execute(text(f"SELECT * FROM knowledge_entries {where}"), params)
+        ).fetchall()
 
     scored: list[KnowledgeSearchResult] = []
     for r in rows:
@@ -161,9 +190,9 @@ async def search_by_embedding(
             continue
         sim = cosine_similarity(query_embedding, emb)
         if sim >= threshold:
-            scored.append(KnowledgeSearchResult(
-                entry=_row_to_entry(r), score=sim, match_type="semantic"
-            ))
+            scored.append(
+                KnowledgeSearchResult(entry=_row_to_entry(r), score=sim, match_type="semantic")
+            )
 
     scored.sort(key=lambda x: x.score, reverse=True)
     return scored[:top_k]
@@ -203,37 +232,52 @@ async def hybrid_search(
 
 async def list_by_category(category: str, top_k: int = 50) -> list[KnowledgeEntry]:
     """List all entries in a category."""
-    from ecms.persistence.database.rest_session import db_session
     from sqlalchemy import text
 
+    from ecms.persistence.database.rest_session import db_session
+
     async with db_session() as session:
-        rows = (await session.execute(text(
-            "SELECT * FROM knowledge_entries WHERE category = :cat "
-            "ORDER BY created_at DESC LIMIT :limit"
-        ), {"cat": category, "limit": top_k})).fetchall()
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT * FROM knowledge_entries WHERE category = :cat "
+                    "ORDER BY created_at DESC LIMIT :limit"
+                ),
+                {"cat": category, "limit": top_k},
+            )
+        ).fetchall()
 
     return [_row_to_entry(r) for r in rows]
 
 
 async def get_stats() -> dict:
     """Knowledge base statistics."""
-    from ecms.persistence.database.rest_session import db_session
     from sqlalchemy import text
 
+    from ecms.persistence.database.rest_session import db_session
+
     async with db_session() as session:
-        total = (await session.execute(text(
-            "SELECT count(*) FROM knowledge_entries"
-        ))).scalar() or 0
+        total = (
+            await session.execute(text("SELECT count(*) FROM knowledge_entries"))
+        ).scalar() or 0
 
-        by_cat = (await session.execute(text(
-            "SELECT category, count(*) AS cnt FROM knowledge_entries "
-            "GROUP BY category ORDER BY cnt DESC"
-        ))).fetchall()
+        by_cat = (
+            await session.execute(
+                text(
+                    "SELECT category, count(*) AS cnt FROM knowledge_entries "
+                    "GROUP BY category ORDER BY cnt DESC"
+                )
+            )
+        ).fetchall()
 
-        by_domain = (await session.execute(text(
-            "SELECT domain, count(*) AS cnt FROM knowledge_entries "
-            "WHERE domain != '' GROUP BY domain ORDER BY cnt DESC LIMIT 20"
-        ))).fetchall()
+        by_domain = (
+            await session.execute(
+                text(
+                    "SELECT domain, count(*) AS cnt FROM knowledge_entries "
+                    "WHERE domain != '' GROUP BY domain ORDER BY cnt DESC LIMIT 20"
+                )
+            )
+        ).fetchall()
 
     return {
         "total": total,
@@ -244,11 +288,12 @@ async def get_stats() -> dict:
 
 async def delete_entry(entry_id: str) -> bool:
     """Delete a knowledge entry by ID."""
-    from ecms.persistence.database.rest_session import db_session
     from sqlalchemy import text
 
+    from ecms.persistence.database.rest_session import db_session
+
     async with db_session() as session:
-        result = await session.execute(text(
-            "DELETE FROM knowledge_entries WHERE id = :id"
-        ), {"id": entry_id})
+        result = await session.execute(
+            text("DELETE FROM knowledge_entries WHERE id = :id"), {"id": entry_id}
+        )
     return result.rowcount > 0

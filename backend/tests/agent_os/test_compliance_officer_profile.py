@@ -19,9 +19,7 @@ class ComplianceOfficerProfileTests(unittest.TestCase):
 
     def test_declares_one_read_only_assessment_stage(self) -> None:
         spec = self.plugin.profile_spec
-        ba_stage_ids = {
-            stage.stage_id for stage in business_analyst_dsh_profile_spec().stages
-        }
+        ba_stage_ids = {stage.stage_id for stage in business_analyst_dsh_profile_spec().stages}
         compliance_stage_ids = {stage.stage_id for stage in spec.stages}
 
         self.assertEqual(spec.identity, "compliance-officer@1.0.0")
@@ -71,9 +69,7 @@ class ComplianceOfficerProfileTests(unittest.TestCase):
             idempotency_key="compliance-evidence-1",
             arguments={"query": "retention control evidence"},
         )
-        disallowed = allowed.model_copy(
-            update={"capability_id": "project.write.v1"}
-        )
+        disallowed = allowed.model_copy(update={"capability_id": "project.write.v1"})
 
         self.plugin.validate_envelope(self.stage, allowed)
         with self.assertRaisesRegex(ProfileContractError, "not allowed"):

@@ -103,16 +103,24 @@ def upgrade() -> None:
         sa.Column("id", sa.String(length=128), nullable=False),
         sa.Column("blocked_task_id", sa.String(length=128), nullable=False),
         sa.Column("blocker_task_id", sa.String(length=128), nullable=False),
-        sa.Column("dependency_type", sa.String(length=32), nullable=False, server_default="same_team"),
+        sa.Column(
+            "dependency_type", sa.String(length=32), nullable=False, server_default="same_team"
+        ),
         sa.Column("cross_team_request_id", sa.String(length=128), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.ForeignKeyConstraint(["blocked_task_id"], ["tasks.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["blocker_task_id"], ["tasks.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(["cross_team_request_id"], ["cross_team_requests.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(
+            ["cross_team_request_id"], ["cross_team_requests.id"], ondelete="SET NULL"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_task_dependencies_blocked_task_id", "task_dependencies", ["blocked_task_id"])
-    op.create_index("ix_task_dependencies_blocker_task_id", "task_dependencies", ["blocker_task_id"])
+    op.create_index(
+        "ix_task_dependencies_blocked_task_id", "task_dependencies", ["blocked_task_id"]
+    )
+    op.create_index(
+        "ix_task_dependencies_blocker_task_id", "task_dependencies", ["blocker_task_id"]
+    )
 
 
 def downgrade() -> None:

@@ -2,25 +2,25 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ecms.persistence.models.task import Task, TaskDependency, CrossTeamRequest
+from ecms.persistence.models.task import CrossTeamRequest, Task, TaskDependency
 
 
 def _task_id() -> str:
-    return f"task-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{hex(hash(datetime.now(timezone.utc)) & 0xFFFF)[2:]}"
+    return f"task-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}-{hex(hash(datetime.now(UTC)) & 0xFFFF)[2:]}"
 
 
 def _ctr_id() -> str:
-    return f"ctr-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{hex(hash(datetime.now(timezone.utc)) & 0xFFFF)[2:]}"
+    return f"ctr-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}-{hex(hash(datetime.now(UTC)) & 0xFFFF)[2:]}"
 
 
 def _dep_id() -> str:
-    return f"dep-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{hex(hash(datetime.now(timezone.utc)) & 0xFFFF)[2:]}"
+    return f"dep-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}-{hex(hash(datetime.now(UTC)) & 0xFFFF)[2:]}"
 
 
 class TaskRepository:
@@ -75,9 +75,7 @@ class TaskRepository:
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
-    async def update_status(
-        self, task_id: str, status: str, **extra: Any
-    ) -> Task | None:
+    async def update_status(self, task_id: str, status: str, **extra: Any) -> Task | None:
         task = await self.get(task_id)
         if not task:
             return None
@@ -90,10 +88,7 @@ class TaskRepository:
 
     async def get_blockers(self, task_id: str) -> list[dict[str, Any]]:
         """Get all tasks blocking this task."""
-        stmt = (
-            select(TaskDependency)
-            .where(TaskDependency.blocked_task_id == task_id)
-        )
+        stmt = select(TaskDependency).where(TaskDependency.blocked_task_id == task_id)
         result = await self._session.execute(stmt)
         deps = result.scalars().all()
         blockers = []
@@ -107,12 +102,14 @@ class TaskRepository:
                     )
                     ctr_result = await self._session.execute(ctr_stmt)
                     ctr = ctr_result.scalar_one_or_none()
-                blockers.append({
-                    "dependency_id": dep.id,
-                    "blocker_task": blocker.to_dict(),
-                    "dependency_type": dep.dependency_type,
-                    "cross_team_request": ctr.to_dict() if ctr else None,
-                })
+                blockers.append(
+                    {
+                        "dependency_id": dep.id,
+                        "blocker_task": blocker.to_dict(),
+                        "dependency_type": dep.dependency_type,
+                        "cross_team_request": ctr.to_dict() if ctr else None,
+                    }
+                )
         return blockers
 
     # ── Dependencies ──────────────────────────────────────────
@@ -167,7 +164,9 @@ class TaskRepository:
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def list_ctrs_by_target(self, target_dept: str, status: str | None = None) -> list[CrossTeamRequest]:
+    async def list_ctrs_by_target(
+        self, target_dept: str, status: str | None = None
+    ) -> list[CrossTeamRequest]:
         stmt = select(CrossTeamRequest).where(CrossTeamRequest.target_dept == target_dept)
         if status:
             stmt = stmt.where(CrossTeamRequest.status == status)

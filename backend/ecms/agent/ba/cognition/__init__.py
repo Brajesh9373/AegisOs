@@ -48,7 +48,10 @@ def __getattr__(name: str) -> object:
     if name in {"BAStagePromptRenderer", "PromptBudgetExceeded"}:
         from ecms.agent.ba.cognition.renderer import BAStagePromptRenderer, PromptBudgetExceeded
 
-        return {"BAStagePromptRenderer": BAStagePromptRenderer, "PromptBudgetExceeded": PromptBudgetExceeded}[name]
+        return {
+            "BAStagePromptRenderer": BAStagePromptRenderer,
+            "PromptBudgetExceeded": PromptBudgetExceeded,
+        }[name]
     if name == "ScopedCognitionContextProvider":
         from ecms.agent.ba.cognition.provider import ScopedCognitionContextProvider
 
@@ -56,5 +59,8 @@ def __getattr__(name: str) -> object:
     if name in {"BACognitionService", "BAStageValidationError"}:
         from ecms.agent.ba.cognition.service import BACognitionService, BAStageValidationError
 
-        return {"BACognitionService": BACognitionService, "BAStageValidationError": BAStageValidationError}[name]
+        return {
+            "BACognitionService": BACognitionService,
+            "BAStageValidationError": BAStageValidationError,
+        }[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

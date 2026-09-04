@@ -65,9 +65,7 @@ def upgrade() -> None:
             name="ck_ba_canonical_projection_classification_rank",
         ),
         sa.CheckConstraint(_LIFECYCLE, name="ck_ba_canonical_projection_lifecycle"),
-        sa.CheckConstraint(
-            "projection_version > 0", name="ck_ba_canonical_projection_version"
-        ),
+        sa.CheckConstraint("projection_version > 0", name="ck_ba_canonical_projection_version"),
     )
     op.create_index(
         "ix_ba_canonical_projection_access",

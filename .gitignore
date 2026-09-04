@@ -64,3 +64,4 @@ commandcode/
 
 # ---- Docs site ----
 site/
+.claude/worktrees/

@@ -147,12 +147,8 @@ class AppSettings(BaseSettings):
             "supports exactly one globally serialized writer."
         ),
     )
-    connector_ingestion_partition_target_files: int = Field(
-        default=100, ge=1, le=10_000
-    )
-    connector_ingestion_max_active_partitions_per_org: int = Field(
-        default=8, ge=1, le=256
-    )
+    connector_ingestion_partition_target_files: int = Field(default=100, ge=1, le=10_000)
+    connector_ingestion_max_active_partitions_per_org: int = Field(default=8, ge=1, le=256)
     connector_ingestion_max_staged_bytes_per_org: int = Field(
         default=10 * 1024 * 1024 * 1024,
         ge=1,
@@ -170,16 +166,10 @@ class AppSettings(BaseSettings):
         description="Retention after graph commit before staged objects are eligible for cleanup.",
     )
     connector_ingestion_chunk_size: int = Field(default=10, ge=1, le=200)
-    connector_ingestion_write_yield_seconds: float = Field(
-        default=0.1, ge=0, le=10
-    )
+    connector_ingestion_write_yield_seconds: float = Field(default=0.1, ge=0, le=10)
     connector_ingestion_max_files: int = Field(default=250_000, ge=1)
-    connector_ingestion_max_file_bytes: int = Field(
-        default=2 * 1024 * 1024, ge=1
-    )
-    connector_ingestion_max_total_bytes: int = Field(
-        default=2 * 1024 * 1024 * 1024, ge=1
-    )
+    connector_ingestion_max_file_bytes: int = Field(default=2 * 1024 * 1024, ge=1)
+    connector_ingestion_max_total_bytes: int = Field(default=2 * 1024 * 1024 * 1024, ge=1)
     connector_ingestion_max_deliveries: int = Field(default=3, ge=1, le=20)
     connector_ingestion_stale_after_seconds: int = Field(default=120, ge=30)
     connector_git_clone_depth: int = Field(default=50, ge=1, le=10_000)
@@ -294,9 +284,7 @@ class AppSettings(BaseSettings):
             self.environment == Profile.PRODUCTION
             and self.knowledge_graph_build_start_delay_seconds > 0
         ):
-            raise ValueError(
-                "knowledge graph build start delay must be zero in production"
-            )
+            raise ValueError("knowledge graph build start delay must be zero in production")
         if (
             self.connector_parallel_ingestion_enabled
             and self.connector_graph_writer_concurrency != 1

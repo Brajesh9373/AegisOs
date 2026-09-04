@@ -31,7 +31,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_session_context_session_id", "session_context", ["session_id"])
-    op.create_index("ix_session_context_session_key", "session_context", ["session_id", "key"], unique=True)
+    op.create_index(
+        "ix_session_context_session_key", "session_context", ["session_id", "key"], unique=True
+    )
 
 
 def downgrade() -> None:

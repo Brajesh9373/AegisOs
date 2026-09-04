@@ -136,9 +136,7 @@ def _coordinator(tmp_path: Path, *, spec: GitJobSpec):
 
 
 async def test_coordinator_clones_once_stores_plan_and_publishes_ids(tmp_path: Path) -> None:
-    coordinator, jobs, plans, publisher, objects = _coordinator(
-        tmp_path, spec=_spec()
-    )
+    coordinator, jobs, plans, publisher, objects = _coordinator(tmp_path, spec=_spec())
 
     result = await coordinator.coordinate(job_id="job-1", organization_id="org")
 
@@ -187,9 +185,7 @@ async def test_coordinator_short_circuits_unchanged_revision(tmp_path: Path) -> 
 async def test_coordinator_cancels_before_clone_when_lease_is_lost(
     tmp_path: Path,
 ) -> None:
-    coordinator, jobs, plans, publisher, _objects = _coordinator(
-        tmp_path, spec=_spec()
-    )
+    coordinator, jobs, plans, publisher, _objects = _coordinator(tmp_path, spec=_spec())
 
     async def lease_lost(_job_id: str) -> bool:
         return False
@@ -209,9 +205,7 @@ async def test_coordinator_cancels_before_clone_when_lease_is_lost(
 
 
 async def test_coordinator_marks_retryable_failure(tmp_path: Path) -> None:
-    coordinator, jobs, _plans, _publisher, _objects = _coordinator(
-        tmp_path, spec=_spec()
-    )
+    coordinator, jobs, _plans, _publisher, _objects = _coordinator(tmp_path, spec=_spec())
     coordinator._workspace = FakeWorkspace(  # type: ignore[attr-defined]
         tmp_path / "missing"
     )

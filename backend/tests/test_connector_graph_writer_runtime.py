@@ -158,9 +158,7 @@ async def test_staged_file_is_replayed_through_current_legacy_semantics() -> Non
         writer_id="writer-1",
     )
 
-    await handler(
-        GraphWriteDelivery("1-0", "job-1", "partition-1", "batch-1")
-    )
+    await handler(GraphWriteDelivery("1-0", "job-1", "partition-1", "batch-1"))
 
     assert [(item.relative_path, item.content, item.size_bytes) for item in sink.files] == [
         ("src/app.py", "x = 1\n", 6)
@@ -187,9 +185,7 @@ async def test_writer_fails_closed_on_checksum_or_unproven_edge_semantics() -> N
         await handler(delivery)
     assert store.retries == 1
 
-    document = _document(
-        edges=[{"source": "node-1", "target": "node-2", "type": "DEPENDS_ON"}]
-    )
+    document = _document(edges=[{"source": "node-1", "target": "node-2", "type": "DEPENDS_ON"}])
     edge_canonical, edge_payload = _payload(document)
     edge_work = _work(edge_canonical, edge_payload, edge_count=1)
     await objects.put_object(edge_work.object_key, edge_payload)
@@ -219,9 +215,7 @@ async def test_committed_redelivery_only_reconciles_and_finalizes_once() -> None
         writer_id="writer-1",
     )
 
-    await handler(
-        GraphWriteDelivery("1-0", "job-1", "partition-1", "batch-1")
-    )
+    await handler(GraphWriteDelivery("1-0", "job-1", "partition-1", "batch-1"))
 
     assert store.commits == 0
     assert sink.finalized == [("job-1", 12)]

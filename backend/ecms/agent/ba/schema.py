@@ -16,8 +16,8 @@ __all__ = [
     "GUARDRAIL_LABELS",
     "INFRASTRUCTURE_LABELS",
     "DetailItem",
-    "Phase",
     "FinalizedRequirements",
+    "Phase",
 ]
 
 # ── Fixed taxonomy (order matters — panels render in this order) ────────────
@@ -50,6 +50,7 @@ INFRASTRUCTURE_LABELS: tuple[str, ...] = (
 
 
 # ── Models ──────────────────────────────────────────────────────────────────
+
 
 class DetailItem(BaseModel):
     """A labeled detail entry (Governance / Guardrails / Infrastructure)."""
@@ -109,9 +110,24 @@ class FinalizedRequirements(BaseModel):
     def _coerce_phases(cls, v):
         if not isinstance(v, list) or not v:
             return v
-        first = v[0] if isinstance(v[0], dict) else {"name": getattr(v[0], "name", ""), "description": getattr(v[0], "description", "")}
-        name = (first.get("name") or "").strip() if isinstance(first, dict) else str(first.get("name", "")).strip()
-        if name.lower() not in ("discovery & requirements baseline", "discovery & requirements baseline ", "discovery and requirements baseline"):
+        first = (
+            v[0]
+            if isinstance(v[0], dict)
+            else {
+                "name": getattr(v[0], "name", ""),
+                "description": getattr(v[0], "description", ""),
+            }
+        )
+        name = (
+            (first.get("name") or "").strip()
+            if isinstance(first, dict)
+            else str(first.get("name", "")).strip()
+        )
+        if name.lower() not in (
+            "discovery & requirements baseline",
+            "discovery & requirements baseline ",
+            "discovery and requirements baseline",
+        ):
             if isinstance(v[0], dict):
                 v[0]["name"] = "Discovery & Requirements Baseline"
             else:
@@ -123,8 +139,16 @@ class FinalizedRequirements(BaseModel):
             v[0]["description"] = "Baseline of discovery so far and prerequisites for execution."
         for idx in range(1, len(v)):
             item = v[idx]
-            desc = (item.get("description") or "") if isinstance(item, dict) else getattr(item, "description", "")
-            prev_name = (v[idx - 1].get("name") or "") if isinstance(v[idx - 1], dict) else getattr(v[idx - 1], "name", "")
+            desc = (
+                (item.get("description") or "")
+                if isinstance(item, dict)
+                else getattr(item, "description", "")
+            )
+            prev_name = (
+                (v[idx - 1].get("name") or "")
+                if isinstance(v[idx - 1], dict)
+                else getattr(v[idx - 1], "name", "")
+            )
             prefix = f"Depends on {prev_name.strip()}:"
             if not desc.strip().startswith(prefix):
                 fixed = f"{prefix} {desc.strip()}" if desc.strip() else prefix
@@ -146,7 +170,9 @@ class FinalizedRequirements(BaseModel):
         if first.name.strip() != "Discovery & Requirements Baseline":
             raise ValueError('phases[0].name must be "Discovery & Requirements Baseline"')
         if not first.description.strip():
-            raise ValueError("phases[0].description must capture the discovery baseline and prerequisites")
+            raise ValueError(
+                "phases[0].description must capture the discovery baseline and prerequisites"
+            )
         return v
 
     def to_frontend(self) -> dict:
@@ -168,8 +194,12 @@ class FinalizedRequirements(BaseModel):
 
 # ── Validation helpers ────────────────────────────────────────────────────
 
+
 def _normalize_labels(items: list[DetailItem]) -> list[DetailItem]:
-    norm_map = {lbl.lower().strip(): lbl for lbl in GOVERNANCE_LABELS + GUARDRAIL_LABELS + INFRASTRUCTURE_LABELS}
+    norm_map = {
+        lbl.lower().strip(): lbl
+        for lbl in GOVERNANCE_LABELS + GUARDRAIL_LABELS + INFRASTRUCTURE_LABELS
+    }
     for it in items:
         key = it.label.strip().lower()
         if key in norm_map:

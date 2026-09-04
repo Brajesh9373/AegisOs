@@ -141,9 +141,7 @@ class ConnectorIngestionStageBatch(Base):
         UniqueConstraint(
             "partition_id", "sequence_number", name="uq_connector_ingestion_stage_sequence"
         ),
-        UniqueConstraint(
-            "partition_id", "checksum", name="uq_connector_ingestion_stage_checksum"
-        ),
+        UniqueConstraint("partition_id", "checksum", name="uq_connector_ingestion_stage_checksum"),
         ForeignKeyConstraint(
             ["partition_id", "job_id", "organization_id"],
             [

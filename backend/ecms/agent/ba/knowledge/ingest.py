@@ -84,7 +84,9 @@ async def ingest_text(
     classification = await classify_knowledge(text)
     logger.info(
         "[ingest] classified: category=%s domain=%s tags=%s",
-        classification.category, classification.domain, classification.tags,
+        classification.category,
+        classification.domain,
+        classification.tags,
     )
 
     # Step 2: Chunk
@@ -116,7 +118,9 @@ async def ingest_text(
         )
         entries.append(entry)
 
-    logger.info("[ingest] stored %d chunk(s) for category=%s", len(entries), classification.category)
+    logger.info(
+        "[ingest] stored %d chunk(s) for category=%s", len(entries), classification.category
+    )
     return entries
 
 
@@ -138,10 +142,14 @@ async def ingest_correction(
     """
     anti_entries = await ingest_text(
         f"ANTI-PATTERN (avoid this): {what_was_wrong}",
-        source=source, contributor=contributor, project_id=project_id,
+        source=source,
+        contributor=contributor,
+        project_id=project_id,
     )
     correction_entries = await ingest_text(
         f"CORRECTION (do this instead): {what_is_right}",
-        source=source, contributor=contributor, project_id=project_id,
+        source=source,
+        contributor=contributor,
+        project_id=project_id,
     )
     return anti_entries + correction_entries

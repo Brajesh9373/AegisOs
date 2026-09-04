@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ecms.agent_os.capabilities.contracts import (
@@ -238,9 +238,7 @@ class CapabilityBroker:
             )
             await session.commit()
 
-    def get_capability_spec(
-        self, capability_id: str
-    ) -> CapabilitySpec | None:
+    def get_capability_spec(self, capability_id: str) -> CapabilitySpec | None:
         """Get the spec for a registered capability."""
         capability = self._capabilities.get(capability_id)
         return capability.capability_spec if capability else None

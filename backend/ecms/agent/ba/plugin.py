@@ -8,7 +8,6 @@ and profile-specific response mapping.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
 from typing import Any
 
@@ -214,10 +213,10 @@ class BusinessAnalystProfilePlugin(AgentProfilePlugin):
 
 
 # Global catalog instance
-_catalog: "AgentProfileCatalog | None" = None
+_catalog: AgentProfileCatalog | None = None
 
 
-def get_ba_profile_catalog() -> "AgentProfileCatalog":
+def get_ba_profile_catalog() -> AgentProfileCatalog:
     """Get the BA profile catalog singleton."""
     global _catalog
     if _catalog is None:

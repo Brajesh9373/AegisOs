@@ -219,8 +219,12 @@ class KnowledgeWatcher:
             target_id = self._resolve_import_target(cr.target)
         else:
             # Intra-file relationships: source/target are symbol names
-            source_id = self._uco_map.get(cr.source) or self._resolve_intrafile_target(cr.source, source_rel)
-            target_id = self._uco_map.get(cr.target) or self._resolve_intrafile_target(cr.target, source_rel)
+            source_id = self._uco_map.get(cr.source) or self._resolve_intrafile_target(
+                cr.source, source_rel
+            )
+            target_id = self._uco_map.get(cr.target) or self._resolve_intrafile_target(
+                cr.target, source_rel
+            )
             if not target_id:
                 target_id = self._resolve_import_target(cr.target)
         return source_id, target_id
@@ -273,6 +277,7 @@ class KnowledgeWatcher:
     @staticmethod
     def _extract_imports(content: str) -> set[str]:
         import re
+
         pattern = re.compile(
             r"""(?:import\s+.*?from\s+['\"]([^'\"]+)['\"]|require\(['\"]([^'\"]+)['\"]\)|@import\s+['\"]([^'\"]+)['\"]|link\s+rel=['\"]stylesheet['\"]\s+href=['\"]([^'\"]+)['\"]|script\s+src=['\"]([^'\"]+)['\"])"""
         )

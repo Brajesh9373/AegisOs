@@ -3,10 +3,18 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from legacy_ecms.api.routes.graph import router as legacy_graph_router
+from legacy_ecms.api.routes.ingest import router as legacy_ingest_router
+from legacy_ecms.api.routes.memory import router as legacy_memory_router
+
+# Legacy provider integration — live Git/MySQL sync, generic UKO ingestion,
+# workspace management, GBrain memory, mem0 semantic memory, and cognitive agent.
+from legacy_ecms.api.routes.providers import router as legacy_providers_router
+from legacy_ecms.api.routes.query import router as legacy_query_router
+from legacy_ecms.api.routes.workspaces import router as legacy_workspaces_router
 from starlette.middleware.gzip import GZipMiddleware
 
 from ecms import __version__
@@ -15,15 +23,28 @@ from ecms.api.graphql.router import create_graphql_router
 from ecms.api.middleware.context import RequestContextMiddleware
 from ecms.api.middleware.observability import MetricsMiddleware, TracingMiddleware
 from ecms.api.middleware.rate_limit import RateLimitMiddleware
-from ecms.api.rest import auth, cognition, health, metrics, system, projects, session_chat, agents, policies, categories, categorize, agent_profiles
-from ecms.api.rest.platform import router as platform_router
+from ecms.api.rest import (
+    agent_profiles,
+    agents,
+    auth,
+    categories,
+    categorize,
+    cognition,
+    health,
+    metrics,
+    policies,
+    projects,
+    session_chat,
+    system,
+)
+from ecms.api.rest.connector_ingestions import router as connector_ingestion_router
 from ecms.api.rest.discovery import router as discovery_router
+from ecms.api.rest.governance import router as governance_router
+from ecms.api.rest.knowledge_graph_snapshots import router as knowledge_graph_snapshot_router
 from ecms.api.rest.meetings import router as meetings_router
 from ecms.api.rest.organization import router as organization_router
 from ecms.api.rest.organization import tool_router as org_tool_router
-from ecms.api.rest.governance import router as governance_router
-from ecms.api.rest.knowledge_graph_snapshots import router as knowledge_graph_snapshot_router
-from ecms.api.rest.connector_ingestions import router as connector_ingestion_router
+from ecms.api.rest.platform import router as platform_router
 from ecms.api.websocket.endpoints import router as websocket_router
 from ecms.api.websocket.manager import ConnectionManager
 from ecms.api.websocket.terminal import router as terminal_router
@@ -31,15 +52,6 @@ from ecms.knowledge.services.watcher import KnowledgeWatcher
 from ecms.sdk import EcmsSDK, create_sdk
 from ecms.sdk.cognitive import create_cognitive_system
 from ecms.websocket import TelemetryBridge
-
-# Legacy provider integration — live Git/MySQL sync, generic UKO ingestion,
-# workspace management, GBrain memory, mem0 semantic memory, and cognitive agent.
-from legacy_ecms.api.routes.providers import router as legacy_providers_router
-from legacy_ecms.api.routes.workspaces import router as legacy_workspaces_router
-from legacy_ecms.api.routes.memory import router as legacy_memory_router
-from legacy_ecms.api.routes.ingest import router as legacy_ingest_router
-from legacy_ecms.api.routes.graph import router as legacy_graph_router
-from legacy_ecms.api.routes.query import router as legacy_query_router
 
 __all__ = ["create_app"]
 
@@ -91,11 +103,19 @@ def create_app(sdk: EcmsSDK | None = None) -> FastAPI:
     }
 
     app.add_middleware(GZipMiddleware, minimum_size=500)
-    app.add_middleware(RateLimitMiddleware, limit=resolved.settings.rate_limit_per_minute, window_seconds=60.0)
+    app.add_middleware(
+        RateLimitMiddleware, limit=resolved.settings.rate_limit_per_minute, window_seconds=60.0
+    )
     app.add_middleware(MetricsMiddleware, metrics=resolved.metrics)
     app.add_middleware(TracingMiddleware)
     app.add_middleware(RequestContextMiddleware)
-    app.add_middleware(CORSMiddleware, allow_origins=resolved.settings.cors_origins, allow_credentials=resolved.settings.cors_allow_credentials, allow_methods=resolved.settings.cors_methods, allow_headers=resolved.settings.cors_headers)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=resolved.settings.cors_origins,
+        allow_credentials=resolved.settings.cors_allow_credentials,
+        allow_methods=resolved.settings.cors_methods,
+        allow_headers=resolved.settings.cors_headers,
+    )
 
     register_exception_handlers(app)
 
@@ -137,17 +157,13 @@ def create_app(sdk: EcmsSDK | None = None) -> FastAPI:
     async def _start_watcher() -> None:
         cognitive = app.state.cognitive
         watcher = KnowledgeWatcher.get_or_create(
-            cognitive.knowledge,
-            cognitive.graph,
-            "/workspace",
-            organization_id="default"
+            cognitive.knowledge, cognitive.graph, "/workspace", organization_id="default"
         )  # type: ignore[no-untyped-call]
         loop = asyncio.get_event_loop()
         loop.create_task(watcher.watch_forever(interval=3.0))
         app.state.watcher = watcher
 
         # Memory bridge: continuous sync every 2 minutes (lightweight — 5 nodes max)
-        import asyncio as _asyncio
         loop.create_task(_run_bridge_worker())
         loop.create_task(_reset_stuck_team_statuses())
 
@@ -156,16 +172,21 @@ def create_app(sdk: EcmsSDK | None = None) -> FastAPI:
 
 async def _run_bridge_worker() -> None:
     """Continuous bridge sync — lightweight, handles knowledge-layer promotion."""
-    import asyncio as _asyncio, logging
+    import asyncio as _asyncio
+    import logging
+
     logger = logging.getLogger("ecms.bridge")
     await _asyncio.sleep(30)  # initial delay for FalkorDB readiness
 
     from ecms.api.rest.session_chat import sync_all_memory
+
     while True:
         try:
             result = await sync_all_memory()
             if result.get("synced", 0):
-                logger.info("Bridge synced %d new atoms (total: %d)", result["synced"], result["total"])
+                logger.info(
+                    "Bridge synced %d new atoms (total: %d)", result["synced"], result["total"]
+                )
         except Exception as e:
             logger.warning("Bridge sync failed: %s", e)
         await _asyncio.sleep(120)  # every 2 minutes
@@ -178,17 +199,23 @@ async def _reset_stuck_team_statuses() -> None:
     This is the safety net for background `_run_team_design` tasks that died
     with the container — the only state they leave behind is `generating`.
     """
-    import asyncio as _asyncio, logging
+    import asyncio as _asyncio
+    import logging
+
     logger = logging.getLogger("ecms.startup")
     await _asyncio.sleep(5)  # let migrations finish
     try:
-        from ecms.persistence.database.rest_session import db_session
         from sqlalchemy import text
+
+        from ecms.persistence.database.rest_session import db_session
+
         async with db_session() as session:
-            result = await session.execute(text(
-                "UPDATE business_projects SET team_status='failed', updatedat=NOW() "
-                "WHERE team_status = 'generating'"
-            ))
+            result = await session.execute(
+                text(
+                    "UPDATE business_projects SET team_status='failed', updatedat=NOW() "
+                    "WHERE team_status = 'generating'"
+                )
+            )
             count = result.rowcount or 0
             if count:
                 logger.warning(

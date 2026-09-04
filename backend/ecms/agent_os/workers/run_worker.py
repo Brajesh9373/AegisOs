@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ecms.agent_os.capabilities.broker import get_capability_broker
@@ -21,7 +20,6 @@ from ecms.agent_os.persistence.repositories.run_repository import (
     AgentRunRepository,
     AgentRunStepRepository,
 )
-from ecms.agent_os.profiles.contracts import parse_step_envelope
 from ecms.shared.ids import new_id
 
 logger = logging.getLogger(__name__)
@@ -145,6 +143,7 @@ class AgentRunWorker:
             # Get profile spec and execute stages
             try:
                 from ecms.agent.ba.dsh_profile import business_analyst_dsh_profile_spec
+
                 profile_spec = business_analyst_dsh_profile_spec()
             except Exception as exc:
                 await run_repo.update_state(

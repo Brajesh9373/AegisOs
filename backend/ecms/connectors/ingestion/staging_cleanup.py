@@ -23,9 +23,7 @@ logger = logging.getLogger(__name__)
 async def cleanup(*, execute: bool, limit: int = 1_000) -> int:
     """Delete objects for old committed batches while retaining audit metadata."""
     settings = get_settings()
-    cutoff = utcnow() - timedelta(
-        days=settings.connector_ingestion_staged_retention_days
-    )
+    cutoff = utcnow() - timedelta(days=settings.connector_ingestion_staged_retention_days)
     async with db_session() as session:
         keys = list(
             await session.scalars(

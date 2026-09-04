@@ -54,7 +54,10 @@ async def terminal_endpoint(websocket: WebSocket) -> None:
     # Use script -qfc to give command-code a real PTY
     # stdout+stderr → single pipe, stdin → pipe
     proc = await asyncio.create_subprocess_exec(
-        "script", "-qfc", binary, "/dev/null",
+        "script",
+        "-qfc",
+        binary,
+        "/dev/null",
         cwd=_DIR,
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,

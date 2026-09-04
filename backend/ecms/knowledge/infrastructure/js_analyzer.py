@@ -155,11 +155,14 @@ def _run_node_script(script_text: str, filepath: str, module: str = "acorn") -> 
         env.setdefault("NODE_PATH", "/usr/lib/node_modules")
         result = subprocess.run(
             ["node", script_path, filepath, module],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True,
+            text=True,
+            timeout=15,
             env=env,
         )
         if result.returncode != 0:
             from ecms.infrastructure.telemetry import get_logger
+
             get_logger("ecms.knowledge.js_analyzer").warning(
                 "node_extract_failed",
                 filepath=filepath,
@@ -182,7 +185,9 @@ class JavaScriptAnalyzer:
 
     @staticmethod
     def analyze(content: str, *, module_name: str = "module") -> CodeAnalysis:
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".cjs", delete=False, encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".cjs", delete=False, encoding="utf-8"
+        ) as f:
             f.write(content)
             fp = f.name
         try:
@@ -196,24 +201,28 @@ class JavaScriptAnalyzer:
         imports: list[str] = []
 
         for ent in data_repr.get("entities", []):
-            entities.append(CodeEntity(
-                kind=ent.get("kind", "function"),
-                name=ent.get("name", ""),
-                qualified_name=f"{module_name}.{ent.get('name', '')}",
-                signature=ent.get("signature"),
-                docstring=ent.get("docstring"),
-                bases=ent.get("bases", []),
-                lineno=ent.get("lineno", 0),
-            ))
+            entities.append(
+                CodeEntity(
+                    kind=ent.get("kind", "function"),
+                    name=ent.get("name", ""),
+                    qualified_name=f"{module_name}.{ent.get('name', '')}",
+                    signature=ent.get("signature"),
+                    docstring=ent.get("docstring"),
+                    bases=ent.get("bases", []),
+                    lineno=ent.get("lineno", 0),
+                )
+            )
         for rel in data_repr.get("relationships", []):
-            relationships.append(CodeRelationship(
-                source=rel.get("source", ""),
-                target=rel.get("target", ""),
-                relationship_type=RelationshipType(
-                    rel.get("relationship_type", "depends_on")
-                ),
-            ))
-        imports_list = data_repr.get("imports", {}) if isinstance(data_repr.get("imports"), dict) else {}
+            relationships.append(
+                CodeRelationship(
+                    source=rel.get("source", ""),
+                    target=rel.get("target", ""),
+                    relationship_type=RelationshipType(rel.get("relationship_type", "depends_on")),
+                )
+            )
+        imports_list = (
+            data_repr.get("imports", {}) if isinstance(data_repr.get("imports"), dict) else {}
+        )
         imports = [v.get("module", "") for v in imports_list.values()]
 
         return CodeAnalysis(
@@ -230,7 +239,9 @@ class TypeScriptAnalyzer:
     @staticmethod
     def analyze(content: str, *, module_name: str = "module") -> CodeAnalysis:
         # TypeScript files can be parsed as JS with acorn's typescript plugin
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".ts", delete=False, encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".ts", delete=False, encoding="utf-8"
+        ) as f:
             f.write(content)
             fp = f.name
         try:
@@ -258,7 +269,9 @@ class TypeScriptAnalyzer:
             )
             for rel in data_repr.get("relationships", [])
         ]
-        imports_list = data_repr.get("imports", {}) if isinstance(data_repr.get("imports"), dict) else {}
+        imports_list = (
+            data_repr.get("imports", {}) if isinstance(data_repr.get("imports"), dict) else {}
+        )
         imports = [v.get("module", "") for v in imports_list.values()]
 
         return CodeAnalysis(

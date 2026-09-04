@@ -5,18 +5,18 @@ Revises: 0046_ba_canonical_projections
 Create Date: 2026-09-03
 
 """
+
 from __future__ import annotations
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 revision: str = "0047_agent_profiles"
-down_revision: Union[str, None] = "0046_ba_canonical_projections"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0046_ba_canonical_projections"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -43,8 +43,16 @@ def upgrade() -> None:
         sa.Column("max_tokens", sa.Integer, nullable=True),
         sa.Column("execution_budget", sa.JSON, nullable=True),
         sa.Column("created_by", sa.String(64), nullable=True),
-        sa.Column("createdat", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("updatedat", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now(), onupdate=sa.func.now()),
+        sa.Column(
+            "createdat", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
+        sa.Column(
+            "updatedat",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+            onupdate=sa.func.now(),
+        ),
     )
     op.create_index("ix_agent_profiles_status", "agent_profiles", ["status"])
     op.create_index("ix_agent_profiles_parent", "agent_profiles", ["parent_profile_id"])

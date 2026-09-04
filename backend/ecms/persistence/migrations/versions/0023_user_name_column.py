@@ -6,8 +6,6 @@ Revises: 0022
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-
 from alembic import op
 
 revision = "0023_user_name_column"

@@ -21,7 +21,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from ecms.shared.exceptions import EcmsError, LlmProviderError
+from ecms.shared.exceptions import LlmProviderError
 
 logger = logging.getLogger("ecms.ba.llm_client")
 
@@ -43,10 +43,17 @@ class LlmCallOpts:
     breaker_open_s: float = 30.0
 
     @classmethod
-    def for_finalize(cls) -> "LlmCallOpts":
+    def for_finalize(cls) -> LlmCallOpts:
         """180s per attempt for the 6k-token finalize emit — user's approved budget."""
-        return cls(timeout_s=180.0, max_retries=1, backoff_base=1.5, jitter=0.2,
-                   breaker_threshold=5, breaker_window_s=60.0, breaker_open_s=30.0)
+        return cls(
+            timeout_s=180.0,
+            max_retries=1,
+            backoff_base=1.5,
+            jitter=0.2,
+            breaker_threshold=5,
+            breaker_window_s=60.0,
+            breaker_open_s=30.0,
+        )
 
 
 _breaker: dict[tuple[str, str], dict[str, Any]] = {}
@@ -81,7 +88,9 @@ def _record_success(model: str, base_url: str | None) -> None:
 def _record_failure(model: str, base_url: str | None, opts: LlmCallOpts | None = None) -> None:
     o = opts or LlmCallOpts()
     key = _breaker_key(model, base_url or "")
-    state = _breaker.setdefault(key, {"failures": 0, "window_start": time.monotonic(), "open_until": None})
+    state = _breaker.setdefault(
+        key, {"failures": 0, "window_start": time.monotonic(), "open_until": None}
+    )
     now = time.monotonic()
     if now - state["window_start"] > o.breaker_window_s:
         state["failures"] = 0
@@ -92,7 +101,9 @@ def _record_failure(model: str, base_url: str | None, opts: LlmCallOpts | None =
         state["open_until"] = now + o.breaker_open_s
         logger.warning(
             "[ba.llm_client] circuit_open model=%s failures=%d open_for=%ds",
-            model, state["failures"], int(o.breaker_open_s),
+            model,
+            state["failures"],
+            int(o.breaker_open_s),
         )
 
 
@@ -117,14 +128,16 @@ def _to_llm_provider_error(exc: BaseException, model: str) -> LlmProviderError:
     details: dict[str, Any] = {"model": model, "error_type": type(exc).__name__}
     if status is not None:
         details["status_code"] = status
-    retry_after = getattr(exc, "headers", {}).get("retry-after") if hasattr(exc, "headers") else None
+    retry_after = (
+        getattr(exc, "headers", {}).get("retry-after") if hasattr(exc, "headers") else None
+    )
     if retry_after:
         details["retry_after"] = retry_after
     return LlmProviderError(str(exc) or type(exc).__name__, code=code, details=details)
 
 
 def _backoff(attempt: int, opts: LlmCallOpts) -> float:
-    base = opts.backoff_base ** attempt
+    base = opts.backoff_base**attempt
     jitter = random.uniform(0, opts.jitter * base)
     return base + jitter
 
@@ -132,14 +145,18 @@ def _backoff(attempt: int, opts: LlmCallOpts) -> float:
 class BaLlmClient:
     """Resilient wrapper around AsyncOpenAI for BA stages."""
 
-    def __init__(self, model: str, api_key: str, base_url: str | None, opts: LlmCallOpts | None = None) -> None:
+    def __init__(
+        self, model: str, api_key: str, base_url: str | None, opts: LlmCallOpts | None = None
+    ) -> None:
         self.model = model
         self.api_key = api_key
         self.base_url = base_url
         self.opts = opts or LlmCallOpts()
         self._openai_client = None
 
-    def _convert_tools_to_anthropic(self, tools: list[dict[str, Any]] | None) -> list[dict[str, Any]] | None:
+    def _convert_tools_to_anthropic(
+        self, tools: list[dict[str, Any]] | None
+    ) -> list[dict[str, Any]] | None:
         """Convert OpenAI-style tools to Anthropic format.
 
         OpenAI: {"type": "function", "function": {"name": "...", "parameters": {...}}}
@@ -155,7 +172,7 @@ class BaLlmClient:
                 anthropic_tool = {
                     "name": func.get("name"),
                     "description": func.get("description", ""),
-                    "input_schema": func.get("parameters", {"type": "object", "properties": {}})
+                    "input_schema": func.get("parameters", {"type": "object", "properties": {}}),
                 }
                 anthropic_tools.append(anthropic_tool)
             else:
@@ -170,50 +187,50 @@ class BaLlmClient:
 
         # Extract text content from Anthropic response
         text_content = ""
-        if hasattr(anthropic_resp, 'content') and anthropic_resp.content:
+        if hasattr(anthropic_resp, "content") and anthropic_resp.content:
             for block in anthropic_resp.content:
-                if hasattr(block, 'type') and block.type == 'text':
-                    text_content += getattr(block, 'text', '')
+                if hasattr(block, "type") and block.type == "text":
+                    text_content += getattr(block, "text", "")
 
         # Extract tool calls if present
         tool_calls = []
-        if hasattr(anthropic_resp, 'content'):
+        if hasattr(anthropic_resp, "content"):
             for block in anthropic_resp.content:
-                if hasattr(block, 'type') and block.type == 'tool_use':
-                    tool_calls.append(SimpleNamespace(
-                        id=getattr(block, 'id', ''),
-                        type='function',
-                        function=SimpleNamespace(
-                            name=getattr(block, 'name', ''),
-                            arguments=json.dumps(getattr(block, 'input', {}))
+                if hasattr(block, "type") and block.type == "tool_use":
+                    tool_calls.append(
+                        SimpleNamespace(
+                            id=getattr(block, "id", ""),
+                            type="function",
+                            function=SimpleNamespace(
+                                name=getattr(block, "name", ""),
+                                arguments=json.dumps(getattr(block, "input", {})),
+                            ),
                         )
-                    ))
+                    )
 
         # Create OpenAI-style response object
         message = SimpleNamespace(
-            role='assistant',
-            content=text_content,
-            tool_calls=tool_calls if tool_calls else None
+            role="assistant", content=text_content, tool_calls=tool_calls if tool_calls else None
         )
 
         choice = SimpleNamespace(
-            index=0,
-            message=message,
-            finish_reason=getattr(anthropic_resp, 'stop_reason', 'stop')
+            index=0, message=message, finish_reason=getattr(anthropic_resp, "stop_reason", "stop")
         )
 
         response = SimpleNamespace(
-            id=getattr(anthropic_resp, 'id', ''),
-            object='chat.completion',
+            id=getattr(anthropic_resp, "id", ""),
+            object="chat.completion",
             created=int(time.time()),
-            model=getattr(anthropic_resp, 'model', self.model),
+            model=getattr(anthropic_resp, "model", self.model),
             choices=[choice],
             usage=SimpleNamespace(
-                prompt_tokens=getattr(getattr(anthropic_resp, 'usage', None), 'input_tokens', 0),
-                completion_tokens=getattr(getattr(anthropic_resp, 'usage', None), 'output_tokens', 0),
-                total_tokens=getattr(getattr(anthropic_resp, 'usage', None), 'input_tokens', 0) +
-                           getattr(getattr(anthropic_resp, 'usage', None), 'output_tokens', 0)
-            )
+                prompt_tokens=getattr(getattr(anthropic_resp, "usage", None), "input_tokens", 0),
+                completion_tokens=getattr(
+                    getattr(anthropic_resp, "usage", None), "output_tokens", 0
+                ),
+                total_tokens=getattr(getattr(anthropic_resp, "usage", None), "input_tokens", 0)
+                + getattr(getattr(anthropic_resp, "usage", None), "output_tokens", 0),
+            ),
         )
 
         return response
@@ -228,8 +245,8 @@ class BaLlmClient:
                 base_url=self.base_url,
                 default_headers={
                     "X-Claude-Code-Session-Id": "ba-agent-session",
-                    "Authorization": f"Bearer {self.api_key}"
-                }
+                    "Authorization": f"Bearer {self.api_key}",
+                },
             )
         return self._openai_client
 
@@ -284,22 +301,33 @@ class BaLlmClient:
                 )
                 _record_success(self.model, self.base_url)
                 elapsed = int((time.perf_counter() - t0) * 1000)
-                logger.info("[ba.llm_client] success model=%s latency_ms=%d attempt=%d", self.model, elapsed, attempt)
+                logger.info(
+                    "[ba.llm_client] success model=%s latency_ms=%d attempt=%d",
+                    self.model,
+                    elapsed,
+                    attempt,
+                )
 
                 # Normalize Anthropic response to OpenAI format for compatibility
                 return self._normalize_response(resp)
 
-            except asyncio.TimeoutError as exc:
+            except TimeoutError as exc:
                 last_exc = exc
                 _record_failure(self.model, self.base_url, self.opts)
                 if attempt >= self.opts.max_retries:
                     break
                 delay = _backoff(attempt, self.opts)
-                logger.warning("[ba.llm_client] timeout model=%s attempt=%d/%d retry_in=%.1fs", self.model, attempt, self.opts.max_retries, delay)
+                logger.warning(
+                    "[ba.llm_client] timeout model=%s attempt=%d/%d retry_in=%.1fs",
+                    self.model,
+                    attempt,
+                    self.opts.max_retries,
+                    delay,
+                )
                 await asyncio.sleep(delay)
                 continue
 
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 last_exc = exc
                 retriable = _is_retriable(exc)
                 _record_failure(self.model, self.base_url, self.opts)
@@ -307,17 +335,32 @@ class BaLlmClient:
                     elapsed = getattr(exc, "status_code", None)
                     logger.warning(
                         "[ba.llm_client] failed model=%s error=%s status=%s retriable=%s attempt=%d",
-                        self.model, type(exc).__name__, elapsed, retriable, attempt,
+                        self.model,
+                        type(exc).__name__,
+                        elapsed,
+                        retriable,
+                        attempt,
                     )
                     raise _to_llm_provider_error(exc, self.model) from exc
                 delay = _backoff(attempt, self.opts)
-                logger.warning("[ba.llm_client] retriable model=%s error=%s attempt=%d/%d retry_in=%.1fs", self.model, type(exc).__name__, attempt, self.opts.max_retries, delay)
+                logger.warning(
+                    "[ba.llm_client] retriable model=%s error=%s attempt=%d/%d retry_in=%.1fs",
+                    self.model,
+                    type(exc).__name__,
+                    attempt,
+                    self.opts.max_retries,
+                    delay,
+                )
                 await asyncio.sleep(delay)
                 continue
 
         if last_exc is not None:
             if isinstance(last_exc, asyncio.TimeoutError):
-                raise LlmProviderError(f"LLM timeout after {self.opts.max_retries + 1} attempts", code="llm_timeout", details={"model": self.model, "error_type": "TimeoutError"}) from last_exc
+                raise LlmProviderError(
+                    f"LLM timeout after {self.opts.max_retries + 1} attempts",
+                    code="llm_timeout",
+                    details={"model": self.model, "error_type": "TimeoutError"},
+                ) from last_exc
             raise _to_llm_provider_error(last_exc, self.model) from last_exc
         raise LlmProviderError("LLM call failed", details={"model": self.model})
 
@@ -331,5 +374,7 @@ async def get_ba_llm_client(opts: LlmCallOpts | None = None) -> BaLlmClient:
     api_key = cfg.get("api_key") or ""
     base_url = cfg.get("base_url") or None
     if not model or not api_key:
-        raise LlmProviderError("BA model not configured", code="ba_model_not_configured", details={"model": model})
+        raise LlmProviderError(
+            "BA model not configured", code="ba_model_not_configured", details={"model": model}
+        )
     return BaLlmClient(model=model, api_key=api_key, base_url=base_url, opts=opts)

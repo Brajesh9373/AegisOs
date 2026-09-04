@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Any
 
 import falkordb
-
 from legacy_ecms.config import get_settings
 from legacy_ecms.memory.stores.file_store import FileMemoryStore
 
@@ -37,7 +36,8 @@ class ConceptRegistry:
         if self._graph is None:
             s = get_settings()
             db = falkordb.FalkorDB(
-                host=s.falkordb_host, port=s.falkordb_port,
+                host=s.falkordb_host,
+                port=s.falkordb_port,
                 password=s.falkordb_password or None,
             )
             self._graph = db.select_graph(s.falkordb_database)
@@ -62,12 +62,14 @@ class ConceptRegistry:
         for a in atoms:
             if a.status.value == "superseded":
                 continue
-            result["definitions"].append({
-                "summary": a.summary[:300],
-                "type": a.type.value,
-                "confidence": round(a.confidence, 2),
-                "source_atom": a.id,
-            })
+            result["definitions"].append(
+                {
+                    "summary": a.summary[:300],
+                    "type": a.type.value,
+                    "confidence": round(a.confidence, 2),
+                    "source_atom": a.id,
+                }
+            )
 
         # 2. Search FalkorDB for entity locations + relationships
         try:
@@ -129,7 +131,7 @@ class ConceptRegistry:
                 lines.append(f"- {f}")
 
         if concept["related"]:
-            lines.append(f"\n### Related Concepts")
+            lines.append("\n### Related Concepts")
             for r in concept["related"]:
                 lines.append(f"- {r['name']} ({r['relation']})")
 

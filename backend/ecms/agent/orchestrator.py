@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
 
 from legacy_ecms.config import get_settings
 
@@ -37,7 +36,6 @@ async def spawn_subagent(task_id: str, title: str, description: str, instruction
         instructions: The detailed prompt for the sub-agent to execute
     """
     from ecms.agent.loop import AgentLoop
-    from ecms.persistence.database.rest_session import db_session
 
     settings = get_settings()
     logger.info("[SUB-%s] START | %s | %s", task_id, title, instructions[:100])
@@ -60,20 +58,31 @@ async def spawn_subagent(task_id: str, title: str, description: str, instruction
 
         logger.info("[SUB-%s] DONE | %d chars", task_id, len(answer))
         if _sse_emitter:
-            _sse_emitter({"type": "task_done", "id": str(task_id), "title": title, "result_preview": answer[:200]})
+            _sse_emitter(
+                {
+                    "type": "task_done",
+                    "id": str(task_id),
+                    "title": title,
+                    "result_preview": answer[:200],
+                }
+            )
 
         return f"Task '{title}' completed. Result:\n{answer}"
 
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.warning("[SUB-%s] TIMEOUT", task_id)
         if _sse_emitter:
-            _sse_emitter({"type": "task_failed", "id": str(task_id), "title": title, "error": "timed_out"})
+            _sse_emitter(
+                {"type": "task_failed", "id": str(task_id), "title": title, "error": "timed_out"}
+            )
         return f"Task '{title}' timed out after 180 seconds. Provide partial findings or skip this task."
 
     except Exception as e:
         logger.error("[SUB-%s] FAILED: %s", task_id, e)
         if _sse_emitter:
-            _sse_emitter({"type": "task_failed", "id": str(task_id), "title": title, "error": str(e)})
+            _sse_emitter(
+                {"type": "task_failed", "id": str(task_id), "title": title, "error": str(e)}
+            )
         return f"Task '{title}' failed: {e}"
 
 

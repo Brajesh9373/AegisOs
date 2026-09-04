@@ -26,6 +26,7 @@ def _get_model():
     global _model
     if _model is None:
         from fastembed import TextEmbedding
+
         logger.info("[embeddings] loading model %s (first call, downloads ~100MB)", _MODEL_NAME)
         _model = TextEmbedding(_MODEL_NAME)
         logger.info("[embeddings] model loaded (dim=%d)", len(list(_model.embed(["test"]))[0]))

@@ -14,7 +14,7 @@ import json
 import logging
 import tempfile
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -81,9 +81,7 @@ class BAAgentBenchmark:
     """Run comparable staged BA workflows against native AegisOS and real DSH."""
 
     def __init__(self, output_dir: Path | None = None) -> None:
-        self.output_dir = output_dir or (
-            Path(tempfile.gettempdir()) / "aegisos-ba-benchmark"
-        )
+        self.output_dir = output_dir or (Path(tempfile.gettempdir()) / "aegisos-ba-benchmark")
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
@@ -108,9 +106,7 @@ class BAAgentBenchmark:
             metadata=metadata or {},
         )
 
-    async def benchmark_native_agent(
-        self, test_case: dict[str, str]
-    ) -> list[BenchmarkResult]:
+    async def benchmark_native_agent(self, test_case: dict[str, str]) -> list[BenchmarkResult]:
         """Run the native BA stages, stopping after the first failed dependency."""
         from ecms.agent.ba.agent import clarify, finalize, retrieve_knowledge, understand
 
@@ -176,9 +172,7 @@ class BAAgentBenchmark:
         )
         return results
 
-    async def benchmark_dsh_agent(
-        self, test_case: dict[str, str]
-    ) -> list[BenchmarkResult]:
+    async def benchmark_dsh_agent(self, test_case: dict[str, str]) -> list[BenchmarkResult]:
         """Run strict BA stage helpers through one real DSH profile runtime."""
         from ecms.agent.ba.dsh_profile import business_analyst_dsh_profile_spec
         from ecms.agent.dsh_runtime import (
@@ -287,9 +281,7 @@ class BAAgentBenchmark:
                 "dsh_latency_seconds": dsh.latency_seconds,
                 "latency_difference_seconds": dsh.latency_seconds - native.latency_seconds,
                 "latency_difference_percent": (
-                    (dsh.latency_seconds - native.latency_seconds)
-                    / native.latency_seconds
-                    * 100
+                    (dsh.latency_seconds - native.latency_seconds) / native.latency_seconds * 100
                     if native.latency_seconds
                     else None
                 ),

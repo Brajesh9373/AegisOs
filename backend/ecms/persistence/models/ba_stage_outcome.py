@@ -55,7 +55,12 @@ class BAStageReceipt(Base):
         CheckConstraint(
             "execution_duration_ms >= 0", name="ck_ba_stage_receipt_nonnegative_duration"
         ),
-        Index("ix_ba_stage_receipt_org_session_created", "organization_id", "discovery_session_id", "created_at"),
+        Index(
+            "ix_ba_stage_receipt_org_session_created",
+            "organization_id",
+            "discovery_session_id",
+            "created_at",
+        ),
         Index("ix_ba_stage_receipt_org_project_stage", "organization_id", "project_id", "stage"),
     )
 
@@ -88,7 +93,9 @@ class BAStageReceipt(Base):
     runtime_metadata_keys: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     execution_duration_ms: Mapped[int] = mapped_column(Integer, nullable=False)
     validation_attempts: Mapped[int] = mapped_column(Integer, nullable=False)
-    candidate_outcomes: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False, default=list)
+    candidate_outcomes: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON, nullable=False, default=list
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utcnow
     )
@@ -147,9 +154,7 @@ class BAPromotionOutbox(Base):
 
     __tablename__ = "ba_promotion_outbox"
     __table_args__ = (
-        UniqueConstraint(
-            "organization_id", "dedupe_key", name="uq_ba_outbox_org_dedupe"
-        ),
+        UniqueConstraint("organization_id", "dedupe_key", name="uq_ba_outbox_org_dedupe"),
         ForeignKeyConstraint(
             ["candidate_id", "organization_id"],
             ["ba_candidates.id", "ba_candidates.organization_id"],
@@ -179,7 +184,9 @@ class BAPromotionOutbox(Base):
         DateTime(timezone=True), nullable=False, default=utcnow
     )
     lease_owner: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=12)
     error_code: Mapped[str | None] = mapped_column(String(128), nullable=True)

@@ -35,7 +35,9 @@ class _Profile(AgentProfilePlugin):
 
     @property
     def manifest(self) -> PluginManifest:
-        return PluginManifest(name=f"agent-profile.{self._spec.profile_id}", version=self._spec.version)
+        return PluginManifest(
+            name=f"agent-profile.{self._spec.profile_id}", version=self._spec.version
+        )
 
     @property
     def profile_spec(self) -> DSHProfileSpec:
@@ -53,7 +55,9 @@ class _Profile(AgentProfilePlugin):
 
 
 class AgentOSProfileContractTests(unittest.TestCase):
-    def _spec(self, *, profile_id: str = "project-context", version: str = "1.0.0") -> DSHProfileSpec:
+    def _spec(
+        self, *, profile_id: str = "project-context", version: str = "1.0.0"
+    ) -> DSHProfileSpec:
         root = Path(tempfile.gettempdir()) / "agent-os-profile"
         return DSHProfileSpec(
             profile_id=profile_id,

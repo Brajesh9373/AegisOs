@@ -21,11 +21,7 @@ def compliance_officer_dsh_profile_spec() -> DSHProfileSpec:
         profile_id="compliance-officer",
         version="1.0.0",
         asset_root=(
-            repository_root
-            / "packages"
-            / "dsh-integration"
-            / "profiles"
-            / "compliance-officer"
+            repository_root / "packages" / "dsh-integration" / "profiles" / "compliance-officer"
         ),
         required_environment=("ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN"),
         generated_environment=("CLAUDE_CODE_SESSION_ID",),

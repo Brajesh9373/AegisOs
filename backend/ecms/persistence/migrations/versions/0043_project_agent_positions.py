@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision: str = "0043_project_agent_positions"
 down_revision: str | None = "0042_connector_ingestion_integrity"
@@ -36,16 +36,30 @@ def upgrade() -> None:
         sa.Column("automation", sa.JSON(), nullable=True),
         sa.Column("features", sa.JSON(), nullable=True),
         sa.Column("status", sa.String(length=32), nullable=False, server_default="active"),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.ForeignKeyConstraint(["reports_to"], ["project_agent_positions.id"], ondelete="SET NULL"),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
+        sa.ForeignKeyConstraint(
+            ["reports_to"], ["project_agent_positions.id"], ondelete="SET NULL"
+        ),
         sa.UniqueConstraint("project_id", "position_key", name="uq_project_agent_position_key"),
     )
-    op.create_index("ix_project_agent_positions_project_id", "project_agent_positions", ["project_id"])
+    op.create_index(
+        "ix_project_agent_positions_project_id", "project_agent_positions", ["project_id"]
+    )
     op.create_index("ix_project_agent_positions_role", "project_agent_positions", ["role"])
-    op.create_index("ix_project_agent_positions_designation", "project_agent_positions", ["designation"])
-    op.create_index("ix_project_agent_positions_department", "project_agent_positions", ["department"])
-    op.create_index("ix_project_agent_positions_reports_to", "project_agent_positions", ["reports_to"])
+    op.create_index(
+        "ix_project_agent_positions_designation", "project_agent_positions", ["designation"]
+    )
+    op.create_index(
+        "ix_project_agent_positions_department", "project_agent_positions", ["department"]
+    )
+    op.create_index(
+        "ix_project_agent_positions_reports_to", "project_agent_positions", ["reports_to"]
+    )
     op.create_index("ix_project_agent_positions_status", "project_agent_positions", ["status"])
 
     op.create_table(
@@ -53,11 +67,17 @@ def upgrade() -> None:
         sa.Column("position_id", sa.String(length=128), primary_key=True),
         sa.Column("agent_id", sa.String(length=128), nullable=False),
         sa.Column("assigned_by_user_id", sa.String(length=128), nullable=True),
-        sa.Column("assigned_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.ForeignKeyConstraint(["position_id"], ["project_agent_positions.id"], ondelete="CASCADE"),
+        sa.Column(
+            "assigned_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
+        sa.ForeignKeyConstraint(
+            ["position_id"], ["project_agent_positions.id"], ondelete="CASCADE"
+        ),
         sa.ForeignKeyConstraint(["agent_id"], ["agents.id"], ondelete="RESTRICT"),
     )
-    op.create_index("ix_project_agent_assignments_agent_id", "project_agent_assignments", ["agent_id"])
+    op.create_index(
+        "ix_project_agent_assignments_agent_id", "project_agent_assignments", ["agent_id"]
+    )
 
 
 def downgrade() -> None:

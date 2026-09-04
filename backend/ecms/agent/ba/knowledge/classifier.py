@@ -52,8 +52,9 @@ async def classify_knowledge(text: str) -> KnowledgeClassifyResult:
     Returns a KnowledgeClassifyResult with category, domain, tags, and summary.
     Falls back to a safe default if classification fails.
     """
-    from ecms.agent.ba.model import resolve_ba_model
     from openai import AsyncOpenAI
+
+    from ecms.agent.ba.model import resolve_ba_model
 
     try:
         cfg = await resolve_ba_model()

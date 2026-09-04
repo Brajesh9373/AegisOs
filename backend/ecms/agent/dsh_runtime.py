@@ -202,9 +202,7 @@ class DSHRuntime:
         supplied_env = dict(env or {})
         unsupported = sorted(set(supplied_env) - _EXPLICIT_ENV_KEYS)
         if unsupported:
-            raise ValueError(
-                "DSH environment contains unsupported keys: " + ", ".join(unsupported)
-            )
+            raise ValueError("DSH environment contains unsupported keys: " + ", ".join(unsupported))
         if any(
             not isinstance(key, str) or not isinstance(value, str)
             for key, value in supplied_env.items()
@@ -338,8 +336,10 @@ class DSHRuntime:
                 f"DSH profile {self.profile_spec.identity} package.json must "
                 "declare dsh.profile.bundles"
             ) from error
-        if not isinstance(bundles, list) or not bundles or any(
-            not isinstance(bundle, str) or not bundle.strip() for bundle in bundles
+        if (
+            not isinstance(bundles, list)
+            or not bundles
+            or any(not isinstance(bundle, str) or not bundle.strip() for bundle in bundles)
         ):
             raise DSHProfileNotFoundError(
                 f"DSH profile {self.profile_spec.identity} dsh.profile.bundles must be non-empty"
@@ -602,8 +602,7 @@ class DSHRuntime:
                     os.killpg(process.pid, signal.SIGKILL)
                 kill_deadline = time.monotonic() + self.shutdown_grace_seconds
                 while (  # noqa: ASYNC110
-                    _process_group_exists(process.pid)
-                    and time.monotonic() < kill_deadline
+                    _process_group_exists(process.pid) and time.monotonic() < kill_deadline
                 ):
                     await asyncio.sleep(0.05)
         elif process.returncode is None:  # pragma: no cover - Windows is not deployment target.
@@ -678,8 +677,10 @@ class DSHRuntime:
             return {}
         digests: dict[str, str] = {}
         for key, value in metadata.items():
-            if not isinstance(key, str) or not key.isidentifier() or any(
-                marker in key.upper() for marker in _SECRET_MARKERS
+            if (
+                not isinstance(key, str)
+                or not key.isidentifier()
+                or any(marker in key.upper() for marker in _SECRET_MARKERS)
             ):
                 raise ValueError(f"DSH metadata key is not permitted: {key!r}")
             if not isinstance(value, str):

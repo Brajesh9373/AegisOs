@@ -7,13 +7,14 @@ with a defined responsibility (primary_owner, monitor, approver).
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from ecms.persistence.models.agent import (
+    Agent,
+)
 from ecms.persistence.models.base import Base
-from ecms.persistence.models.agent import Agent  # noqa: F401  (required for relationship resolution)
 from ecms.shared.time import utcnow
 
 __all__ = ["ProjectAgentGovernanceAssignment"]
@@ -23,7 +24,9 @@ class ProjectAgentGovernanceAssignment(Base):
     __tablename__ = "project_agent_governance_assignments"
     __table_args__ = (
         UniqueConstraint(
-            "organization_member_id", "project_agent_id", "responsibility",
+            "organization_member_id",
+            "project_agent_id",
+            "responsibility",
             name="uq_member_agent_responsibility",
         ),
     )
@@ -43,25 +46,34 @@ class ProjectAgentGovernanceAssignment(Base):
     )
     project_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     responsibility: Mapped[str] = mapped_column(
-        String(32), nullable=False, index=True,
+        String(32),
+        nullable=False,
+        index=True,
     )  # primary_owner | monitor | approver
     status: Mapped[str] = mapped_column(
-        String(32), nullable=False, default="active", index=True,
+        String(32),
+        nullable=False,
+        default="active",
+        index=True,
     )  # active | needs_review | revoked
     assigned_by_user_id: Mapped[str] = mapped_column(String(128), nullable=False)
     assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, onupdate=utcnow,
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
     )
-    review_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    review_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Relationships
-    member: Mapped["OrganizationMember"] = relationship(
-        "OrganizationMember", foreign_keys=[organization_member_id],
+    member: Mapped[OrganizationMember] = relationship(
+        "OrganizationMember",
+        foreign_keys=[organization_member_id],
         passive_deletes=True,
     )
-    agent: Mapped["Agent"] = relationship(
-        "Agent", foreign_keys=[project_agent_id],
+    agent: Mapped[Agent] = relationship(
+        "Agent",
+        foreign_keys=[project_agent_id],
         primaryjoin="ProjectAgentGovernanceAssignment.project_agent_id == foreign(Agent.id)",
         passive_deletes=True,
     )

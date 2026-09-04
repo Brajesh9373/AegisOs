@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from ecms.agent.ba.cognition.contracts import BAExecutionResponse, BAStageExecutor, BAStageInvocation
+from ecms.agent.ba.cognition.contracts import (
+    BAExecutionResponse,
+    BAStageExecutor,
+    BAStageInvocation,
+)
 from ecms.agent.dsh_runtime import DSHExecutionError, DSHRuntime
 
 __all__ = ["DSHBAStageExecutor"]

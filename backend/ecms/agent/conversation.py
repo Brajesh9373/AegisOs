@@ -73,9 +73,15 @@ class Conversation:
     def _save(self) -> None:
         self._file.write_text(json.dumps(self._messages, indent=2))
 
-    def add(self, role: str, content: str | None = None,
-            *, tool_calls: list[dict] | None = None,
-            tool_call_id: str | None = None, name: str | None = None) -> None:
+    def add(
+        self,
+        role: str,
+        content: str | None = None,
+        *,
+        tool_calls: list[dict] | None = None,
+        tool_call_id: str | None = None,
+        name: str | None = None,
+    ) -> None:
         """Add a message. Supports user, assistant, tool, and function_call roles."""
         msg: dict = {"role": role}
         if content is not None:

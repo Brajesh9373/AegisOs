@@ -5,10 +5,9 @@ CRUD for sessions and messages in PostgreSQL. Workspace-scoped.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
-from sqlalchemy import delete, select, func
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 

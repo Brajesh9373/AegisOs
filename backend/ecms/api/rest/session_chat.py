@@ -13,24 +13,24 @@ import json
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-
 from legacy_ecms.config import get_settings
 from legacy_ecms.memory.cognitive_orchestrator import CognitiveOrchestrator
+from pydantic import BaseModel
 
 __all__ = ["router", "sync_all_memory"]
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
-_STORE: "FileMemoryStore | None" = None
+_STORE: FileMemoryStore | None = None
 
 
-def _get_store() -> "FileMemoryStore":
+def _get_store() -> FileMemoryStore:
     global _STORE
     if _STORE is None:
         from legacy_ecms.memory.stores.file_store import FileMemoryStore
+
         _STORE = FileMemoryStore(Path("/app/memory"))
     return _STORE
 
@@ -38,7 +38,9 @@ def _get_store() -> "FileMemoryStore":
 async def sync_all_memory() -> dict:
     """Sync FalkorDB + GBrain into atom store. Called at startup."""
     import asyncio as _asyncio
+
     from legacy_ecms.memory.bridge import UnifiedMemoryBridge
+
     store = _get_store()
     bridge = UnifiedMemoryBridge(Path("/app/memory"))
     try:
@@ -77,6 +79,7 @@ class ChatResponse(BaseModel):
 async def _get_session_repo():
     from ecms.persistence.database.rest_session import db_session as pg_session
     from ecms.persistence.repositories.session import SessionRepository
+
     return pg_session, SessionRepository
 
 
@@ -91,7 +94,12 @@ class _SessionRepo:
             pass
 
     @staticmethod
-    async def ensure(session_id: str, workspace_id: str | None, title: str | None = None, project_id: str | None = None) -> None:
+    async def ensure(
+        session_id: str,
+        workspace_id: str | None,
+        title: str | None = None,
+        project_id: str | None = None,
+    ) -> None:
         try:
             pg, Repo = await _get_session_repo()
             async with pg() as s:
@@ -128,7 +136,6 @@ async def create_session(body: CreateSessionRequest = CreateSessionRequest()) ->
 @router.post("/{session_id}/chat")
 async def session_chat(session_id: str, body: ChatRequest):
     """Agentic chat — streams task plan + progress via SSE."""
-
     workspace_id = body.workspace_id or "default"
 
     # Ensure session exists in DB
@@ -143,13 +150,19 @@ async def session_chat(session_id: str, body: ChatRequest):
     agent_profile = None
     if body.agent_id:
         try:
-            from ecms.persistence.database.rest_session import db_session as _pg_db
             from sqlalchemy import text as _text
+
+            from ecms.persistence.database.rest_session import db_session as _pg_db
+
             async with _pg_db() as _s:
-                row = (await _s.execute(
-                    _text("SELECT system_prompt_addon, tool_policy FROM agents WHERE id = :aid"),
-                    {"aid": body.agent_id},
-                )).first()
+                row = (
+                    await _s.execute(
+                        _text(
+                            "SELECT system_prompt_addon, tool_policy FROM agents WHERE id = :aid"
+                        ),
+                        {"aid": body.agent_id},
+                    )
+                ).first()
                 if row:
                     d = {k.lower(): v for k, v in row._mapping.items() if v is not None}
                     agent_profile = d
@@ -164,13 +177,17 @@ async def session_chat(session_id: str, body: ChatRequest):
         show_progress = True
         if body.agent_id:
             try:
-                from ecms.persistence.database.rest_session import db_session as pg_db
                 from sqlalchemy import text as _text
+
+                from ecms.persistence.database.rest_session import db_session as pg_db
+
                 async with pg_db() as s:
-                    row = (await s.execute(
-                        _text("SELECT show_task_progress FROM agents WHERE id = :aid"),
-                        {"aid": body.agent_id},
-                    )).first()
+                    row = (
+                        await s.execute(
+                            _text("SELECT show_task_progress FROM agents WHERE id = :aid"),
+                            {"aid": body.agent_id},
+                        )
+                    ).first()
                     if row:
                         show_progress = bool(row[0])
             except Exception:
@@ -180,13 +197,15 @@ async def session_chat(session_id: str, body: ChatRequest):
             if not show_progress:
                 return
             try:
-                queue.put_nowait({
-                    "type": "task_progress",
-                    "id": "1",
-                    "title": "Agent working",
-                    "iteration": data.get("iteration", 0),
-                    "tool_name": data.get("tool_name", ""),
-                })
+                queue.put_nowait(
+                    {
+                        "type": "task_progress",
+                        "id": "1",
+                        "title": "Agent working",
+                        "iteration": data.get("iteration", 0),
+                        "tool_name": data.get("tool_name", ""),
+                    }
+                )
             except asyncio.QueueFull:
                 pass
 
@@ -207,13 +226,16 @@ async def session_chat(session_id: str, body: ChatRequest):
             answer = answer.replace("[_FINALIZE_READY_]", "").strip()
             # Clean up double spaces left by marker removal
             import re as _re
-            answer = _re.sub(r'  +', ' ', answer)
 
-        await queue.put({
-            "type": "answer",
-            "content": answer or "I was unable to complete my reasoning.",
-            "show_finalize": show_finalize,
-        })
+            answer = _re.sub(r"  +", " ", answer)
+
+        await queue.put(
+            {
+                "type": "answer",
+                "content": answer or "I was unable to complete my reasoning.",
+                "show_finalize": show_finalize,
+            }
+        )
         await queue.put(None)  # Sentinel: done
 
     async def _stream():
@@ -246,13 +268,16 @@ async def session_chat(session_id: str, body: ChatRequest):
         async def _record_episode():
             try:
                 from ecms.memory.episodic import get_event_store
+
                 store = get_event_store()
                 store.record(session_id, body.prompt, answer)
             except Exception:
                 pass
+
         asyncio.create_task(_record_episode())
 
         if getattr(settings, "mem0_enabled", False):
+
             async def _capture():
                 nonlocal memory_updated
                 try:
@@ -261,13 +286,14 @@ async def session_chat(session_id: str, body: ChatRequest):
                     memory_updated = True
                 except Exception:
                     pass
+
             asyncio.create_task(_capture())
 
         # ── GBrain capture + structured atom store ──────────────────
         try:
             from legacy_ecms.memory.brain import GBrain
-            from legacy_ecms.memory.stores.file_store import FileMemoryStore
             from legacy_ecms.memory.extraction import ConversationExtractor
+            from legacy_ecms.memory.stores.file_store import FileMemoryStore
 
             store = FileMemoryStore(Path("/app/memory"))
             brain = GBrain(Path("/app/memory"))
@@ -275,7 +301,9 @@ async def session_chat(session_id: str, body: ChatRequest):
                 f"Chat: {body.prompt[:60]}",
                 f"**Q:** {body.prompt}\n\n**A:** {answer[:2000]}",
             )
-            extractor = ConversationExtractor(store, min_confidence=0.70, max_atoms_per_conversation=8)
+            extractor = ConversationExtractor(
+                store, min_confidence=0.70, max_atoms_per_conversation=8
+            )
             await extractor.extract_and_persist(
                 question=body.prompt,
                 answer=answer,
@@ -301,12 +329,12 @@ async def session_chat(session_id: str, body: ChatRequest):
 @router.get("")
 async def list_sessions(workspace_id: str | None = Query(None)) -> dict:
     """Return sessions for a workspace from PostgreSQL, falling back to episode store."""
-
     # Try PostgreSQL first
     if workspace_id:
         try:
             from ecms.persistence.database.rest_session import db_session as pg_session
             from ecms.persistence.repositories.session import SessionRepository
+
             async with pg_session() as s:
                 repo = SessionRepository(s)
                 db_sessions = await repo.list_by_workspace(workspace_id, limit=50)
@@ -328,6 +356,7 @@ async def list_sessions(workspace_id: str | None = Query(None)) -> dict:
     # Fallback: episode store (legacy)
     try:
         from ecms.memory.episodic import get_event_store
+
         store = get_event_store()
         episodes = store.recent(limit=50)
         sessions: dict[str, dict] = {}
@@ -359,6 +388,7 @@ async def get_messages(session_id: str) -> dict:
     try:
         from ecms.persistence.database.rest_session import db_session as pg_session
         from ecms.persistence.repositories.session import SessionRepository
+
         async with pg_session() as s:
             repo = SessionRepository(s)
             msgs = await repo.get_messages(session_id)
@@ -400,6 +430,7 @@ async def delete_session(session_id: str) -> dict:
     try:
         from ecms.persistence.database.rest_session import db_session as pg_session
         from ecms.persistence.repositories.session import SessionRepository
+
         async with pg_session() as s:
             repo = SessionRepository(s)
             deleted = await repo.delete(session_id)

@@ -4,8 +4,12 @@ from ecms.persistence.repositories.project_agent_position import normalize_desig
 
 
 def test_normalize_designation_matches_titles_across_formatting() -> None:
-    assert normalize_designation("Backend/API Engineer") == normalize_designation("backend api engineer")
-    assert normalize_designation("Security & Compliance Engineer") == normalize_designation("security compliance engineer")
+    assert normalize_designation("Backend/API Engineer") == normalize_designation(
+        "backend api engineer"
+    )
+    assert normalize_designation("Security & Compliance Engineer") == normalize_designation(
+        "security compliance engineer"
+    )
 
 
 def test_project_position_serializes_vacant_state() -> None:

@@ -29,17 +29,19 @@ def test_clarification_categories_match_product_contract() -> None:
         "execution_stages": "Execution Stages",
         "timelines": "Timelines",
     }
-    category_schema = (
-        CLARIFICATION_TOOL["function"]["parameters"]["properties"]["category"]
-    )
+    category_schema = CLARIFICATION_TOOL["function"]["parameters"]["properties"]["category"]
     assert category_schema["enum"] == list(CLARIFICATION_CATEGORIES)
 
 
 def test_parse_clarification_adds_canonical_label() -> None:
-    turn = _parse_clarification(_response({
-        "category": "pain_points",
-        "questions_markdown": "- Where does the current process fail most often?",
-    }))
+    turn = _parse_clarification(
+        _response(
+            {
+                "category": "pain_points",
+                "questions_markdown": "- Where does the current process fail most often?",
+            }
+        )
+    )
 
     assert turn == {
         "category": "pain_points",
@@ -48,10 +50,13 @@ def test_parse_clarification_adds_canonical_label() -> None:
     }
 
 
-@pytest.mark.parametrize("payload", [
-    {"category": "scope", "questions_markdown": "- What is in scope?"},
-    {"category": "background", "questions_markdown": ""},
-])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"category": "scope", "questions_markdown": "- What is in scope?"},
+        {"category": "background", "questions_markdown": ""},
+    ],
+)
 def test_parse_clarification_rejects_invalid_turn(payload: dict) -> None:
     with pytest.raises(ValueError):
         _parse_clarification(_response(payload))

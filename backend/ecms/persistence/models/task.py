@@ -8,15 +8,15 @@ review feedback, and produced artifacts.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, JSON
+from sqlalchemy import JSON, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ecms.persistence.models.base import Base
 from ecms.shared.time import utcnow
 
-__all__ = ["Task", "TaskDependency", "CrossTeamRequest"]
+__all__ = ["CrossTeamRequest", "Task", "TaskDependency"]
 
 
 class Task(Base):
@@ -24,7 +24,7 @@ class Task(Base):
 
     id: Mapped[str] = mapped_column(String(128), primary_key=True)
     title: Mapped[str] = mapped_column(String(512), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     assigner_id: Mapped[str] = mapped_column(
         String(128), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -38,20 +38,22 @@ class Task(Base):
         String(32), default="normal"
     )  # low | normal | high | blocking
     inputs: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    expected_output: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    output_files: Mapped[Optional[list[Any]]] = mapped_column(JSON, nullable=True)
-    output_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    review_feedback: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    parent_task_id: Mapped[Optional[str]] = mapped_column(
+    expected_output: Mapped[str | None] = mapped_column(Text, nullable=True)
+    output_files: Mapped[list[Any] | None] = mapped_column(JSON, nullable=True)
+    output_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    review_feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parent_task_id: Mapped[str | None] = mapped_column(
         String(128), ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
 
-    assigner: Mapped["Agent"] = relationship("Agent", foreign_keys=[assigner_id])
-    assignee: Mapped["Agent"] = relationship("Agent", foreign_keys=[assignee_id])
+    assigner: Mapped[Agent] = relationship("Agent", foreign_keys=[assigner_id])
+    assignee: Mapped[Agent] = relationship("Agent", foreign_keys=[assignee_id])
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -86,7 +88,7 @@ class TaskDependency(Base):
     dependency_type: Mapped[str] = mapped_column(
         String(32), default="same_team"
     )  # same_team | cross_team
-    cross_team_request_id: Mapped[Optional[str]] = mapped_column(
+    cross_team_request_id: Mapped[str | None] = mapped_column(
         String(128), ForeignKey("cross_team_requests.id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -97,15 +99,15 @@ class CrossTeamRequest(Base):
 
     id: Mapped[str] = mapped_column(String(128), primary_key=True)
     title: Mapped[str] = mapped_column(String(512), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     requester_id: Mapped[str] = mapped_column(
         String(128), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False, index=True
     )
     target_dept: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
-    target_senior_id: Mapped[Optional[str]] = mapped_column(
+    target_senior_id: Mapped[str | None] = mapped_column(
         String(128), ForeignKey("agents.id", ondelete="SET NULL"), nullable=True
     )
-    spawned_task_id: Mapped[Optional[str]] = mapped_column(
+    spawned_task_id: Mapped[str | None] = mapped_column(
         String(128), ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True
     )
     status: Mapped[str] = mapped_column(
@@ -113,9 +115,9 @@ class CrossTeamRequest(Base):
     )  # pending | accepted | in_progress | fulfilled | declined
     priority: Mapped[str] = mapped_column(String(32), default="normal")
     inputs: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    output: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
+    output: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     def to_dict(self) -> dict[str, Any]:
         return {

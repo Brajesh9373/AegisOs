@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import re
-from typing import Any
-
 import uuid
+from typing import Any
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,8 +13,8 @@ from ecms.persistence.models.agent import Agent
 from ecms.persistence.models.organization_member import OrganizationMember
 from ecms.persistence.models.project_agent_position import (
     ProjectAgentAssignment,
-    ProjectHumanAssignment,
     ProjectAgentPosition,
+    ProjectHumanAssignment,
 )
 
 
@@ -28,7 +27,9 @@ class ProjectAgentPositionRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def replace_project_positions(self, project_id: str, rows: list[dict[str, Any]]) -> list[ProjectAgentPosition]:
+    async def replace_project_positions(
+        self, project_id: str, rows: list[dict[str, Any]]
+    ) -> list[ProjectAgentPosition]:
         """Replace the BA-designed project positions and cascade old assignments."""
         await self._session.execute(
             delete(ProjectAgentPosition).where(ProjectAgentPosition.project_id == project_id)
@@ -42,7 +43,10 @@ class ProjectAgentPositionRepository:
                 id=row["id"],
                 project_id=project_id,
                 position_key=position_key,
-                name=row.get("name") or row.get("designation") or row.get("role") or "Agent Position",
+                name=row.get("name")
+                or row.get("designation")
+                or row.get("role")
+                or "Agent Position",
                 role=row.get("role") or "",
                 designation=row.get("designation") or row.get("role") or "",
                 role_description=row.get("role_description"),
@@ -72,14 +76,20 @@ class ProjectAgentPositionRepository:
         result = await self._session.execute(
             select(ProjectAgentPosition)
             .where(ProjectAgentPosition.project_id == project_id)
-            .order_by(ProjectAgentPosition.department, ProjectAgentPosition.role, ProjectAgentPosition.name)
+            .order_by(
+                ProjectAgentPosition.department,
+                ProjectAgentPosition.role,
+                ProjectAgentPosition.name,
+            )
         )
         return list(result.scalars().all())
 
     async def list_assignments_by_project(self, project_id: str) -> dict[str, Agent]:
         result = await self._session.execute(
             select(ProjectAgentAssignment.position_id, Agent)
-            .join(ProjectAgentPosition, ProjectAgentPosition.id == ProjectAgentAssignment.position_id)
+            .join(
+                ProjectAgentPosition, ProjectAgentPosition.id == ProjectAgentAssignment.position_id
+            )
             .join(Agent, Agent.id == ProjectAgentAssignment.agent_id)
             .where(ProjectAgentPosition.project_id == project_id)
         )
@@ -90,7 +100,9 @@ class ProjectAgentPositionRepository:
         assignments = await self.list_assignments_by_project(project_id)
         return [position.to_dict(assignments.get(position.id)) for position in positions]
 
-    async def assign(self, position_id: str, agent_id: str, assigned_by_user_id: str | None = None) -> ProjectAgentAssignment | None:
+    async def assign(
+        self, position_id: str, agent_id: str, assigned_by_user_id: str | None = None
+    ) -> ProjectAgentAssignment | None:
         position = await self.get(position_id)
         if not position:
             return None
@@ -141,15 +153,19 @@ class ProjectAgentPositionRepository:
         for position in positions:
             desired = normalize_designation(position.designation or position.role)
             candidates = [
-                agent for agent in agents
+                agent
+                for agent in agents
                 if normalize_designation(agent.designation or agent.role) == desired
             ]
             if not candidates:
                 candidates = [
-                    agent for agent in agents
+                    agent
+                    for agent in agents
                     if normalize_designation(agent.role) == normalize_designation(position.role)
                 ]
-            agent = next((candidate for candidate in candidates if candidate.id not in used_in_project), None)
+            agent = next(
+                (candidate for candidate in candidates if candidate.id not in used_in_project), None
+            )
             if not agent:
                 continue
             await self.assign(position.id, agent.id, assigned_by_user_id="ba_agent")
@@ -166,7 +182,9 @@ class ProjectAgentPositionRepository:
         )
         return list(result.scalars().all())
 
-    def _select_workspace_owner(self, members: list[OrganizationMember]) -> OrganizationMember | None:
+    def _select_workspace_owner(
+        self, members: list[OrganizationMember]
+    ) -> OrganizationMember | None:
         if not members:
             return None
 
@@ -178,7 +196,10 @@ class ProjectAgentPositionRepository:
         for member in roots:
             role = norm(member.role)
             designation = norm(member.designation)
-            if role in {"ceo", "chief executive officer"} or "chief executive officer" in designation:
+            if (
+                role in {"ceo", "chief executive officer"}
+                or "chief executive officer" in designation
+            ):
                 return member
         return roots[0] if roots else members[0]
 
@@ -240,14 +261,18 @@ class ProjectAgentPositionRepository:
         position_designation = normalize_designation(position.designation)
         member_role = normalize_designation(member.role)
         member_designation = normalize_designation(member.designation)
-        position_skills = {normalize_designation(skill) for skill in (position.skills or []) if skill}
+        position_skills = {
+            normalize_designation(skill) for skill in (position.skills or []) if skill
+        }
         member_skills = {normalize_designation(skill) for skill in (member.skills or []) if skill}
 
         score = 0.0
         if position_department and member_department:
             if position_department == member_department:
                 score += 0.45
-            elif position_department in member_department or member_department in position_department:
+            elif (
+                position_department in member_department or member_department in position_department
+            ):
                 score += 0.25
 
         department_aliases = {
@@ -276,16 +301,27 @@ class ProjectAgentPositionRepository:
         text = f"{position_department} {position_role} {position_designation}"
         member_text = f"{member_department} {member_role} {member_designation}"
         targeted_terms = [
-            (("sre", "infrastructure", "reliability", "devops"), ("devops", "platform", "infrastructure", "reliability")),
+            (
+                ("sre", "infrastructure", "reliability", "devops"),
+                ("devops", "platform", "infrastructure", "reliability"),
+            ),
             (("integration", "connector", "api"), ("backend", "platform", "integration", "api")),
-            (("solution", "architect", "architecture"), ("cto", "director engineering", "architecture", "engineering")),
-            (("business analyst", "requirements", "analysis"), ("product", "program", "delivery", "cpo")),
+            (
+                ("solution", "architect", "architecture"),
+                ("cto", "director engineering", "architecture", "engineering"),
+            ),
+            (
+                ("business analyst", "requirements", "analysis"),
+                ("product", "program", "delivery", "cpo"),
+            ),
             (("delivery", "engagement"), ("program", "delivery", "operations", "coo")),
             (("security", "compliance"), ("security", "cto", "compliance")),
             (("quality", "qa", "acceptance"), ("qa", "quality", "test")),
         ]
         for position_terms, member_terms in targeted_terms:
-            if any(term in text for term in position_terms) and any(term in member_text for term in member_terms):
+            if any(term in text for term in position_terms) and any(
+                term in member_text for term in member_terms
+            ):
                 score += 0.4
 
         if position_skills and member_skills:
@@ -294,7 +330,10 @@ class ProjectAgentPositionRepository:
                 score += 0.2 * min(1.0, len(skill_overlap) / max(len(position_skills), 1))
 
         member_title = f"{member_role} {member_designation}"
-        if any(term in member_title for term in ("manager", "lead", "director", "head", "cto", "cpo", "coo", "cfo")):
+        if any(
+            term in member_title
+            for term in ("manager", "lead", "director", "head", "cto", "cpo", "coo", "cfo")
+        ):
             score += 0.1
 
         return score
@@ -346,14 +385,18 @@ class ProjectAgentPositionRepository:
             if best_member.id in used_member_ids:
                 alternatives = sorted(
                     members,
-                    key=lambda member: self._score_position_owner(position, member, workspace_owner_id),
+                    key=lambda member: self._score_position_owner(
+                        position, member, workspace_owner_id
+                    ),
                     reverse=True,
                 )
                 alternative = next(
                     (
-                        member for member in alternatives
+                        member
+                        for member in alternatives
                         if member.id not in used_member_ids
-                        and self._score_position_owner(position, member, workspace_owner_id) >= max(0.15, best_score * 0.65)
+                        and self._score_position_owner(position, member, workspace_owner_id)
+                        >= max(0.15, best_score * 0.65)
                     ),
                     None,
                 )
@@ -390,7 +433,10 @@ class ProjectAgentPositionRepository:
     async def serialize_human_assignments(self, project_id: str) -> list[dict[str, Any]]:
         result = await self._session.execute(
             select(ProjectHumanAssignment, OrganizationMember)
-            .join(OrganizationMember, OrganizationMember.id == ProjectHumanAssignment.organization_member_id)
+            .join(
+                OrganizationMember,
+                OrganizationMember.id == ProjectHumanAssignment.organization_member_id,
+            )
             .where(
                 ProjectHumanAssignment.project_id == project_id,
                 ProjectHumanAssignment.status == "active",

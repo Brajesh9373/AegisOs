@@ -72,9 +72,7 @@ class BAStageOutcomeRepository:
         """Bind this repository to the caller-owned transaction."""
         self._session = session
 
-    async def get_receipt(
-        self, receipt_id: str, *, organization_id: str
-    ) -> BAStageReceipt | None:
+    async def get_receipt(self, receipt_id: str, *, organization_id: str) -> BAStageReceipt | None:
         """Return a receipt only within its owning organization."""
         return await self._session.scalar(
             select(BAStageReceipt).where(
@@ -642,7 +640,9 @@ def _assert_same_receipt(existing: BAStageReceipt, values: Mapping[str, Any]) ->
         "output_checksum",
     )
     if any(getattr(existing, field) != values[field] for field in comparable):
-        raise ValueError("BA stage receipt idempotency collision has inconsistent immutable content")
+        raise ValueError(
+            "BA stage receipt idempotency collision has inconsistent immutable content"
+        )
 
 
 def _json_value(value: JSONValue) -> JSONValue:

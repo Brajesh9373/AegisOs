@@ -22,9 +22,12 @@ async def get_model_ids() -> list[str]:
     try:
         async with db_session() as session:
             from sqlalchemy import text
-            rows = (await session.execute(text(
-                "SELECT model_id FROM ai_models ORDER BY is_default DESC, created_at DESC"
-            ))).fetchall()
+
+            rows = (
+                await session.execute(
+                    text("SELECT model_id FROM ai_models ORDER BY is_default DESC, created_at DESC")
+                )
+            ).fetchall()
         ids = [r[0] for r in rows if r[0]]
         # de-duplicate, preserve order
         seen: set[str] = set()
@@ -41,8 +44,8 @@ async def get_model_ids() -> list[str]:
 
 def get_tool_names() -> list[str]:
     """Return every tool name an agent could be granted."""
-    from ecms.agent.tools import TOOL_DEFINITIONS
     from ecms.agent.org_tools import ORG_TOOL_DEFINITIONS
+    from ecms.agent.tools import TOOL_DEFINITIONS
 
     names: list[str] = []
     seen: set[str] = set()

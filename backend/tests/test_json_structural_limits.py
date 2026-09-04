@@ -4,9 +4,9 @@ from legacy_ecms.pipeline.structural.json_parser import JsonStructuralExtractor
 
 
 def test_json_artifact_count_is_bounded() -> None:
-    content = '{"items": [' + ",".join(
-        f'{{"key_{index}": {index}}}' for index in range(1_000)
-    ) + "]}"
+    content = (
+        '{"items": [' + ",".join(f'{{"key_{index}": {index}}}' for index in range(1_000)) + "]}"
+    )
 
     result = JsonStructuralExtractor(
         max_artifacts=25,

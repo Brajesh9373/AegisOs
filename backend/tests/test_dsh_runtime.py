@@ -16,7 +16,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 from ecms.agent import dsh_runtime
-from ecms.agent_os.profiles.contracts import DSHProfileSpec, StageSpec
 from ecms.agent.dsh_runtime import (
     DSHExecutionError,
     DSHExecutionResult,
@@ -24,11 +23,10 @@ from ecms.agent.dsh_runtime import (
     DSHRuntime,
     _json_object,
 )
+from ecms.agent_os.profiles.contracts import DSHProfileSpec, StageSpec
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PROFILE_DIR = (
-    REPO_ROOT / "packages" / "dsh-integration" / "profiles" / "business-analyst"
-)
+PROFILE_DIR = REPO_ROOT / "packages" / "dsh-integration" / "profiles" / "business-analyst"
 
 
 class DSHProfileContractTests(unittest.TestCase):
@@ -281,7 +279,9 @@ class DSHRuntimeTests(unittest.IsolatedAsyncioTestCase):
             arguments = root / "arguments.txt"
             executable = self._create_executable(
                 root,
-                "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + shlex.quote(str(arguments)) + "\nprintf 'ok\\n'\n",
+                "#!/bin/sh\nprintf '%s\\n' \"$@\" > "
+                + shlex.quote(str(arguments))
+                + "\nprintf 'ok\\n'\n",
             )
             runtime = self._runtime(root, executable)
 
@@ -326,7 +326,9 @@ class DSHRuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_output_limit_terminates_process_group(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            executable = self._create_executable(root, "#!/bin/sh\nprintf '0123456789abcdef'\nsleep 5\n")
+            executable = self._create_executable(
+                root, "#!/bin/sh\nprintf '0123456789abcdef'\nsleep 5\n"
+            )
             runtime = self._runtime(
                 root,
                 executable,

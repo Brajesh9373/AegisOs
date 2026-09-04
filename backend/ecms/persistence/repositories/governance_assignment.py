@@ -6,7 +6,6 @@ from typing import Any
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from ecms.persistence.models.governance_assignment import ProjectAgentGovernanceAssignment
 
@@ -32,7 +31,10 @@ class GovernanceAssignmentRepository:
         stmt = (
             select(ProjectAgentGovernanceAssignment)
             .where(ProjectAgentGovernanceAssignment.organization_member_id == member_id)
-            .order_by(ProjectAgentGovernanceAssignment.project_id, ProjectAgentGovernanceAssignment.assigned_at)
+            .order_by(
+                ProjectAgentGovernanceAssignment.project_id,
+                ProjectAgentGovernanceAssignment.assigned_at,
+            )
         )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
@@ -44,7 +46,10 @@ class GovernanceAssignmentRepository:
                 ProjectAgentGovernanceAssignment.project_id == project_id,
                 ProjectAgentGovernanceAssignment.status == "active",
             )
-            .order_by(ProjectAgentGovernanceAssignment.responsibility, ProjectAgentGovernanceAssignment.assigned_at)
+            .order_by(
+                ProjectAgentGovernanceAssignment.responsibility,
+                ProjectAgentGovernanceAssignment.assigned_at,
+            )
         )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
@@ -70,7 +75,9 @@ class GovernanceAssignmentRepository:
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def update(self, assignment_id: str, **kwargs: Any) -> ProjectAgentGovernanceAssignment | None:
+    async def update(
+        self, assignment_id: str, **kwargs: Any
+    ) -> ProjectAgentGovernanceAssignment | None:
         assignment = await self.get(assignment_id)
         if not assignment:
             return None

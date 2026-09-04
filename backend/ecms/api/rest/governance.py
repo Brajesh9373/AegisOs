@@ -12,9 +12,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ecms.persistence.database.rest_session import db_session
+from ecms.persistence.repositories.agent import AgentRepository
 from ecms.persistence.repositories.governance_assignment import GovernanceAssignmentRepository
 from ecms.persistence.repositories.organization_member import OrganizationMemberRepository
-from ecms.persistence.repositories.agent import AgentRepository
 
 router = APIRouter(tags=["governance"])
 
@@ -89,18 +89,22 @@ async def assign_agents(member_id: str, body: AssignAgentsRequest):
                 errors.append({"agent_id": agent_id, "error": "Agent not found"})
                 continue
             if agent.project_id != body.project_id:
-                errors.append({"agent_id": agent_id, "error": "Agent does not belong to this project"})
+                errors.append(
+                    {"agent_id": agent_id, "error": "Agent does not belong to this project"}
+                )
                 continue
 
             # Check for primary_owner conflict
             if body.responsibility == "primary_owner":
                 existing_owner = await gov_repo.get_primary_owner(agent_id)
                 if existing_owner and existing_owner.organization_member_id != member_id:
-                    errors.append({
-                        "agent_id": agent_id,
-                        "error": f"Already owned by {existing_owner.organization_member_id}",
-                        "existing_owner_id": existing_owner.organization_member_id,
-                    })
+                    errors.append(
+                        {
+                            "agent_id": agent_id,
+                            "error": f"Already owned by {existing_owner.organization_member_id}",
+                            "existing_owner_id": existing_owner.organization_member_id,
+                        }
+                    )
                     continue
 
             # Check for duplicate
@@ -128,7 +132,9 @@ async def assign_agents(member_id: str, body: AssignAgentsRequest):
 
 
 @router.put("/organization/members/{member_id}/assignments/{assignment_id}")
-async def change_responsibility(member_id: str, assignment_id: str, body: ChangeResponsibilityRequest):
+async def change_responsibility(
+    member_id: str, assignment_id: str, body: ChangeResponsibilityRequest
+):
     """Change the responsibility type of an assignment."""
     async with db_session() as s:
         gov_repo = GovernanceAssignmentRepository(s)
@@ -201,17 +207,19 @@ async def project_governance(project_id: str):
                 elif a.responsibility == "approver":
                     approvers.append(entry)
 
-            coverage.append({
-                "agent_id": agent.id,
-                "agent_name": agent.name,
-                "agent_role": agent.role,
-                "agent_designation": agent.designation,
-                "primary_owner": owners[0] if owners else None,
-                "monitors": monitors,
-                "approvers": approvers,
-                "has_owner": len(owners) > 0,
-                "needs_review": any(a.status == "needs_review" for a in assignments),
-            })
+            coverage.append(
+                {
+                    "agent_id": agent.id,
+                    "agent_name": agent.name,
+                    "agent_role": agent.role,
+                    "agent_designation": agent.designation,
+                    "primary_owner": owners[0] if owners else None,
+                    "monitors": monitors,
+                    "approvers": approvers,
+                    "has_owner": len(owners) > 0,
+                    "needs_review": any(a.status == "needs_review" for a in assignments),
+                }
+            )
 
         total = len(coverage)
         owned = sum(1 for c in coverage if c["has_owner"])

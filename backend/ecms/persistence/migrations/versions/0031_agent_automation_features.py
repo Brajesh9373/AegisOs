@@ -4,8 +4,8 @@ Revision ID: 0031
 Revises: 0030
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0031_agent_automation_features"
 down_revision = "0030_seed_organization_members"
@@ -29,17 +29,17 @@ def upgrade() -> None:
     # Skills are now populated at creation time via the BA team design prompt,
     # but existing agents created before that fix need a one-time backfill.
     skill_map = {
-        'delivery_manager': '["delivery management", "stakeholder coordination", "risk management", "sprint planning", "status reporting"]',
-        'architect': '["system design", "architecture review", "technical planning", "solution modeling", "technology evaluation"]',
-        'business_analyst': '["requirements management", "acceptance criteria", "scope control", "stakeholder interviews", "process mapping"]',
-        'engineering_manager': '["engineering planning", "dependency management", "execution coordination", "resource allocation", "code review"]',
-        'tech_lead': '["data modeling", "migration", "data validation", "ETL pipelines", "schema design"]',
-        'engineer': '["backend engineering", "API design", "service integration", "database optimization", "debugging"]',
-        'sre': '["infrastructure management", "CI/CD", "monitoring", "incident response", "automation"]',
-        'security_engineer': '["security assessment", "compliance auditing", "access control", "encryption", "vulnerability scanning"]',
-        'qa_engineer': '["test planning", "automation testing", "regression testing", "quality assurance", "defect tracking"]',
-        'qa_lead': '["test leadership", "test strategy", "test coordination", "quality metrics", "release sign-off"]',
-        'uat_lead': '["UAT coordination", "hypercare support", "user feedback", "go-live validation", "post-launch monitoring"]',
+        "delivery_manager": '["delivery management", "stakeholder coordination", "risk management", "sprint planning", "status reporting"]',
+        "architect": '["system design", "architecture review", "technical planning", "solution modeling", "technology evaluation"]',
+        "business_analyst": '["requirements management", "acceptance criteria", "scope control", "stakeholder interviews", "process mapping"]',
+        "engineering_manager": '["engineering planning", "dependency management", "execution coordination", "resource allocation", "code review"]',
+        "tech_lead": '["data modeling", "migration", "data validation", "ETL pipelines", "schema design"]',
+        "engineer": '["backend engineering", "API design", "service integration", "database optimization", "debugging"]',
+        "sre": '["infrastructure management", "CI/CD", "monitoring", "incident response", "automation"]',
+        "security_engineer": '["security assessment", "compliance auditing", "access control", "encryption", "vulnerability scanning"]',
+        "qa_engineer": '["test planning", "automation testing", "regression testing", "quality assurance", "defect tracking"]',
+        "qa_lead": '["test leadership", "test strategy", "test coordination", "quality metrics", "release sign-off"]',
+        "uat_lead": '["UAT coordination", "hypercare support", "user feedback", "go-live validation", "post-launch monitoring"]',
     }
     for role, skills in skill_map.items():
         op.execute(f"""

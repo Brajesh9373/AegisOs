@@ -157,9 +157,9 @@ and recommend appropriate permission scopes.
 ## Agent Profile
 
 **Name:** {name}
-**Description:** {description or 'Not provided'}
-**Role:** {role or 'Not specified'}
-**Reports to:** {parent_profile_id or 'No parent (top-level agent)'}
+**Description:** {description or "Not provided"}
+**Role:** {role or "Not specified"}
+**Reports to:** {parent_profile_id or "No parent (top-level agent)"}
 **System Prompt:**
 {system_prompt[:1000]}
 

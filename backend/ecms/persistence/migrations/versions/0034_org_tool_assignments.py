@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision: str = "0034_org_tool_assignments"
 down_revision: str | None = "0033_governance_drop_member_fk"
@@ -29,7 +29,9 @@ def upgrade() -> None:
         sa.Column("assigned_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
-    op.create_index("ix_org_tool_assignments_member", "org_tool_assignments", ["organization_member_id"])
+    op.create_index(
+        "ix_org_tool_assignments_member", "org_tool_assignments", ["organization_member_id"]
+    )
     op.create_index("ix_org_tool_assignments_tool", "org_tool_assignments", ["tool_name"])
     op.create_unique_constraint(
         "uq_org_tool_member_tool",

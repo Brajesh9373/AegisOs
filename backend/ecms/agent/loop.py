@@ -6,34 +6,30 @@ reads results, and iterates until it has enough context to respond.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
-import os
 import platform as _platform
 import subprocess
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
-
-from openai import AsyncOpenAI
+from typing import Any
 
 from legacy_ecms.config import get_settings
+from openai import AsyncOpenAI
+
+from ecms.agent.commandcode_tools import ToolContext as CCToolContext
 from ecms.agent.conversation import Conversation
 from ecms.agent.session_context import SessionContext
+from ecms.agent.tool_capture import capture_tool_result
 from ecms.agent.tools import (
-    TOOL_DEFINITIONS,
+    get_effective_tools,
     invoke_tool,
     set_agent_context,
-    get_working_memory,
     set_cc_context,
-    get_effective_tools,
-    CC_TOOL_DEFINITIONS,
 )
-from ecms.agent.commandcode_tools import ToolContext as CCToolContext
-from ecms.agent.tool_capture import capture_tool_result
 from ecms.agent.working_memory import WorkingMemory
 from ecms.memory.system_prompt import AGENTIC_SYSTEM_PROMPT
 
@@ -43,6 +39,7 @@ logger = logging.getLogger("ecms.agent")
 # ── Proactive context builders ───────────────────────────────────────
 
 _SKILLS_CACHE: str | None = None
+
 
 def _load_skills_context() -> str:
     """Load bundled skills from disk and return their descriptions."""
@@ -85,7 +82,9 @@ def _load_skills_context() -> str:
                             name = line.split(":", 1)[1].strip()
                         elif line.startswith("description:") and not desc:
                             desc = line.split(":", 1)[1].strip().strip('"').strip("'")
-                skills_found.append(f"- **{name}**: {desc}" if desc else f"- **{name}**: {skill_dir.name}")
+                skills_found.append(
+                    f"- **{name}**: {desc}" if desc else f"- **{name}**: {skill_dir.name}"
+                )
             except Exception:
                 skills_found.append(f"- {skill_dir.name}")
 
@@ -101,7 +100,10 @@ def _git_branch() -> str:
     try:
         result = subprocess.run(
             ["git", "branch", "--show-current"],
-            capture_output=True, text=True, timeout=5, cwd="/workspace",
+            capture_output=True,
+            text=True,
+            timeout=5,
+            cwd="/workspace",
         )
         return result.stdout.strip() or "unknown"
     except Exception:
@@ -112,7 +114,10 @@ def _git_status() -> str:
     try:
         result = subprocess.run(
             ["git", "status", "--short"],
-            capture_output=True, text=True, timeout=5, cwd="/workspace",
+            capture_output=True,
+            text=True,
+            timeout=5,
+            cwd="/workspace",
         )
         lines = result.stdout.strip().split("\n")
         modified = sum(1 for l in lines if l.startswith("M ") or l.startswith(" M"))
@@ -126,12 +131,12 @@ def _git_status() -> str:
 def _build_environment_block(session_id: str, plan_mode: bool) -> str:
     """Build <context_environment> with live system data."""
     lines = [
-        f"Working directory: /workspace",
-        f"Date: {datetime.now(timezone.utc).isoformat()}",
+        "Working directory: /workspace",
+        f"Date: {datetime.now(UTC).isoformat()}",
         f"Platform: {_platform.system()} {_platform.release()}",
         f"Git branch: {_git_branch()}",
         f"Git status: {_git_status()}",
-        f"Workspace roots: /workspace, /app",
+        "Workspace roots: /workspace, /app",
         f"Session: {session_id[:8]}",
         f"Plan mode: {'ON' if plan_mode else 'OFF'}",
     ]
@@ -161,6 +166,7 @@ def _build_tools_block(tool_defs: list[dict]) -> str:
 @dataclass
 class AgentTrace:
     """Captured trace of every agent action for visibility."""
+
     session_id: str
     trace_id: str
     started_at: str = ""
@@ -169,8 +175,9 @@ class AgentTrace:
     total_llm_calls: int = 0
     total_ms: float = 0.0
 
-    def add_step(self, kind: str, detail: str, latency_ms: float = 0.0,
-                 data: dict | None = None) -> None:
+    def add_step(
+        self, kind: str, detail: str, latency_ms: float = 0.0, data: dict | None = None
+    ) -> None:
         step: dict = {"kind": kind, "detail": detail, "ms": round(latency_ms, 1)}
         if data:
             step["data"] = data
@@ -199,13 +206,19 @@ class AgentLoop:
 
     _MAX_ITERATIONS = 50
 
-    def __init__(self, session_id: str, *, lightweight: bool = False,
-                 model: str | None = None, api_key: str | None = None,
-                 base_url: str | None = None,
-                 progress_callback: Callable[[dict], None] | None = None,
-                 agent_id: str | None = None,
-                 event_queue: Any = None,
-                 agent_profile: dict | None = None) -> None:
+    def __init__(
+        self,
+        session_id: str,
+        *,
+        lightweight: bool = False,
+        model: str | None = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        progress_callback: Callable[[dict], None] | None = None,
+        agent_id: str | None = None,
+        event_queue: Any = None,
+        agent_profile: dict | None = None,
+    ) -> None:
         settings = get_settings()
         self._session_id = session_id
         self._conv = Conversation(session_id)
@@ -229,10 +242,14 @@ class AgentLoop:
         if agent_profile:
             self._custom_prompt = agent_profile.get("system_prompt_addon", "")
             import json as _json
+
             tp = agent_profile.get("tool_policy", "{}")
             self._tool_policy = _json.loads(tp) if isinstance(tp, str) else (tp or {})
-            logger.info("[%s] Using agent profile: prompt_addon=%d chars",
-                        session_id[:8], len(self._custom_prompt))
+            logger.info(
+                "[%s] Using agent profile: prompt_addon=%d chars",
+                session_id[:8],
+                len(self._custom_prompt),
+            )
         self._trace = AgentTrace(
             session_id=session_id,
             trace_id=f"trace-{session_id[:8]}",
@@ -252,16 +269,20 @@ class AgentLoop:
     def _load_agent_profile(self, agent_id: str) -> None:
         """Load agent configuration from the agents table."""
         try:
-            from ecms.persistence.database.rest_session import db_session
-            from sqlalchemy import text
             import asyncio as _asyncio
+
+            from sqlalchemy import text
+
+            from ecms.persistence.database.rest_session import db_session
 
             async def _load():
                 async with db_session() as s:
-                    row = (await s.execute(
-                        text("SELECT * FROM agents WHERE id = :aid"),
-                        {"aid": agent_id},
-                    )).first()
+                    row = (
+                        await s.execute(
+                            text("SELECT * FROM agents WHERE id = :aid"),
+                            {"aid": agent_id},
+                        )
+                    ).first()
                     if not row:
                         return
                     d = {k.lower(): v for k, v in row._mapping.items() if v is not None}
@@ -269,14 +290,16 @@ class AgentLoop:
                     # Apply system prompt addon
                     addon = d.get("system_prompt_addon", "")
                     if addon:
-                        from ecms.memory.system_prompt import AGENTIC_SYSTEM_PROMPT
                         self._custom_prompt = addon
-                        logger.info("[%s] Loaded agent profile: %s", agent_id, d.get("name", "unknown"))
+                        logger.info(
+                            "[%s] Loaded agent profile: %s", agent_id, d.get("name", "unknown")
+                        )
 
                     # Apply tool policy
                     tool_policy_raw = d.get("tool_policy", "{}")
                     if isinstance(tool_policy_raw, str):
                         import json as _json
+
                         tool_policy_raw = _json.loads(tool_policy_raw)
                     self._tool_policy = tool_policy_raw
 
@@ -317,14 +340,21 @@ class AgentLoop:
                 llm_ms = (time.perf_counter() - iter_start) * 1000
                 logger.info(
                     "[%s] LLM call #%d | %.0fms | tokens=%s",
-                    self._trace.trace_id, iteration + 1, llm_ms,
+                    self._trace.trace_id,
+                    iteration + 1,
+                    llm_ms,
                     response.usage.total_tokens if response.usage else "?",
                 )
             except Exception as e:
                 llm_ms = (time.perf_counter() - iter_start) * 1000
-                logger.warning("[%s] LLM call #%d FAILED (%.0fms): %s",
-                               self._trace.trace_id, iteration + 1, llm_ms, e)
-                self._trace.add_step("error", f"LLM call #{iteration+1} failed: {e}", llm_ms)
+                logger.warning(
+                    "[%s] LLM call #%d FAILED (%.0fms): %s",
+                    self._trace.trace_id,
+                    iteration + 1,
+                    llm_ms,
+                    e,
+                )
+                self._trace.add_step("error", f"LLM call #{iteration + 1} failed: {e}", llm_ms)
                 last = self._conv.last_message
                 if last and last["role"] == "assistant" and last.get("content"):
                     return last["content"], self._trace.to_dict()
@@ -342,23 +372,34 @@ class AgentLoop:
                 total_ms = (time.perf_counter() - t_start) * 1000
                 self._trace.total_ms = total_ms
                 self._trace.add_step(
-                    "respond", f"Answered in {len(content)} chars", total_ms,
+                    "respond",
+                    f"Answered in {len(content)} chars",
+                    total_ms,
                     data={"iterations": iteration + 1, "answer_preview": content[:200]},
                 )
                 logger.info(
                     "[%s] DONE | %d iterations | %.0fms | %.100s",
-                    self._trace.trace_id, iteration + 1, total_ms, content,
+                    self._trace.trace_id,
+                    iteration + 1,
+                    total_ms,
+                    content,
                 )
                 return content, self._trace.to_dict()
 
             # Max iterations reached — make one final wrap-up call
             if iteration >= self._MAX_ITERATIONS:
-                self._trace.add_step("wrapup", f"Max iterations ({self._MAX_ITERATIONS}) reached", 0)
+                self._trace.add_step(
+                    "wrapup", f"Max iterations ({self._MAX_ITERATIONS}) reached", 0
+                )
                 logger.info("[%s] WRAPUP at max iterations=%d", self._trace.trace_id, iteration + 1)
 
                 try:
                     # Gather all findings from the conversation
-                    conv_summary = self._conv.get_summary() if hasattr(self._conv, 'get_summary') else str(self._conv.messages[-10:])
+                    conv_summary = (
+                        self._conv.get_summary()
+                        if hasattr(self._conv, "get_summary")
+                        else str(self._conv.messages[-10:])
+                    )
 
                     wrap_prompt = (
                         "You have reached your reasoning iteration limit. "
@@ -368,7 +409,10 @@ class AgentLoop:
                     )
 
                     wrap_messages = [
-                        {"role": "system", "content": "You are an AI coding assistant. Synthesize findings into a concise, helpful answer."},
+                        {
+                            "role": "system",
+                            "content": "You are an AI coding assistant. Synthesize findings into a concise, helpful answer.",
+                        },
                         {"role": "user", "content": wrap_prompt},
                     ]
 
@@ -378,7 +422,10 @@ class AgentLoop:
                         temperature=0.2,
                         max_tokens=2000,
                     )
-                    content = wrap_response.choices[0].message.content or "I was unable to complete my reasoning."
+                    content = (
+                        wrap_response.choices[0].message.content
+                        or "I was unable to complete my reasoning."
+                    )
                 except Exception as wrap_err:
                     logger.warning("[%s] Wrap-up call failed: %s", self._trace.trace_id, wrap_err)
                     content = "I was unable to complete my reasoning."
@@ -392,20 +439,31 @@ class AgentLoop:
             tool_names = [tc.function.name for tc in msg.tool_calls]
             preview = msg.content[:100] if msg.content else f"calling {', '.join(tool_names)}"
             self._trace.add_step(
-                "thinking", preview, llm_ms,
+                "thinking",
+                preview,
+                llm_ms,
                 data={"iteration": iteration + 1, "tool_calls": tool_names},
             )
             logger.info(
                 "[%s] THINK iteration=%d | tools=%s | %.100s",
-                self._trace.trace_id, iteration + 1, tool_names, preview,
+                self._trace.trace_id,
+                iteration + 1,
+                tool_names,
+                preview,
             )
 
-            self._conv.add("assistant", content=msg.content,
-                           tool_calls=[
-                               {"id": tc.id, "type": "function",
-                                "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
-                               for tc in msg.tool_calls
-                           ])
+            self._conv.add(
+                "assistant",
+                content=msg.content,
+                tool_calls=[
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                    }
+                    for tc in msg.tool_calls
+                ],
+            )
 
             for tc in msg.tool_calls:
                 tc_start = time.perf_counter()
@@ -419,18 +477,20 @@ class AgentLoop:
                 # Notify orchestrator of progress
                 if self._progress_callback:
                     try:
-                        self._progress_callback({
-                            "type": "task_progress",
-                            "iteration": iteration + 1,
-                            "tool_name": name,
-                            "agent_id": agent_id or self._session_id,
-                        })
+                        self._progress_callback(
+                            {
+                                "type": "task_progress",
+                                "iteration": iteration + 1,
+                                "tool_name": name,
+                                "agent_id": agent_id or self._session_id,
+                            }
+                        )
                     except Exception:
                         pass
 
                 try:
                     result = await invoke_tool(name, args)
-                except Exception as tool_exc:  # noqa: BLE001
+                except Exception as tool_exc:
                     result = f"Tool '{name}' failed: {tool_exc}"
                     logger.warning("[%s] TOOL %s FAILED: %s", self._trace.trace_id, name, tool_exc)
                 tc_ms = (time.perf_counter() - tc_start) * 1000
@@ -447,13 +507,23 @@ class AgentLoop:
                     self._cc_context.plan_mode = False
 
                 self._trace.add_step(
-                    "tool_call", f"{name}({', '.join(f'{k}={v}' for k,v in args.items())})",
+                    "tool_call",
+                    f"{name}({', '.join(f'{k}={v}' for k, v in args.items())})",
                     tc_ms,
-                    data={"tool": name, "args": args, "result_len": len(result), "result_preview": result[:200]},
+                    data={
+                        "tool": name,
+                        "args": args,
+                        "result_len": len(result),
+                        "result_preview": result[:200],
+                    },
                 )
                 logger.info(
                     "[%s] RESULT %s | %.0fms | %d chars | %.150s",
-                    self._trace.trace_id, name, tc_ms, len(result), result,
+                    self._trace.trace_id,
+                    name,
+                    tc_ms,
+                    len(result),
+                    result,
                 )
                 self._conv.add("tool", result, tool_call_id=tc.id, name=name)
 
@@ -499,19 +569,25 @@ class AgentLoop:
             # <context_knowledge_graph> — tool discoveries this turn (agent-controlled)
             kg_parts = []
             if self._working.active_atom_ids:
-                kg_parts.append(f"Active memory atoms: {', '.join(self._working.active_atom_ids[:10])}")
+                kg_parts.append(
+                    f"Active memory atoms: {', '.join(self._working.active_atom_ids[:10])}"
+                )
             if self._working.active_graph_refs:
-                kg_parts.append(f"Active graph references: {', '.join(self._working.active_graph_refs[:10])}")
+                kg_parts.append(
+                    f"Active graph references: {', '.join(self._working.active_graph_refs[:10])}"
+                )
             if kg_parts:
                 context_blocks.append(
-                    "<context_knowledge_graph>\n" + "\n".join(kg_parts) + "\n</context_knowledge_graph>"
+                    "<context_knowledge_graph>\n"
+                    + "\n".join(kg_parts)
+                    + "\n</context_knowledge_graph>"
                 )
 
         # Assemble
         context_block_text = "\n\n".join(context_blocks)
         if self._lightweight:
             system_content = context_block_text or "You are a helpful coding agent."
-        elif hasattr(self, '_custom_prompt') and self._custom_prompt:
+        elif hasattr(self, "_custom_prompt") and self._custom_prompt:
             prefix = context_block_text + "\n\n" if context_block_text else ""
             system_content = prefix + self._custom_prompt
         else:

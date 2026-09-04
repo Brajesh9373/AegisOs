@@ -14,10 +14,11 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-from fastapi import APIRouter, File as FastAPIFile, HTTPException, Request, UploadFile
+from fastapi import APIRouter, HTTPException, Request, UploadFile
+from fastapi import File as FastAPIFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -39,8 +40,9 @@ _COLUMNS = (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _uuid() -> str:
@@ -58,15 +60,20 @@ async def _get_current_user(request: Request) -> dict:
         _error("AUTH-4011", "Missing token", 401)
     async with db_session() as session:
         from sqlalchemy import text
-        row = (await session.execute(
-            text("SELECT * FROM auth_sessions WHERE token = :t"), {"t": token}
-        )).first()
+
+        row = (
+            await session.execute(
+                text("SELECT * FROM auth_sessions WHERE token = :t"), {"t": token}
+            )
+        ).first()
         if not row:
             _error("AUTH-4012", "Invalid session", 401)
         sess = {k.lower(): v for k, v in row._mapping.items()}
-        user_row = (await session.execute(
-            text("SELECT * FROM users WHERE id = :id"), {"id": sess["userid"]}
-        )).first()
+        user_row = (
+            await session.execute(
+                text("SELECT * FROM users WHERE id = :id"), {"id": sess["userid"]}
+            )
+        ).first()
         if not user_row:
             _error("AUTH-4013", "User not found", 401)
         return {k.lower(): v for k, v in user_row._mapping.items()}
@@ -89,7 +96,7 @@ def _row_to_meeting(row) -> dict:
     participants = _arr(d.get("participants"))
     status = d.get("status") or "upcoming"
     meeting_date = d.get("meeting_date")
-    if meeting_date and meeting_date < datetime.now(timezone.utc).date().isoformat():
+    if meeting_date and meeting_date < datetime.now(UTC).date().isoformat():
         status = "past"
     return {
         "id": d.get("id"),
@@ -120,12 +127,13 @@ def _row_to_meeting(row) -> dict:
 # Models
 # ---------------------------------------------------------------------------
 
+
 class MeetingBody(BaseModel):
     title: str
-    date: str | None = None          # e.g. "2026-07-15"
-    time: str | None = None          # e.g. "10:00 AM"
+    date: str | None = None  # e.g. "2026-07-15"
+    time: str | None = None  # e.g. "10:00 AM"
     duration: str | None = None
-    type: str | None = "both"        # 'human' | 'agent' | 'both'
+    type: str | None = "both"  # 'human' | 'agent' | 'both'
     status: str | None = "upcoming"  # 'upcoming' | 'past'
     participants: list[str] = []
     agenda: str | None = None
@@ -140,16 +148,23 @@ class MeetingBody(BaseModel):
 # Endpoints
 # ---------------------------------------------------------------------------
 
+
 @router.get("/projects/{project_id}/meetings")
 async def list_meetings(project_id: str, request: Request):
     """All meetings for a project, newest-first by date."""
     await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
-        rows = (await session.execute(text(
-            f"SELECT {_COLUMNS} FROM meetings WHERE project_id = :pid "
-            "ORDER BY meeting_date DESC NULLS LAST, created_at DESC"
-        ), {"pid": project_id})).fetchall()
+
+        rows = (
+            await session.execute(
+                text(
+                    f"SELECT {_COLUMNS} FROM meetings WHERE project_id = :pid "
+                    "ORDER BY meeting_date DESC NULLS LAST, created_at DESC"
+                ),
+                {"pid": project_id},
+            )
+        ).fetchall()
     return {"meetings": [_row_to_meeting(r) for r in rows]}
 
 
@@ -161,28 +176,41 @@ async def create_meeting(project_id: str, body: MeetingBody, request: Request):
     now = _now()
     async with db_session() as session:
         from sqlalchemy import text
-        await session.execute(text(
-            "INSERT INTO meetings "
-            "(id, project_id, title, meeting_date, meeting_time, duration, type, status, "
-            " participants, agenda, notes, summary, decisions, action_items, attachments, "
-            " source, created_at, updated_at) "
-            "VALUES (:id, :pid, :title, :date, :time, :dur, :type, :status, "
-            " :participants, :agenda, :notes, :summary, :decisions, :action_items, :attachments, "
-            " 'manual', :t, :t)"
-        ), {
-            "id": mid, "pid": project_id, "title": body.title,
-            "date": body.date, "time": body.time, "dur": body.duration,
-            "type": body.type or "both", "status": body.status or "upcoming",
-            "participants": json.dumps(body.participants or []),
-            "agenda": body.agenda, "notes": body.notes, "summary": body.summary,
-            "decisions": json.dumps(body.decisions or []),
-            "action_items": json.dumps(body.action_items or []),
-            "attachments": json.dumps(body.attachments or []),
-            "t": now,
-        })
-        row = (await session.execute(text(
-            f"SELECT {_COLUMNS} FROM meetings WHERE id = :id"
-        ), {"id": mid})).first()
+
+        await session.execute(
+            text(
+                "INSERT INTO meetings "
+                "(id, project_id, title, meeting_date, meeting_time, duration, type, status, "
+                " participants, agenda, notes, summary, decisions, action_items, attachments, "
+                " source, created_at, updated_at) "
+                "VALUES (:id, :pid, :title, :date, :time, :dur, :type, :status, "
+                " :participants, :agenda, :notes, :summary, :decisions, :action_items, :attachments, "
+                " 'manual', :t, :t)"
+            ),
+            {
+                "id": mid,
+                "pid": project_id,
+                "title": body.title,
+                "date": body.date,
+                "time": body.time,
+                "dur": body.duration,
+                "type": body.type or "both",
+                "status": body.status or "upcoming",
+                "participants": json.dumps(body.participants or []),
+                "agenda": body.agenda,
+                "notes": body.notes,
+                "summary": body.summary,
+                "decisions": json.dumps(body.decisions or []),
+                "action_items": json.dumps(body.action_items or []),
+                "attachments": json.dumps(body.attachments or []),
+                "t": now,
+            },
+        )
+        row = (
+            await session.execute(
+                text(f"SELECT {_COLUMNS} FROM meetings WHERE id = :id"), {"id": mid}
+            )
+        ).first()
     return _row_to_meeting(row)
 
 
@@ -192,15 +220,20 @@ async def delete_meeting(project_id: str, meeting_id: str, request: Request):
     await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
-        row = (await session.execute(text(
-            "SELECT recording_path FROM meetings WHERE id = :id AND project_id = :pid"
-        ), {"id": meeting_id, "pid": project_id})).first()
+
+        row = (
+            await session.execute(
+                text("SELECT recording_path FROM meetings WHERE id = :id AND project_id = :pid"),
+                {"id": meeting_id, "pid": project_id},
+            )
+        ).first()
         if not row:
             _error("NOT-FOUND", "Meeting not found", 404)
         rec_path = row[0]
-        await session.execute(text(
-            "DELETE FROM meetings WHERE id = :id AND project_id = :pid"
-        ), {"id": meeting_id, "pid": project_id})
+        await session.execute(
+            text("DELETE FROM meetings WHERE id = :id AND project_id = :pid"),
+            {"id": meeting_id, "pid": project_id},
+        )
     # Best-effort file cleanup outside the transaction.
     if rec_path:
         try:
@@ -221,15 +254,19 @@ async def upload_recording(
     await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
-        exists = (await session.execute(text(
-            "SELECT 1 FROM meetings WHERE id = :id AND project_id = :pid"
-        ), {"id": meeting_id, "pid": project_id})).first()
+
+        exists = (
+            await session.execute(
+                text("SELECT 1 FROM meetings WHERE id = :id AND project_id = :pid"),
+                {"id": meeting_id, "pid": project_id},
+            )
+        ).first()
         if not exists:
             _error("NOT-FOUND", "Meeting not found", 404)
 
     content = await file.read()
     hash_digest = hashlib.sha256(content).hexdigest()[:12]
-    ext = file.filename.rsplit('.', 1)[-1] if '.' in (file.filename or '') else 'mp4'
+    ext = file.filename.rsplit(".", 1)[-1] if "." in (file.filename or "") else "mp4"
     filename = f"{meeting_id}-{hash_digest}.{ext}"
     rec_dir = BASE_UPLOAD_DIR / project_id / "recordings"
     rec_dir.mkdir(parents=True, exist_ok=True)
@@ -238,11 +275,20 @@ async def upload_recording(
 
     async with db_session() as session:
         from sqlalchemy import text
-        await session.execute(text(
-            "UPDATE meetings SET recording_path = :p, recording_name = :n, updated_at = :t "
-            "WHERE id = :id AND project_id = :pid"
-        ), {"p": str(filepath), "n": file.filename, "t": _now(),
-            "id": meeting_id, "pid": project_id})
+
+        await session.execute(
+            text(
+                "UPDATE meetings SET recording_path = :p, recording_name = :n, updated_at = :t "
+                "WHERE id = :id AND project_id = :pid"
+            ),
+            {
+                "p": str(filepath),
+                "n": file.filename,
+                "t": _now(),
+                "id": meeting_id,
+                "pid": project_id,
+            },
+        )
 
     return {"success": True, "recording": file.filename}
 
@@ -253,10 +299,16 @@ async def get_recording(project_id: str, meeting_id: str, request: Request):
     await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
-        row = (await session.execute(text(
-            "SELECT recording_path, recording_name FROM meetings "
-            "WHERE id = :id AND project_id = :pid"
-        ), {"id": meeting_id, "pid": project_id})).first()
+
+        row = (
+            await session.execute(
+                text(
+                    "SELECT recording_path, recording_name FROM meetings "
+                    "WHERE id = :id AND project_id = :pid"
+                ),
+                {"id": meeting_id, "pid": project_id},
+            )
+        ).first()
     if not row or not row[0]:
         _error("NOT-FOUND", "No recording for this meeting", 404)
     path = Path(row[0])
@@ -269,6 +321,7 @@ async def get_recording(project_id: str, meeting_id: str, request: Request):
 # Notifications
 # ---------------------------------------------------------------------------
 
+
 class NotificationActionBody(BaseModel):
     confirmed_time: str | None = None
 
@@ -279,22 +332,36 @@ async def list_notifications(project_id: str, request: Request):
     await _get_current_user(request)
     async with db_session() as session:
         from sqlalchemy import text
-        rows = (await session.execute(text(
-            "SELECT id, project_id, meeting_id, type, title, message, status, "
-            "action_type, action_data, created_at, updated_at "
-            "FROM notifications WHERE project_id = :pid "
-            "ORDER BY created_at DESC LIMIT 50"
-        ), {"pid": project_id})).fetchall()
-    return {"notifications": [
-        {
-            "id": r[0], "project_id": r[1], "meeting_id": r[2],
-            "type": r[3], "title": r[4], "message": r[5],
-            "status": r[6], "action_type": r[7],
-            "action_data": r[8] if isinstance(r[8], dict) else json.loads(r[8] or '{}'),
-            "created_at": r[9], "updated_at": r[10],
-        }
-        for r in rows
-    ]}
+
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT id, project_id, meeting_id, type, title, message, status, "
+                    "action_type, action_data, created_at, updated_at "
+                    "FROM notifications WHERE project_id = :pid "
+                    "ORDER BY created_at DESC LIMIT 50"
+                ),
+                {"pid": project_id},
+            )
+        ).fetchall()
+    return {
+        "notifications": [
+            {
+                "id": r[0],
+                "project_id": r[1],
+                "meeting_id": r[2],
+                "type": r[3],
+                "title": r[4],
+                "message": r[5],
+                "status": r[6],
+                "action_type": r[7],
+                "action_data": r[8] if isinstance(r[8], dict) else json.loads(r[8] or "{}"),
+                "created_at": r[9],
+                "updated_at": r[10],
+            }
+            for r in rows
+        ]
+    }
 
 
 @router.post("/projects/{project_id}/notifications/{notification_id}/confirm-time")
@@ -306,13 +373,19 @@ async def confirm_meeting_time(
 ):
     """Confirm or set a meeting time from a notification."""
     await _get_current_user(request)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     async with db_session() as session:
         from sqlalchemy import text
-        row = (await session.execute(text(
-            "SELECT meeting_id, action_data FROM notifications "
-            "WHERE id = :nid AND project_id = :pid"
-        ), {"nid": notification_id, "pid": project_id})).first()
+
+        row = (
+            await session.execute(
+                text(
+                    "SELECT meeting_id, action_data FROM notifications "
+                    "WHERE id = :nid AND project_id = :pid"
+                ),
+                {"nid": notification_id, "pid": project_id},
+            )
+        ).first()
         if not row:
             _error("NOT-FOUND", "Notification not found", 404)
 
@@ -321,29 +394,40 @@ async def confirm_meeting_time(
 
         # Update the meeting time
         if meeting_id and confirmed_time:
-            await session.execute(text(
-                "UPDATE meetings SET meeting_time = :time, updated_at = :t "
-                "WHERE id = :mid AND project_id = :pid"
-            ), {"time": confirmed_time, "t": now, "mid": meeting_id, "pid": project_id})
+            await session.execute(
+                text(
+                    "UPDATE meetings SET meeting_time = :time, updated_at = :t "
+                    "WHERE id = :mid AND project_id = :pid"
+                ),
+                {"time": confirmed_time, "t": now, "mid": meeting_id, "pid": project_id},
+            )
 
         # Mark notification as resolved
-        await session.execute(text(
-            "UPDATE notifications SET status = 'resolved', updated_at = :t "
-            "WHERE id = :nid AND project_id = :pid"
-        ), {"t": now, "nid": notification_id, "pid": project_id})
+        await session.execute(
+            text(
+                "UPDATE notifications SET status = 'resolved', updated_at = :t "
+                "WHERE id = :nid AND project_id = :pid"
+            ),
+            {"t": now, "nid": notification_id, "pid": project_id},
+        )
 
         # Create a confirmation notification
         conf_id = str(uuid.uuid4())
-        await session.execute(text(
-            "INSERT INTO notifications "
-            "(id, project_id, meeting_id, type, title, message, status, action_type, action_data, created_at, updated_at) "
-            "VALUES (:id, :pid, :mid, 'time_confirmed', :title, :msg, 'unread', NULL, '{}', :t, :t)"
-        ), {
-            "id": conf_id, "pid": project_id, "mid": meeting_id,
-            "title": "Meeting Time Confirmed",
-            "msg": f"Meeting time set to {confirmed_time}.",
-            "t": now,
-        })
+        await session.execute(
+            text(
+                "INSERT INTO notifications "
+                "(id, project_id, meeting_id, type, title, message, status, action_type, action_data, created_at, updated_at) "
+                "VALUES (:id, :pid, :mid, 'time_confirmed', :title, :msg, 'unread', NULL, '{}', :t, :t)"
+            ),
+            {
+                "id": conf_id,
+                "pid": project_id,
+                "mid": meeting_id,
+                "title": "Meeting Time Confirmed",
+                "msg": f"Meeting time set to {confirmed_time}.",
+                "t": now,
+            },
+        )
 
     return {"success": True, "confirmed_time": confirmed_time}
 
@@ -356,12 +440,15 @@ async def dismiss_notification(
 ):
     """Dismiss a notification."""
     await _get_current_user(request)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     async with db_session() as session:
         from sqlalchemy import text
-        await session.execute(text(
-            "UPDATE notifications SET status = 'dismissed', updated_at = :t "
-            "WHERE id = :nid AND project_id = :pid"
-        ), {"t": now, "nid": notification_id, "pid": project_id})
-    return {"success": True}
 
+        await session.execute(
+            text(
+                "UPDATE notifications SET status = 'dismissed', updated_at = :t "
+                "WHERE id = :nid AND project_id = :pid"
+            ),
+            {"t": now, "nid": notification_id, "pid": project_id},
+        )
+    return {"success": True}

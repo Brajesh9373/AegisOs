@@ -76,9 +76,7 @@ class ClientMetric(BaseModel):
     """Bounded browser renderer telemetry payload."""
 
     renderer: str = Field(pattern="^(cosmos|d3)$")
-    event: str = Field(
-        pattern="^(ready|load_failed|webgl_fallback|unmounted)$"
-    )
+    event: str = Field(pattern="^(ready|load_failed|webgl_fallback|unmounted)$")
     duration_ms: int | None = Field(default=None, ge=0, le=600_000)
 
 
@@ -106,16 +104,8 @@ def _snapshot_manifest(
         and current.link_count <= settings.knowledge_graph_max_client_links
     )
     store = _object_store()
-    points_url = (
-        store.presign_get(current.points_object_key)
-        if current.points_object_key
-        else None
-    )
-    links_url = (
-        store.presign_get(current.links_object_key)
-        if current.links_object_key
-        else None
-    )
+    points_url = store.presign_get(current.points_object_key) if current.points_object_key else None
+    links_url = store.presign_get(current.links_object_key) if current.links_object_key else None
     result["snapshot"] = {
         "version": current.version,
         "schema_version": current.schema_version,
@@ -125,10 +115,8 @@ def _snapshot_manifest(
         "links_bytes": current.links_bytes,
         "points_checksum": current.points_checksum,
         "links_checksum": current.links_checksum,
-        "points_url": points_url
-        or f"/api/knowledge-graph/v2/snapshots/{current.version}/points",
-        "links_url": links_url
-        or f"/api/knowledge-graph/v2/snapshots/{current.version}/links",
+        "points_url": points_url or f"/api/knowledge-graph/v2/snapshots/{current.version}/points",
+        "links_url": links_url or f"/api/knowledge-graph/v2/snapshots/{current.version}/links",
         "generated_at": current.completed_at.isoformat() if current.completed_at else None,
         "source_watermark": current.source_watermark,
         "capacity": {
@@ -165,9 +153,9 @@ async def get_manifest(
             headers["ETag"] = etag
         return Response(content=body, media_type="application/json", headers=headers)
     finally:
-        request.app.state.knowledge_graph_delivery_metrics[
-            "manifest_latency"
-        ].observe(time.perf_counter() - started_at)
+        request.app.state.knowledge_graph_delivery_metrics["manifest_latency"].observe(
+            time.perf_counter() - started_at
+        )
 
 
 @router.get("/config")
@@ -210,10 +198,7 @@ async def get_snapshot_status(
         cursor = 0
         while True:
             cursor, keys = await redis.scan(cursor, match=f"{HEALTH_PREFIX}*", count=100)
-            workers.extend(
-                key.decode() if isinstance(key, bytes) else str(key)
-                for key in keys
-            )
+            workers.extend(key.decode() if isinstance(key, bytes) else str(key) for key in keys)
             if cursor == 0:
                 break
     finally:
@@ -321,17 +306,17 @@ async def stream_snapshot(
                     info = await store.stat_object(key)
                     stat_cache[key] = (time.monotonic() + 30, info)
     except Exception as exc:
-        request.app.state.knowledge_graph_delivery_metrics[
-            "download_failures"
-        ].labels(artifact=artifact, reason="storage_unavailable").inc()
+        request.app.state.knowledge_graph_delivery_metrics["download_failures"].labels(
+            artifact=artifact, reason="storage_unavailable"
+        ).inc()
         raise HTTPException(
             status_code=503,
             detail="snapshot storage is temporarily unavailable",
         ) from exc
     if info.size != expected_size:
-        request.app.state.knowledge_graph_delivery_metrics[
-            "download_failures"
-        ].labels(artifact=artifact, reason="size_mismatch").inc()
+        request.app.state.knowledge_graph_delivery_metrics["download_failures"].labels(
+            artifact=artifact, reason="size_mismatch"
+        ).inc()
         raise HTTPException(status_code=503, detail="snapshot artifact size mismatch")
     requested = _parse_range(range_header, info.size)
     start, end = requested or (0, info.size - 1)
@@ -345,14 +330,15 @@ async def stream_snapshot(
     if requested:
         response_status = status.HTTP_206_PARTIAL_CONTENT
         headers["Content-Range"] = f"bytes {start}-{end}/{info.size}"
+
     async def monitored_stream():
         try:
             async for chunk in store.iter_object(key, start=start, end=end):
                 yield chunk
         except Exception:
-            request.app.state.knowledge_graph_delivery_metrics[
-                "download_failures"
-            ].labels(artifact=artifact, reason="stream_interrupted").inc()
+            request.app.state.knowledge_graph_delivery_metrics["download_failures"].labels(
+                artifact=artifact, reason="stream_interrupted"
+            ).inc()
             raise
 
     return StreamingResponse(
@@ -385,9 +371,7 @@ async def record_client_metric(
 
 def _load_node_metadata(node_id: str) -> dict[str, Any] | None:
     settings = get_settings()
-    graph = falkordb.FalkorDB.from_url(settings.falkordb_url).select_graph(
-        settings.falkordb_graph
-    )
+    graph = falkordb.FalkorDB.from_url(settings.falkordb_url).select_graph(settings.falkordb_graph)
     result = graph.query(
         """
         MATCH (node {id: $node_id})

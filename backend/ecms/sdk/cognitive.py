@@ -35,7 +35,12 @@ class CognitiveSystem:
     repository: InMemoryKnowledgeRepository
 
 
-def create_cognitive_system(*, event_bus: EventBus | None = None, falkordb_url: str | None = None, falkordb_graph: str = "ecms") -> CognitiveSystem:
+def create_cognitive_system(
+    *,
+    event_bus: EventBus | None = None,
+    falkordb_url: str | None = None,
+    falkordb_graph: str = "ecms",
+) -> CognitiveSystem:
     """Assemble the cognition engines and runtime kernel over one knowledge index.
 
     If falkordb_url is provided, uses the FalkorDB-backed persistent graph store.
@@ -50,16 +55,21 @@ def create_cognitive_system(*, event_bus: EventBus | None = None, falkordb_url: 
     if falkordb_url:
         try:
             from ecms.graph.infrastructure.falkordb_store import FalkorDBCypherStore
+
             store = FalkorDBCypherStore(url=falkordb_url, graph_name=falkordb_graph)
         except Exception:
             from ecms.infrastructure.telemetry import get_logger
+
             get_logger("ecms.sdk.cognitive").warning(
-                "falkordb_unavailable_fallback", url=falkordb_url,
+                "falkordb_unavailable_fallback",
+                url=falkordb_url,
             )
             from ecms.graph.infrastructure.memory_store import InMemoryGraphStore
+
             store = InMemoryGraphStore()
     else:
         from ecms.graph.infrastructure.memory_store import InMemoryGraphStore
+
         store = InMemoryGraphStore()
     graph = GraphEngine(store=store, event_bus=event_bus)
     kernel = RuntimeKernel(

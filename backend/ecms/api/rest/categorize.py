@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 
 router = APIRouter(prefix="/categorize", tags=["categorize"])
 

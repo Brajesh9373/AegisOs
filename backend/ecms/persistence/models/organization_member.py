@@ -7,9 +7,9 @@ Distinct from project-generated runtime agents (which live in the `agents` table
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, JSON
+from sqlalchemy import JSON, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ecms.persistence.models.base import Base
@@ -26,29 +26,31 @@ class OrganizationMember(Base):
     designation: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     role: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     department: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
-    role_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    skills: Mapped[Optional[list[Any]]] = mapped_column(JSON, nullable=True)
-    reports_to: Mapped[Optional[str]] = mapped_column(
+    role_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    skills: Mapped[list[Any] | None] = mapped_column(JSON, nullable=True)
+    reports_to: Mapped[str | None] = mapped_column(
         String(128),
         ForeignKey("organization_members.id", ondelete="RESTRICT"),
         nullable=True,
         index=True,
     )
     status: Mapped[str] = mapped_column(String(32), default="active", index=True)
-    user_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    user_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, onupdate=utcnow,
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
     )
 
     # Self-referential hierarchy
-    manager: Mapped[Optional["OrganizationMember"]] = relationship(
+    manager: Mapped[OrganizationMember | None] = relationship(
         "OrganizationMember",
         remote_side="OrganizationMember.id",
         back_populates="reports",
         foreign_keys=[reports_to],
     )
-    reports: Mapped[list["OrganizationMember"]] = relationship(
+    reports: Mapped[list[OrganizationMember]] = relationship(
         "OrganizationMember",
         back_populates="manager",
         foreign_keys=[reports_to],

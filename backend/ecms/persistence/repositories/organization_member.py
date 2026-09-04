@@ -61,7 +61,9 @@ class OrganizationMemberRepository:
         stmt = (
             select(OrganizationMember)
             .where(OrganizationMember.status == "active")
-            .order_by(OrganizationMember.department, OrganizationMember.role, OrganizationMember.name)
+            .order_by(
+                OrganizationMember.department, OrganizationMember.role, OrganizationMember.name
+            )
         )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())

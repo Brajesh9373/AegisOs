@@ -18,8 +18,12 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.execute("ALTER TABLE policy_recommendations DROP CONSTRAINT IF EXISTS policy_recommendations_project_id_fkey")
-    op.execute("ALTER TABLE policy_recommendations DROP CONSTRAINT IF EXISTS policy_recommendations_reviewed_by_fkey")
+    op.execute(
+        "ALTER TABLE policy_recommendations DROP CONSTRAINT IF EXISTS policy_recommendations_project_id_fkey"
+    )
+    op.execute(
+        "ALTER TABLE policy_recommendations DROP CONSTRAINT IF EXISTS policy_recommendations_reviewed_by_fkey"
+    )
 
 
 def downgrade() -> None:

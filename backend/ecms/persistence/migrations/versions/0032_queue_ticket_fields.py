@@ -4,8 +4,8 @@ Revision ID: 0032
 Revises: 0031
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0032_queue_ticket_fields"
 down_revision = "0031_agent_automation_features"
@@ -15,11 +15,19 @@ depends_on = None
 
 def upgrade() -> None:
     op.add_column("human_queue", sa.Column("title", sa.Text(), nullable=True))
-    op.add_column("human_queue", sa.Column("type", sa.Text(), server_default="Approval", nullable=True))
-    op.add_column("human_queue", sa.Column("priority", sa.Text(), server_default="Medium", nullable=True))
-    op.add_column("human_queue", sa.Column("confidence", sa.Integer(), server_default="50", nullable=True))
+    op.add_column(
+        "human_queue", sa.Column("type", sa.Text(), server_default="Approval", nullable=True)
+    )
+    op.add_column(
+        "human_queue", sa.Column("priority", sa.Text(), server_default="Medium", nullable=True)
+    )
+    op.add_column(
+        "human_queue", sa.Column("confidence", sa.Integer(), server_default="50", nullable=True)
+    )
     op.add_column("human_queue", sa.Column("agent_name", sa.Text(), nullable=True))
-    op.add_column("human_queue", sa.Column("submitted_at", sa.DateTime(timezone=True), nullable=True))
+    op.add_column(
+        "human_queue", sa.Column("submitted_at", sa.DateTime(timezone=True), nullable=True)
+    )
     op.add_column("human_queue", sa.Column("due_by", sa.DateTime(timezone=True), nullable=True))
     op.add_column("human_queue", sa.Column("comment", sa.Text(), nullable=True))
 

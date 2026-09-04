@@ -31,8 +31,8 @@ class WorkingMemory:
 
     # CommandCode integration
     task_list: list[dict[str, str]] = field(default_factory=list)  # todo_write items
-    plan_mode: bool = False                                          # plan mode state
-    active_skill: str | None = None                                  # currently loaded skill
+    plan_mode: bool = False  # plan mode state
+    active_skill: str | None = None  # currently loaded skill
 
     def set(self, key: str, value: Any) -> None:
         self.variables[key] = value
@@ -68,7 +68,9 @@ class WorkingMemory:
             counts = ", ".join(f"{v} {k}" for k, v in statuses.items())
             parts.append(f"- {len(self.task_list)} items ({counts})")
             for item in self.task_list:
-                icon = {"pending": "○", "in_progress": "●", "completed": "✓"}.get(item["status"], "·")
+                icon = {"pending": "○", "in_progress": "●", "completed": "✓"}.get(
+                    item["status"], "·"
+                )
                 parts.append(f"  {icon} {item['content']}")
 
         # Plan mode indicator

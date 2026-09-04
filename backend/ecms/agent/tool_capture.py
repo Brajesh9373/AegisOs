@@ -8,7 +8,7 @@ across sessions.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -35,13 +35,22 @@ def _get_store() -> FileMemoryStore:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 _KNOWLEDGE_TOOLS = {
-    "query_graph", "search_memory", "expand_atom",
-    "glob", "grep", "read_file", "read_directory", "read_multiple_files",
-    "search_code", "understand_term", "web_search", "web_fetch",
+    "query_graph",
+    "search_memory",
+    "expand_atom",
+    "glob",
+    "grep",
+    "read_file",
+    "read_directory",
+    "read_multiple_files",
+    "search_code",
+    "understand_term",
+    "web_search",
+    "web_fetch",
 }
 
 
@@ -108,7 +117,7 @@ def capture_tool_result(
             topic = f"{tool_name} result"
 
         summary = _truncate(result, 300)
-        atom_id = f"TOOL-{tool_name}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{hash(summary) & 0xFFFF:04x}"
+        atom_id = f"TOOL-{tool_name}-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}-{hash(summary) & 0xFFFF:04x}"
 
         atom = MemoryAtom(
             id=atom_id,

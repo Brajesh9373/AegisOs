@@ -50,12 +50,8 @@ async def run() -> None:
         workspace=GitWorkspace(
             GitCommandRunner(),
             GitLimits(
-                clone_timeout_seconds=(
-                    settings.connector_git_clone_timeout_seconds
-                ),
-                fetch_timeout_seconds=(
-                    settings.connector_git_fetch_timeout_seconds
-                ),
+                clone_timeout_seconds=(settings.connector_git_clone_timeout_seconds),
+                fetch_timeout_seconds=(settings.connector_git_fetch_timeout_seconds),
                 clone_depth=settings.connector_git_clone_depth,
             ),
         ),
@@ -82,9 +78,7 @@ async def run() -> None:
             delivery = await parents.read()
             if delivery is None:
                 delivery = await parents.claim_stale(
-                    min_idle_ms=(
-                        settings.connector_ingestion_stale_after_seconds * 1_000
-                    )
+                    min_idle_ms=(settings.connector_ingestion_stale_after_seconds * 1_000)
                 )
             if delivery is None:
                 continue

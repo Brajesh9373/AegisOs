@@ -7,16 +7,16 @@ ProjectAgentAssignment links that position to a reusable permanent Agent.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, JSON, String, Text, UniqueConstraint
+from sqlalchemy import JSON, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ecms.persistence.models.agent import Agent
 from ecms.persistence.models.base import Base
 from ecms.shared.time import utcnow
 
-__all__ = ["ProjectAgentPosition", "ProjectAgentAssignment", "ProjectHumanAssignment"]
+__all__ = ["ProjectAgentAssignment", "ProjectAgentPosition", "ProjectHumanAssignment"]
 
 
 class ProjectAgentPosition(Base):
@@ -31,38 +31,38 @@ class ProjectAgentPosition(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     designation: Mapped[str] = mapped_column(String(255), nullable=False, default="", index=True)
-    role_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    skills: Mapped[Optional[list[Any]]] = mapped_column(JSON, nullable=True)
+    role_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    skills: Mapped[list[Any] | None] = mapped_column(JSON, nullable=True)
     department: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
-    reports_to: Mapped[Optional[str]] = mapped_column(
+    reports_to: Mapped[str | None] = mapped_column(
         String(128),
         ForeignKey("project_agent_positions.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
-    model: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    model: Mapped[str | None] = mapped_column(String(255), nullable=True)
     tool_policy: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    system_prompt_addon: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    automation: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
-    features: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
+    system_prompt_addon: Mapped[str | None] = mapped_column(Text, nullable=True)
+    automation: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    features: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="active", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
 
-    manager: Mapped[Optional["ProjectAgentPosition"]] = relationship(
+    manager: Mapped[ProjectAgentPosition | None] = relationship(
         "ProjectAgentPosition",
         remote_side="ProjectAgentPosition.id",
         back_populates="reports",
         foreign_keys=[reports_to],
     )
-    reports: Mapped[list["ProjectAgentPosition"]] = relationship(
+    reports: Mapped[list[ProjectAgentPosition]] = relationship(
         "ProjectAgentPosition",
         back_populates="manager",
         foreign_keys=[reports_to],
     )
-    assignment: Mapped[Optional["ProjectAgentAssignment"]] = relationship(
+    assignment: Mapped[ProjectAgentAssignment | None] = relationship(
         "ProjectAgentAssignment",
         back_populates="position",
         cascade="all, delete-orphan",
@@ -108,7 +108,7 @@ class ProjectAgentAssignment(Base):
         nullable=False,
         index=True,
     )
-    assigned_by_user_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    assigned_by_user_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     position: Mapped[ProjectAgentPosition] = relationship(
@@ -147,16 +147,18 @@ class ProjectHumanAssignment(Base):
         nullable=False,
         index=True,
     )
-    position_id: Mapped[Optional[str]] = mapped_column(
+    position_id: Mapped[str | None] = mapped_column(
         String(128),
         ForeignKey("project_agent_positions.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
     scope: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
-    responsibility: Mapped[str] = mapped_column(String(64), nullable=False, default="workspace_owner")
+    responsibility: Mapped[str] = mapped_column(
+        String(64), nullable=False, default="workspace_owner"
+    )
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active", index=True)
-    assigned_by_user_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    assigned_by_user_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     source: Mapped[str] = mapped_column(String(64), nullable=False, default="system")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(

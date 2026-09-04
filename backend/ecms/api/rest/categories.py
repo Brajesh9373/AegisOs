@@ -63,8 +63,11 @@ async def update_category(category_id: str, body: CategoryUpdate):
         if not cat:
             raise HTTPException(status_code=404, detail="Category not found")
         cat = await repo.update(
-            cat, description=body.description, color=body.color,
-            priority=body.priority, name=body.name,
+            cat,
+            description=body.description,
+            color=body.color,
+            priority=body.priority,
+            name=body.name,
         )
         await s.commit()
         await s.refresh(cat)
@@ -92,6 +95,8 @@ async def delete_category(category_id: str):
 async def recategorize(workspace_id: str):
     """Trigger AI categorization as a background task."""
     import asyncio
+
     from ecms.agent.categorize import run_categorization
+
     asyncio.create_task(run_categorization(workspace_id, workspace_id))
     return {"status": "categorization_started", "workspace_id": workspace_id}

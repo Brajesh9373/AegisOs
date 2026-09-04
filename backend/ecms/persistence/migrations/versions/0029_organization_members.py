@@ -34,7 +34,9 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.ForeignKeyConstraint(
-            ["reports_to"], ["organization_members.id"], ondelete="RESTRICT",
+            ["reports_to"],
+            ["organization_members.id"],
+            ondelete="RESTRICT",
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -62,7 +64,9 @@ def upgrade() -> None:
             ondelete="RESTRICT",
         ),
         sa.ForeignKeyConstraint(
-            ["project_agent_id"], ["agents.id"], ondelete="RESTRICT",
+            ["project_agent_id"],
+            ["agents.id"],
+            ondelete="RESTRICT",
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Mapping, Sequence
-from typing import Any, cast
+from typing import cast
 
 from ecms.agent.ba.cognition.contracts import (
     BAExecutionContext,
@@ -186,8 +186,14 @@ def _validate_stage(
         payload = _json_object(stage, output)
         category = payload.get("category")
         questions = str(payload.get("questions_markdown") or "").strip()
-        if not isinstance(category, str) or category not in CLARIFICATION_CATEGORIES or not questions:
-            raise BAStageValidationError("BA clarify stage returned an invalid category or question set.")
+        if (
+            not isinstance(category, str)
+            or category not in CLARIFICATION_CATEGORIES
+            or not questions
+        ):
+            raise BAStageValidationError(
+                "BA clarify stage returned an invalid category or question set."
+            )
         return {
             "category": category,
             "category_label": CLARIFICATION_CATEGORIES[category],
@@ -213,4 +219,6 @@ def _validate_stage(
             ).model_dump(),
         )
     except Exception as exc:
-        raise BAStageValidationError("BA design-team stage returned an invalid AgentTeam object.") from exc
+        raise BAStageValidationError(
+            "BA design-team stage returned an invalid AgentTeam object."
+        ) from exc

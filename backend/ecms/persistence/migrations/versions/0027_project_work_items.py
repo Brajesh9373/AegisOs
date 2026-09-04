@@ -62,10 +62,16 @@ def upgrade() -> None:
     """)
 
     op.execute("CREATE INDEX IF NOT EXISTS idx_project_epics_project ON project_epics(project_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_project_stories_project ON project_stories(project_id)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_project_stories_project ON project_stories(project_id)"
+    )
     op.execute("CREATE INDEX IF NOT EXISTS idx_project_stories_epic ON project_stories(epic_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_project_story_bugs_project ON project_story_bugs(project_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_project_story_bugs_story ON project_story_bugs(story_id)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_project_story_bugs_project ON project_story_bugs(project_id)"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_project_story_bugs_story ON project_story_bugs(story_id)"
+    )
 
 
 def downgrade() -> None:

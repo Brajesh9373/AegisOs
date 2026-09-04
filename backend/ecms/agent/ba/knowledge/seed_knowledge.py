@@ -45,6 +45,7 @@ async def seed_file(
     embeddings = None
     try:
         from ecms.agent.ba.knowledge.embeddings import generate_embeddings_batch
+
         embeddings = await generate_embeddings_batch(texts)
         logger.info("[seed] generated %d embeddings", len(embeddings))
     except Exception as exc:

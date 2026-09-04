@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -25,19 +25,23 @@ async def _require_auth(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Missing token")
 
     async with db_session() as session:
-        row = (await session.execute(
-            text("SELECT * FROM auth_sessions WHERE token = :token"),
-            {"token": token},
-        )).first()
+        row = (
+            await session.execute(
+                text("SELECT * FROM auth_sessions WHERE token = :token"),
+                {"token": token},
+            )
+        ).first()
         if not row:
             raise HTTPException(status_code=401, detail="Invalid session")
         sess = row._mapping if hasattr(row, "_mapping") else dict(row)
         if int(sess.get("expiresat", "0")) < int(datetime.now().timestamp() * 1000):
             raise HTTPException(status_code=401, detail="Session expired")
-        user_row = (await session.execute(
-            text("SELECT * FROM users WHERE id = :id"),
-            {"id": sess["userid"]},
-        )).first()
+        user_row = (
+            await session.execute(
+                text("SELECT * FROM users WHERE id = :id"),
+                {"id": sess["userid"]},
+            )
+        ).first()
         if not user_row:
             raise HTTPException(status_code=401, detail="User not found")
         return dict(user_row._mapping) if hasattr(user_row, "_mapping") else dict(user_row)
@@ -141,7 +145,9 @@ async def assign_agent(agent_id: str, body: AssignAgentRequest, request: Request
         position = await repo.get(body.position_id)
         if not position:
             raise HTTPException(status_code=404, detail="Project agent position not found")
-        assignment = await repo.assign(body.position_id, agent_id, assigned_by_user_id="current-user")
+        assignment = await repo.assign(
+            body.position_id, agent_id, assigned_by_user_id="current-user"
+        )
         if not assignment:
             raise HTTPException(status_code=404, detail="Active agent not found")
         positions = await repo.serialize_project(position.project_id)
@@ -197,7 +203,9 @@ async def hire_for_position(body: HireForPositionRequest, request: Request):
             status="active",
             model=position.model,
         )
-        assignment = await position_repo.assign(position.id, agent.id, assigned_by_user_id="current-user")
+        assignment = await position_repo.assign(
+            position.id, agent.id, assigned_by_user_id="current-user"
+        )
         positions = await position_repo.serialize_project(position.project_id)
         return {
             "agent": agent.to_dict(),

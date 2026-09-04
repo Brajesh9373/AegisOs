@@ -200,9 +200,7 @@ class IngestionWorker:
                     nodes_written=nodes_written,
                     edges_written=edges_written,
                 )
-                await asyncio.sleep(
-                    self._settings.connector_ingestion_write_yield_seconds
-                )
+                await asyncio.sleep(self._settings.connector_ingestion_write_yield_seconds)
             if cancel.is_set():
                 raise IngestionCancelledError("ingestion cancelled")
             await self._store.mark_stage(spec.job_id, "snapshotting")
@@ -238,9 +236,7 @@ class IngestionWorker:
                 extra={"job_id": delivery.job_id},
             )
 
-    async def _poll_cancellation(
-        self, job_id: str, cancellation: asyncio.Event
-    ) -> None:
+    async def _poll_cancellation(self, job_id: str, cancellation: asyncio.Event) -> None:
         while not cancellation.is_set():
             if not await self._store.renew_lease(job_id):
                 cancellation.set()
@@ -251,16 +247,13 @@ class IngestionWorker:
             await asyncio.sleep(2)
 
 
-async def _worker_loop(
-    queue: IngestionQueue, worker: IngestionWorker
-) -> None:
+async def _worker_loop(queue: IngestionQueue, worker: IngestionWorker) -> None:
     while True:
         delivery = await queue.read()
         await queue.heartbeat()
         if delivery is None:
             delivery = await queue.claim_stale(
-                min_idle_ms=worker._settings.connector_ingestion_stale_after_seconds
-                * 1_000
+                min_idle_ms=worker._settings.connector_ingestion_stale_after_seconds * 1_000
             )
             if delivery is None:
                 continue
@@ -286,9 +279,7 @@ class PostgresJobStore:
         self._lease_owner = lease_owner
         self._lease_seconds = lease_seconds
 
-    async def claim(
-        self, job_id: str, organization_id: str
-    ) -> GitJobSpec | None:
+    async def claim(self, job_id: str, organization_id: str) -> GitJobSpec | None:
         """Claim an eligible job and return its credential-free source specification."""
         async with db_session() as session:
             result = await session.execute(
@@ -330,8 +321,7 @@ class PostgresJobStore:
             checkpoint = job.checkpoint or {}
             last_successful_revision = await session.scalar(
                 text(
-                    "SELECT last_successful_revision FROM connections "
-                    "WHERE number = :connection_id"
+                    "SELECT last_successful_revision FROM connections WHERE number = :connection_id"
                 ),
                 {"connection_id": job.connection_id},
             )
@@ -482,9 +472,7 @@ class PostgresJobStore:
                 )
 
     @staticmethod
-    async def _sync_connection(
-        session: AsyncSession, job: ConnectorIngestionJob
-    ) -> None:
+    async def _sync_connection(session: AsyncSession, job: ConnectorIngestionJob) -> None:
         await session.execute(
             text(
                 "UPDATE connections SET current_ingestion_job_id = :job_id, "
@@ -508,9 +496,7 @@ class LegacyGraphChunkSink:
         self._successes: dict[str, int] = {}
         self._snapshot_timeout_seconds = snapshot_timeout_seconds
 
-    async def write(
-        self, spec: GitJobSpec, files: Sequence[ScannedFile]
-    ) -> ChunkWrite:
+    async def write(self, spec: GitJobSpec, files: Sequence[ScannedFile]) -> ChunkWrite:
         """Normalize a file chunk and submit one graph batch."""
         from legacy_ecms.api.graph_context import orchestrator_context
         from legacy_ecms.core.uko import UKOMetadata, UKOType, UniversalKnowledgeObject
@@ -545,9 +531,7 @@ class LegacyGraphChunkSink:
             for item in files
         ]
         if spec.workspace_id:
-            ukos = attach_ukos_to_workspace(
-                ukos, spec.workspace_id, spec.workspace_id
-            )
+            ukos = attach_ukos_to_workspace(ukos, spec.workspace_id, spec.workspace_id)
         async with orchestrator_context(True) as orchestrator:
             _, result = await orchestrator.process_batch(ukos)
         if result.failure_count:
@@ -555,9 +539,7 @@ class LegacyGraphChunkSink:
             raise RuntimeError(
                 f"graph batch failed ({result.failure_count}): {first.error_message}"
             )
-        self._successes[spec.job_id] = (
-            self._successes.get(spec.job_id, 0) + result.success_count
-        )
+        self._successes[spec.job_id] = self._successes.get(spec.job_id, 0) + result.success_count
         return ChunkWrite(nodes=result.success_count)
 
     async def finalize(self, spec: GitJobSpec) -> None:
@@ -593,19 +575,14 @@ class LegacyGraphChunkSink:
                     )
             await asyncio.sleep(2)
         raise TimeoutError(
-            f"knowledge graph snapshot did not activate within "
-            f"{self._snapshot_timeout_seconds}s"
+            f"knowledge graph snapshot did not activate within {self._snapshot_timeout_seconds}s"
         )
 
-    async def finalize_persisted(
-        self, spec: GitJobSpec, *, success_count: int
-    ) -> None:
+    async def finalize_persisted(self, spec: GitJobSpec, *, success_count: int) -> None:
         """Finalize graph writes recovered from durable batch counters."""
         if success_count < 1:
             raise ValueError("success_count must be positive")
-        self._successes[spec.job_id] = max(
-            self._successes.get(spec.job_id, 0), success_count
-        )
+        self._successes[spec.job_id] = max(self._successes.get(spec.job_id, 0), success_count)
         await self.finalize(spec)
 
     @staticmethod
@@ -657,9 +634,7 @@ def _uko_type(path: str, enum: object) -> object:
     return enum.FILE
 
 
-async def run_worker(
-    store: JobStore | None = None, sink: ChunkSink | None = None
-) -> None:
+async def run_worker(store: JobStore | None = None, sink: ChunkSink | None = None) -> None:
     """Run the production worker or injected test adapters."""
     settings = get_settings()
     redis = Redis.from_url(settings.redis_url)
@@ -679,9 +654,7 @@ async def run_worker(
                 ),
                 sink=sink
                 or LegacyGraphChunkSink(
-                    snapshot_timeout_seconds=(
-                        settings.connector_ingestion_snapshot_timeout_seconds
-                    )
+                    snapshot_timeout_seconds=(settings.connector_ingestion_snapshot_timeout_seconds)
                 ),
                 settings=settings,
             ),

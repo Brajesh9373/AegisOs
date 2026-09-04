@@ -5,7 +5,6 @@ knowledge graph data (node counts, breakdowns, etc.). Delete cascades across
 ALL stores: DB, FalkorDB, Mem0/Qdrant, Redis sessions, GBrain disk files.
 """
 
-import json
 import os
 import shutil
 
@@ -30,9 +29,11 @@ def _get_falkordb_graph():
     """Return a FalkorDB graph handle for the current config."""
     import falkordb
     from legacy_ecms.config import get_settings
+
     s = get_settings()
     db = falkordb.FalkorDB(
-        host=s.falkordb_host, port=s.falkordb_port,
+        host=s.falkordb_host,
+        port=s.falkordb_port,
         password=s.falkordb_password or None,
     )
     return db.select_graph(s.falkordb_database)
@@ -78,6 +79,7 @@ async def list_projects(request: Request) -> list[dict]:
     try:
         from ecms.persistence.database.rest_session import db_session as pg_session
         from ecms.persistence.repositories.project import ProjectRepository
+
         async with pg_session() as session:
             repo = ProjectRepository(session)
             db_projects = await repo.export_all()
@@ -97,7 +99,9 @@ async def list_projects(request: Request) -> list[dict]:
         for row in ws_rows:
             if row[0]:
                 ws_id = str(row[0])
-                ws_name = str(row[1]) if len(row) > 1 and row[1] else ws_id.replace("workspace:", "")
+                ws_name = (
+                    str(row[1]) if len(row) > 1 and row[1] else ws_id.replace("workspace:", "")
+                )
                 graph_workspaces[ws_id] = ws_name
     except Exception:
         graph_workspaces = {}
@@ -111,7 +115,9 @@ async def list_projects(request: Request) -> list[dict]:
                     "MATCH (u:UKO) WHERE u.group_id = $gid RETURN DISTINCT u.source, u.type",
                     {"gid": ws_name},
                 )
-                src_rows = src_result.result_set if hasattr(src_result, "result_set") else src_result
+                src_rows = (
+                    src_result.result_set if hasattr(src_result, "result_set") else src_result
+                )
                 seen: set[str] = set()
                 conns: list[str] = []
                 for sr in src_rows:
@@ -149,39 +155,45 @@ async def list_projects(request: Request) -> list[dict]:
         if g is not None:
             nc, ec, ta, bd = _graph_stats(g, ws_graph_id, ws_id)
 
-        projects.append({
-            "workspace_id": ws_short,
-            "name": display_name,
-            "node_count": nc,
-            "edge_count": ec,
-            "total_nodes": ta,
-            "breakdown": bd,
-            "connectors": connector_sources.get(ws_id, []),
-            "connector_configs": dbp.get("connectors", []),
-            "created_at": dbp.get("created_at", ""),
-            "group_id": dbp.get("group_id", ws_id),
-        })
+        projects.append(
+            {
+                "workspace_id": ws_short,
+                "name": display_name,
+                "node_count": nc,
+                "edge_count": ec,
+                "total_nodes": ta,
+                "breakdown": bd,
+                "connectors": connector_sources.get(ws_id, []),
+                "connector_configs": dbp.get("connectors", []),
+                "created_at": dbp.get("created_at", ""),
+                "group_id": dbp.get("group_id", ws_id),
+            }
+        )
 
     # Second: orphan workspaces in FalkorDB but not in PostgreSQL
     for ws_graph_id, ws_name in graph_workspaces.items():
-        ws_short = ws_name if not ws_name.startswith("workspace:") else ws_name.replace("workspace:", "")
+        ws_short = (
+            ws_name if not ws_name.startswith("workspace:") else ws_name.replace("workspace:", "")
+        )
         if ws_short in seen_ws:
             continue
         seen_ws.add(ws_short)
 
         nc, ec, ta, bd = _graph_stats(g, ws_graph_id, ws_name) if g is not None else (0, 0, 0, {})
 
-        projects.append({
-            "workspace_id": ws_short,
-            "name": ws_name if not ws_name.startswith("workspace:") else ws_short,
-            "node_count": nc,
-            "edge_count": ec,
-            "total_nodes": ta,
-            "breakdown": bd,
-            "connectors": connector_sources.get(ws_name, []),
-            "connector_configs": [],
-            "created_at": "",
-        })
+        projects.append(
+            {
+                "workspace_id": ws_short,
+                "name": ws_name if not ws_name.startswith("workspace:") else ws_short,
+                "node_count": nc,
+                "edge_count": ec,
+                "total_nodes": ta,
+                "breakdown": bd,
+                "connectors": connector_sources.get(ws_name, []),
+                "connector_configs": [],
+                "created_at": "",
+            }
+        )
 
     return projects
 
@@ -192,12 +204,23 @@ async def delete_project(workspace_id: str) -> dict:
     g = _get_falkordb_graph()
 
     # 1. Resolve workspace node
-    ws_id_prefixed = f"workspace:{workspace_id}" if not workspace_id.startswith("workspace:") else workspace_id
+    ws_id_prefixed = (
+        f"workspace:{workspace_id}" if not workspace_id.startswith("workspace:") else workspace_id
+    )
     ws_rows = None
     for q, params in [
-        ("MATCH (w:UKO) WHERE w.type = 'workspace' AND w.id = $id RETURN w.id, w.name", {"id": ws_id_prefixed}),
-        ("MATCH (w:UKO) WHERE w.type = 'workspace' AND w.name = $name RETURN w.id, w.name LIMIT 1", {"name": workspace_id}),
-        ("MATCH (w:UKO) WHERE w.type = 'workspace' AND w.id STARTSWITH $prefix RETURN w.id, w.name LIMIT 1", {"prefix": ws_id_prefixed}),
+        (
+            "MATCH (w:UKO) WHERE w.type = 'workspace' AND w.id = $id RETURN w.id, w.name",
+            {"id": ws_id_prefixed},
+        ),
+        (
+            "MATCH (w:UKO) WHERE w.type = 'workspace' AND w.name = $name RETURN w.id, w.name LIMIT 1",
+            {"name": workspace_id},
+        ),
+        (
+            "MATCH (w:UKO) WHERE w.type = 'workspace' AND w.id STARTSWITH $prefix RETURN w.id, w.name LIMIT 1",
+            {"prefix": ws_id_prefixed},
+        ),
     ]:
         res = g.query(q, params)
         ws_rows = res.result_set if hasattr(res, "result_set") else res
@@ -212,7 +235,7 @@ async def delete_project(workspace_id: str) -> dict:
     # Find by group_id
     try:
         res = g.query("MATCH (u:UKO) WHERE u.group_id = $gid RETURN u.id", {"gid": group_id})
-        for tr in (res.result_set if hasattr(res, "result_set") else res):
+        for tr in res.result_set if hasattr(res, "result_set") else res:
             if tr[0]:
                 all_ids.add(str(tr[0]))
     except Exception:
@@ -225,7 +248,7 @@ async def delete_project(workspace_id: str) -> dict:
                 "MATCH (u:UKO)-[r:RELATES {label: 'part_of_workspace'}]->(w:UKO {id: $ws_id}) RETURN u.id",
                 {"ws_id": ws_node_id},
             )
-            for er in (res.result_set if hasattr(res, "result_set") else res):
+            for er in res.result_set if hasattr(res, "result_set") else res:
                 if er[0]:
                     all_ids.add(str(er[0]))
         except Exception:
@@ -234,8 +257,11 @@ async def delete_project(workspace_id: str) -> dict:
     # Try prefix on group_id
     if not all_ids:
         try:
-            res = g.query("MATCH (u:UKO) WHERE u.group_id STARTSWITH $prefix RETURN u.id", {"prefix": workspace_id})
-            for tr in (res.result_set if hasattr(res, "result_set") else res):
+            res = g.query(
+                "MATCH (u:UKO) WHERE u.group_id STARTSWITH $prefix RETURN u.id",
+                {"prefix": workspace_id},
+            )
+            for tr in res.result_set if hasattr(res, "result_set") else res:
                 if tr[0]:
                     all_ids.add(str(tr[0]))
         except Exception:
@@ -268,6 +294,7 @@ async def delete_project(workspace_id: str) -> dict:
     try:
         from ecms.persistence.database.rest_session import db_session as pg_session
         from ecms.persistence.repositories.project import ProjectRepository
+
         async with pg_session() as session:
             repo = ProjectRepository(session)
             db_deleted = await repo.delete(workspace_id)
@@ -279,6 +306,7 @@ async def delete_project(workspace_id: str) -> dict:
     try:
         from ecms.persistence.database.rest_session import db_session as pg_session2
         from ecms.persistence.repositories.session import SessionRepository
+
         async with pg_session2() as session:
             sessions_deleted = await SessionRepository(session).delete_by_workspace(workspace_id)
     except Exception:
@@ -288,6 +316,7 @@ async def delete_project(workspace_id: str) -> dict:
     mem0_deleted = False
     try:
         import qdrant_client
+
         ws_collection = f"ecms_mem0_{workspace_id}" if workspace_id != "default" else "ecms_mem0"
         qdrant = qdrant_client.QdrantClient(
             url=os.environ.get("ECMS_MEM0_QDRANT_URL", "http://qdrant:6333"),
@@ -304,6 +333,7 @@ async def delete_project(workspace_id: str) -> dict:
     redis_deleted = 0
     try:
         import redis
+
         r = redis.Redis.from_url(
             os.environ.get("ECMS_REDIS_URL", "redis://redis:6379/0"),
             decode_responses=True,
@@ -347,7 +377,9 @@ async def delete_project(workspace_id: str) -> dict:
 async def edit_project(workspace_id: str, body: EditProjectRequest) -> dict:
     """Edit workspace name and connectors."""
     g = _get_falkordb_graph()
-    ws_id_prefixed = f"workspace:{workspace_id}" if not workspace_id.startswith("workspace:") else workspace_id
+    ws_id_prefixed = (
+        f"workspace:{workspace_id}" if not workspace_id.startswith("workspace:") else workspace_id
+    )
 
     try:
         if body.name:
@@ -360,6 +392,7 @@ async def edit_project(workspace_id: str, body: EditProjectRequest) -> dict:
             try:
                 from ecms.persistence.database.rest_session import db_session as pg_session
                 from ecms.persistence.repositories.project import ProjectRepository
+
                 async with pg_session() as session:
                     repo = ProjectRepository(session)
                     await repo.upsert(

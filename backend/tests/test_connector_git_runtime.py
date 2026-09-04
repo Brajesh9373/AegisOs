@@ -66,9 +66,7 @@ async def test_requested_revision_rejects_option_and_revspec_injection(
 ) -> None:
     workspace = GitWorkspace(RecordingRunner(), GitLimits())  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="invalid"):
-        await workspace.checkout_revision(
-            Path("repo"), revision, cancel=asyncio.Event()
-        )
+        await workspace.checkout_revision(Path("repo"), revision, cancel=asyncio.Event())
 
 
 def test_git_diagnostic_redaction_removes_credentials_and_query_secrets() -> None:

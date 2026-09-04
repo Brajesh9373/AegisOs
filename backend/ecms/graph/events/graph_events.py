@@ -35,13 +35,16 @@ def node_created(
     importance: int = 0,
 ) -> BaseEvent:
     """Emitted when a node is created (SECTION 58)."""
-    return _event("NodeCreated", {
-        "node_id": node_id,
-        "display_name": display_name,
-        "ontology_type": ontology_type,
-        "confidence": confidence,
-        "importance": importance,
-    })
+    return _event(
+        "NodeCreated",
+        {
+            "node_id": node_id,
+            "display_name": display_name,
+            "ontology_type": ontology_type,
+            "confidence": confidence,
+            "importance": importance,
+        },
+    )
 
 
 def node_updated(
@@ -53,13 +56,16 @@ def node_updated(
     importance: int = 0,
 ) -> BaseEvent:
     """Emitted when a node is updated to a new version (SECTION 58)."""
-    return _event("NodeUpdated", {
-        "node_id": node_id,
-        "display_name": display_name,
-        "ontology_type": ontology_type,
-        "confidence": confidence,
-        "importance": importance,
-    })
+    return _event(
+        "NodeUpdated",
+        {
+            "node_id": node_id,
+            "display_name": display_name,
+            "ontology_type": ontology_type,
+            "confidence": confidence,
+            "importance": importance,
+        },
+    )
 
 
 def node_deleted(node_id: str) -> BaseEvent:

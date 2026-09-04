@@ -43,9 +43,7 @@ async def _submit(service: ConnectorIngestionService):
 
 def test_repository_identity_removes_credentials_and_git_suffix() -> None:
     with pytest.raises(ValueError, match="must not contain credentials"):
-        normalize_repository_identity(
-            "https://token@GitHub.com/OpenClaw/OpenClaw.git?private=1"
-        )
+        normalize_repository_identity("https://token@GitHub.com/OpenClaw/OpenClaw.git?private=1")
     assert (
         normalize_repository_identity("git@github.com:OpenClaw/OpenClaw.git")
         == "ssh://github.com/OpenClaw/OpenClaw"

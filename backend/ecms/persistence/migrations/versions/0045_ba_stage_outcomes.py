@@ -87,7 +87,9 @@ def upgrade() -> None:
         sa.Column(
             "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
         ),
-        sa.UniqueConstraint("organization_id", "idempotency_key", name="uq_ba_stage_receipt_org_idempotency"),
+        sa.UniqueConstraint(
+            "organization_id", "idempotency_key", name="uq_ba_stage_receipt_org_idempotency"
+        ),
         sa.UniqueConstraint("id", "organization_id", name="uq_ba_stage_receipt_provenance"),
         sa.CheckConstraint(_RECEIPT_STAGE, name="ck_ba_stage_receipt_stage"),
         sa.CheckConstraint(
@@ -137,7 +139,9 @@ def upgrade() -> None:
         sa.Column("approved_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("rejected_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("promoted_at", sa.DateTime(timezone=True), nullable=True),
-        sa.UniqueConstraint("organization_id", "candidate_key", name="uq_ba_candidate_org_idempotency"),
+        sa.UniqueConstraint(
+            "organization_id", "candidate_key", name="uq_ba_candidate_org_idempotency"
+        ),
         sa.UniqueConstraint("id", "organization_id", name="uq_ba_candidate_provenance"),
         sa.ForeignKeyConstraint(
             ["receipt_id", "organization_id"],
@@ -200,20 +204,18 @@ def upgrade() -> None:
             name="fk_ba_outbox_candidate_provenance",
         ),
         sa.CheckConstraint(_OUTBOX_STATE, name="ck_ba_outbox_state"),
-        sa.CheckConstraint(
-            "attempt >= 0 AND max_attempts > 0", name="ck_ba_outbox_attempt_bounds"
-        ),
+        sa.CheckConstraint("attempt >= 0 AND max_attempts > 0", name="ck_ba_outbox_attempt_bounds"),
     )
-    op.create_index("ix_ba_promotion_outbox_organization_id", "ba_promotion_outbox", ["organization_id"])
+    op.create_index(
+        "ix_ba_promotion_outbox_organization_id", "ba_promotion_outbox", ["organization_id"]
+    )
     op.create_index("ix_ba_promotion_outbox_state", "ba_promotion_outbox", ["state"])
     op.create_index(
         "ix_ba_outbox_claim",
         "ba_promotion_outbox",
         ["state", "available_at", "lease_expires_at"],
     )
-    op.create_index(
-        "ix_ba_outbox_org_state", "ba_promotion_outbox", ["organization_id", "state"]
-    )
+    op.create_index("ix_ba_outbox_org_state", "ba_promotion_outbox", ["organization_id", "state"])
 
 
 def downgrade() -> None:

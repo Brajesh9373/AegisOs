@@ -45,21 +45,49 @@ def detect_language(content: str, *, hint: str | None = None) -> str:
     if hint:
         normalized = hint.lower().strip()
         short_map = {
-            "py": "python", "pyi": "python",
-            "js": "javascript", "mjs": "javascript", "cjs": "javascript",
+            "py": "python",
+            "pyi": "python",
+            "js": "javascript",
+            "mjs": "javascript",
+            "cjs": "javascript",
             "jsx": "javascript",
-            "ts": "typescript", "tsx": "typescript", "mts": "typescript",
-            "go": "go", "rs": "rust", "rb": "ruby", "java": "java",
-            "swift": "swift", "kt": "kotlin", "kts": "kotlin",
-            "scala": "scala", "cpp": "cpp", "cc": "cpp", "cxx": "cpp",
-            "hpp": "cpp", "c": "c", "h": "c",
-            "cs": "csharp", "php": "php",
-            "sql": "sql", "sh": "shell", "bash": "shell", "zsh": "shell",
-            "yaml": "yaml", "yml": "yaml", "json": "json",
-            "xml": "xml", "html": "html", "htm": "html",
-            "css": "css", "scss": "scss", "less": "less",
-            "md": "markdown", "mdx": "markdown", "toml": "toml",
-            "dockerfile": "dockerfile", "makefile": "makefile",
+            "ts": "typescript",
+            "tsx": "typescript",
+            "mts": "typescript",
+            "go": "go",
+            "rs": "rust",
+            "rb": "ruby",
+            "java": "java",
+            "swift": "swift",
+            "kt": "kotlin",
+            "kts": "kotlin",
+            "scala": "scala",
+            "cpp": "cpp",
+            "cc": "cpp",
+            "cxx": "cpp",
+            "hpp": "cpp",
+            "c": "c",
+            "h": "c",
+            "cs": "csharp",
+            "php": "php",
+            "sql": "sql",
+            "sh": "shell",
+            "bash": "shell",
+            "zsh": "shell",
+            "yaml": "yaml",
+            "yml": "yaml",
+            "json": "json",
+            "xml": "xml",
+            "html": "html",
+            "htm": "html",
+            "css": "css",
+            "scss": "scss",
+            "less": "less",
+            "md": "markdown",
+            "mdx": "markdown",
+            "toml": "toml",
+            "dockerfile": "dockerfile",
+            "makefile": "makefile",
             "cmake": "cmake",
         }
         return short_map.get(normalized, normalized)
@@ -70,7 +98,9 @@ def detect_language(content: str, *, hint: str | None = None) -> str:
         return "javascript"
     if re.search(r"^\s*(package |func |import \()", sample, re.MULTILINE):
         return "go"
-    if re.search(r"^\s*(fn |use |mod |impl |pub )", sample, re.MULTILINE) and re.search(r"->", sample):
+    if re.search(r"^\s*(fn |use |mod |impl |pub )", sample, re.MULTILINE) and re.search(
+        r"->", sample
+    ):
         return "rust"
     if re.search(r"<\?php", sample):
         return "php"
@@ -255,7 +285,10 @@ def analyze_code(
         return PythonCodeAnalyzer().analyze(content, module_name=module_name)
     if resolved in ("javascript", "typescript"):
         try:
-            from ecms.knowledge.infrastructure.js_analyzer import JavaScriptAnalyzer, TypeScriptAnalyzer  # type: ignore[import-untyped,unused-ignore]
+            from ecms.knowledge.infrastructure.js_analyzer import (  # type: ignore[import-untyped,unused-ignore]
+                JavaScriptAnalyzer,
+                TypeScriptAnalyzer,
+            )
         except ImportError:
             pass  # fall through to generic
         else:

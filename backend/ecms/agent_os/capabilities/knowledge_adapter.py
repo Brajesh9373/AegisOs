@@ -7,17 +7,15 @@ scoped knowledge retrieval infrastructure.
 from __future__ import annotations
 
 import logging
-from typing import Any, Sequence
-
-from pydantic import Field
+from typing import Any
 
 from ecms.agent_os.capabilities.contracts import (
     CapabilityEffect,
     CapabilityExecutionContext,
     CapabilityExecutionResult,
+    CapabilityPlugin,
     CapabilitySpec,
 )
-from ecms.agent_os.capabilities.contracts import CapabilityPlugin
 
 logger = logging.getLogger(__name__)
 
@@ -134,13 +132,15 @@ class KnowledgeSearchCapability(CapabilityPlugin):
 
         results = []
         for uco in ucos:
-            results.append({
-                "id": uco.uco_id,
-                "title": uco.display_name,
-                "summary": uco.summary or uco.description[:200],
-                "type": uco.ontology_type,
-                "confidence": uco.confidence,
-            })
+            results.append(
+                {
+                    "id": uco.uco_id,
+                    "title": uco.display_name,
+                    "summary": uco.summary or uco.description[:200],
+                    "type": uco.ontology_type,
+                    "confidence": uco.confidence,
+                }
+            )
 
         return results
 

@@ -7,10 +7,10 @@ agents are evaluated through DENY-first policy matching.
 from __future__ import annotations
 
 import fnmatch
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from ecms.persistence.models.access_policy import AccessPolicy
-
 
 _RULES: dict[str, list[Callable]] | None = None
 
@@ -27,15 +27,27 @@ def _matches(agent: Any, resource: dict, policy: AccessPolicy) -> bool:
     """Check if a policy matches an agent + resource combination."""
     # Subject match
     if policy.agent_id:
-        agent_id = getattr(agent, "id", agent.get("id", "")) if not isinstance(agent, dict) else agent.get("id", "")
+        agent_id = (
+            getattr(agent, "id", agent.get("id", ""))
+            if not isinstance(agent, dict)
+            else agent.get("id", "")
+        )
         if agent_id != policy.agent_id:
             return False
     if policy.department:
-        dept = getattr(agent, "department", agent.get("department", "")) if not isinstance(agent, dict) else agent.get("department", "")
+        dept = (
+            getattr(agent, "department", agent.get("department", ""))
+            if not isinstance(agent, dict)
+            else agent.get("department", "")
+        )
         if dept != policy.department:
             return False
     if policy.role_level_min is not None:
-        level = getattr(agent, "role_level", agent.get("role_level", 1)) if not isinstance(agent, dict) else agent.get("role_level", 1)
+        level = (
+            getattr(agent, "role_level", agent.get("role_level", 1))
+            if not isinstance(agent, dict)
+            else agent.get("role_level", 1)
+        )
         if level < policy.role_level_min:
             return False
 
@@ -76,18 +88,35 @@ def _rule_deny(agent: Any, resource: dict, policy: AccessPolicy) -> bool:
 
 
 def _is_root_agent(agent: Any) -> bool:
-    reports_to = getattr(agent, "reports_to", agent.get("reports_to")) if not isinstance(agent, dict) else agent.get("reports_to")
+    reports_to = (
+        getattr(agent, "reports_to", agent.get("reports_to"))
+        if not isinstance(agent, dict)
+        else agent.get("reports_to")
+    )
     return reports_to is None
 
 
 async def _get_policies_for_agent(agent: Any) -> list[AccessPolicy]:
     """Fetch all policies matching an agent from the database."""
-    from ecms.persistence.database.rest_session import db_session
-    from sqlalchemy import select, or_
+    from sqlalchemy import or_, select
 
-    department = getattr(agent, "department", agent.get("department", "")) if not isinstance(agent, dict) else agent.get("department", "")
-    agent_id = getattr(agent, "id", agent.get("id", "")) if not isinstance(agent, dict) else agent.get("id", "")
-    role_level = getattr(agent, "role_level", agent.get("role_level", 1)) if not isinstance(agent, dict) else agent.get("role_level", 1)
+    from ecms.persistence.database.rest_session import db_session
+
+    department = (
+        getattr(agent, "department", agent.get("department", ""))
+        if not isinstance(agent, dict)
+        else agent.get("department", "")
+    )
+    agent_id = (
+        getattr(agent, "id", agent.get("id", ""))
+        if not isinstance(agent, dict)
+        else agent.get("id", "")
+    )
+    role_level = (
+        getattr(agent, "role_level", agent.get("role_level", 1))
+        if not isinstance(agent, dict)
+        else agent.get("role_level", 1)
+    )
 
     async with db_session() as s:
         stmt = (
@@ -152,7 +181,9 @@ def filter_atom_results(agent: Any, atoms: list[Any], action: str = "read") -> l
     return allowed
 
 
-async def filter_atom_results_async(agent: Any, atoms: list[Any], action: str = "read") -> list[Any]:
+async def filter_atom_results_async(
+    agent: Any, atoms: list[Any], action: str = "read"
+) -> list[Any]:
     """Async version — post-filter memory atom results."""
     if _is_root_agent(agent):
         return atoms
@@ -180,7 +211,9 @@ async def filter_atom_results_async(agent: Any, atoms: list[Any], action: str = 
         if matched:
             allowed.append(a)
 
-    return allowed if allowed else atoms  # if no policies match, default allow for atoms without explicit DENY
+    return (
+        allowed if allowed else atoms
+    )  # if no policies match, default allow for atoms without explicit DENY
 
 
 async def filter_graph_results(agent: Any, nodes: list[dict], action: str = "read") -> list[dict]:

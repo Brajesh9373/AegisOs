@@ -54,14 +54,10 @@ class GitCommandRunner:
             stderr=asyncio.subprocess.PIPE,
             env={**os.environ, **(env_overrides or {})},
             start_new_session=os.name != "nt",
-            creationflags=(
-                subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
-            ),
+            creationflags=(subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0),
         )
         communicate = asyncio.create_task(process.communicate())
-        cancellation = (
-            asyncio.create_task(cancel.wait()) if cancel is not None else None
-        )
+        cancellation = asyncio.create_task(cancel.wait()) if cancel is not None else None
         try:
             waiters: set[asyncio.Task[Any]] = {communicate}
             if cancellation is not None:
@@ -74,19 +70,13 @@ class GitCommandRunner:
             if communicate in done:
                 stdout, stderr = communicate.result()
                 if process.returncode:
-                    detail = _redact_git_error(
-                        stderr.decode(errors="replace").strip()
-                    )[-2_000:]
-                    raise GitCommandError(
-                        f"git {args[0] if args else 'command'} failed: {detail}"
-                    )
+                    detail = _redact_git_error(stderr.decode(errors="replace").strip())[-2_000:]
+                    raise GitCommandError(f"git {args[0] if args else 'command'} failed: {detail}")
                 return stdout.decode(errors="replace")
             await self._stop(process)
             if cancellation is not None and cancellation in done:
                 raise IngestionCancelledError("Git operation cancelled")
-            raise TimeoutError(
-                f"git {args[0] if args else 'command'} exceeded {timeout_seconds}s"
-            )
+            raise TimeoutError(f"git {args[0] if args else 'command'} exceeded {timeout_seconds}s")
         finally:
             communicate.cancel()
             if cancellation is not None:
@@ -265,9 +255,7 @@ class GitWorkspace:
         """Supply HTTPS auth through process environment, never URL/argv/error output."""
         if not access_token:
             return {}
-        credential = base64.b64encode(
-            f"x-access-token:{access_token}".encode()
-        ).decode()
+        credential = base64.b64encode(f"x-access-token:{access_token}".encode()).decode()
         return {
             "GIT_CONFIG_COUNT": "1",
             "GIT_CONFIG_KEY_0": "http.extraHeader",

@@ -19,7 +19,11 @@ def business_analyst_dsh_profile_spec() -> DSHProfileSpec:
     return DSHProfileSpec(
         profile_id="business-analyst",
         version="1.0.0",
-        asset_root=repository_root / "packages" / "dsh-integration" / "profiles" / "business-analyst",
+        asset_root=repository_root
+        / "packages"
+        / "dsh-integration"
+        / "profiles"
+        / "business-analyst",
         required_environment=("ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN"),
         generated_environment=("CLAUDE_CODE_SESSION_ID",),
         stages=(

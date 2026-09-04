@@ -7,13 +7,15 @@ tasks, and cross_team_requests tables for persistence.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
 from typing import Any
 
+from ecms.agent.permissions import (
+    can_assign,
+    can_request_cross_team,
+    find_senior_in_dept,
+)
 from ecms.persistence.database.rest_session import db_session
-from ecms.persistence.repositories.agent import AgentRepository
 from ecms.persistence.repositories.task import TaskRepository
-from ecms.agent.permissions import can_assign, can_request_cross_team, find_senior_in_dept, get_effective_tools_for_agent
 
 # ── Tool definitions ────────────────────────────────────────────
 
@@ -26,12 +28,25 @@ ORG_TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "assignee_id": {"type": "string", "description": "Agent ID to assign the task to."},
+                    "assignee_id": {
+                        "type": "string",
+                        "description": "Agent ID to assign the task to.",
+                    },
                     "title": {"type": "string", "description": "Task title."},
                     "description": {"type": "string", "description": "Detailed instructions."},
-                    "inputs": {"type": "string", "description": "JSON string of file paths, specs, references. Example: '{\"files\":[\"spec.md\"]}'."},
-                    "expected_output": {"type": "string", "description": "What format/output you expect from the assignee."},
-                    "priority": {"type": "string", "enum": ["low", "normal", "high", "blocking"], "description": "Task priority."},
+                    "inputs": {
+                        "type": "string",
+                        "description": 'JSON string of file paths, specs, references. Example: \'{"files":["spec.md"]}\'.',
+                    },
+                    "expected_output": {
+                        "type": "string",
+                        "description": "What format/output you expect from the assignee.",
+                    },
+                    "priority": {
+                        "type": "string",
+                        "enum": ["low", "normal", "high", "blocking"],
+                        "description": "Task priority.",
+                    },
                 },
                 "required": ["assignee_id", "title"],
             },
@@ -45,7 +60,11 @@ ORG_TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "status": {"type": "string", "enum": ["pending", "in_progress", "submitted", "approved", "rejected"], "description": "Filter by status."},
+                    "status": {
+                        "type": "string",
+                        "enum": ["pending", "in_progress", "submitted", "approved", "rejected"],
+                        "description": "Filter by status.",
+                    },
                 },
                 "required": [],
             },
@@ -75,7 +94,10 @@ ORG_TOOL_DEFINITIONS: list[dict[str, Any]] = [
                 "properties": {
                     "task_id": {"type": "string", "description": "The task ID to submit."},
                     "summary": {"type": "string", "description": "Summary of what you built."},
-                    "output_files": {"type": "string", "description": "JSON array of file paths produced. Example: '[\"src/main.py\"]'."},
+                    "output_files": {
+                        "type": "string",
+                        "description": "JSON array of file paths produced. Example: '[\"src/main.py\"]'.",
+                    },
                 },
                 "required": ["task_id", "summary"],
             },
@@ -90,8 +112,15 @@ ORG_TOOL_DEFINITIONS: list[dict[str, Any]] = [
                 "type": "object",
                 "properties": {
                     "task_id": {"type": "string", "description": "The task ID to review."},
-                    "decision": {"type": "string", "enum": ["approved", "rejected"], "description": "Approve or reject."},
-                    "feedback": {"type": "string", "description": "Review feedback. Required for rejections, optional for approvals."},
+                    "decision": {
+                        "type": "string",
+                        "enum": ["approved", "rejected"],
+                        "description": "Approve or reject.",
+                    },
+                    "feedback": {
+                        "type": "string",
+                        "description": "Review feedback. Required for rejections, optional for approvals.",
+                    },
                 },
                 "required": ["task_id", "decision"],
             },
@@ -106,10 +135,23 @@ ORG_TOOL_DEFINITIONS: list[dict[str, Any]] = [
                 "type": "object",
                 "properties": {
                     "title": {"type": "string", "description": "What you need."},
-                    "description": {"type": "string", "description": "Detailed spec of what's needed and why."},
-                    "target_department": {"type": "string", "description": "Department to request from: backend, frontend, devops, data, platform, qa."},
-                    "priority": {"type": "string", "enum": ["low", "normal", "high", "blocking"], "description": "How urgent this is."},
-                    "inputs": {"type": "string", "description": "JSON string of specs, contracts, examples."},
+                    "description": {
+                        "type": "string",
+                        "description": "Detailed spec of what's needed and why.",
+                    },
+                    "target_department": {
+                        "type": "string",
+                        "description": "Department to request from: backend, frontend, devops, data, platform, qa.",
+                    },
+                    "priority": {
+                        "type": "string",
+                        "enum": ["low", "normal", "high", "blocking"],
+                        "description": "How urgent this is.",
+                    },
+                    "inputs": {
+                        "type": "string",
+                        "description": "JSON string of specs, contracts, examples.",
+                    },
                 },
                 "required": ["title", "target_department"],
             },
@@ -178,7 +220,9 @@ async def assign_task(
             expected_output=expected_output,
             priority=priority,
         )
-    return f"Task created: {task.id}\nTitle: {title}\nAssigned to: {assignee_id}\nPriority: {priority}"
+    return (
+        f"Task created: {task.id}\nTitle: {title}\nAssigned to: {assignee_id}\nPriority: {priority}"
+    )
 
 
 async def my_tasks(status: str | None = None) -> str:
@@ -196,13 +240,25 @@ async def my_tasks(status: str | None = None) -> str:
     if not assigned:
         lines.append("(no tasks assigned to you)")
     for t in assigned:
-        icon = {"pending": "○", "in_progress": "●", "submitted": "✓", "approved": "✅", "rejected": "✗"}.get(t.status, "·")
+        icon = {
+            "pending": "○",
+            "in_progress": "●",
+            "submitted": "✓",
+            "approved": "✅",
+            "rejected": "✗",
+        }.get(t.status, "·")
         lines.append(f"  {icon} {t.id}: {t.title} [{t.priority}] — {t.status}")
 
     if delegated:
         lines.append(f"\n## Tasks You Assigned ({len(delegated)})")
         for t in delegated:
-            icon = {"pending": "○", "in_progress": "●", "submitted": "✓", "approved": "✅", "rejected": "✗"}.get(t.status, "·")
+            icon = {
+                "pending": "○",
+                "in_progress": "●",
+                "submitted": "✓",
+                "approved": "✅",
+                "rejected": "✗",
+            }.get(t.status, "·")
             lines.append(f"  {icon} {t.id}: {t.title} → {t.assignee_id} [{t.status}]")
 
     return "\n".join(lines)
@@ -261,7 +317,8 @@ async def submit_task(task_id: str, summary: str, output_files: str = "[]") -> s
             return f"ERROR: Task must be in_progress to submit. Current: {task.status}."
 
         await repo.update_status(
-            task_id, "submitted",
+            task_id,
+            "submitted",
             output_summary=summary,
             output_files=files_list,
         )
@@ -279,13 +336,17 @@ async def review_task(task_id: str, decision: str, feedback: str = "") -> str:
         if not task:
             return f"ERROR: Task {task_id} not found."
         if task.assigner_id != _CURRENT_AGENT_ID:
-            return f"ERROR: Only the assigner can review this task."
+            return "ERROR: Only the assigner can review this task."
         if task.status != "submitted":
             return f"ERROR: Task must be submitted before review. Current: {task.status}."
 
         if decision == "approved":
             await repo.update_status(task_id, "approved", review_feedback=feedback)
-            return f"Task {task_id} APPROVED.\nFeedback: {feedback}" if feedback else f"Task {task_id} APPROVED."
+            return (
+                f"Task {task_id} APPROVED.\nFeedback: {feedback}"
+                if feedback
+                else f"Task {task_id} APPROVED."
+            )
         else:
             await repo.update_status(task_id, "rejected", review_feedback=feedback)
             return f"Task {task_id} REJECTED. Feedback: {feedback}\nAssignee can restart with start_task()."
@@ -302,7 +363,7 @@ async def request_from_team(
         return "ERROR: No agent identity set for this session."
 
     if not await can_request_cross_team(_CURRENT_AGENT_ID, target_department):
-        return f"ERROR: You don't have authority to make cross-team requests. You must manage people to request from other teams."
+        return "ERROR: You don't have authority to make cross-team requests. You must manage people to request from other teams."
 
     try:
         inputs_dict = json.loads(inputs) if inputs else {}
@@ -359,7 +420,9 @@ async def my_blockers() -> str:
         lines.append(f"\n- **{b['blocked_task_title']}** is blocked by:")
         lines.append(f"  - {bt['title']} ({bt['assignee_id']}) — {status}")
         if ctr:
-            lines.append(f"  - Cross-team request: {ctr['title']} → {ctr['target_dept']} ({ctr['status']})")
+            lines.append(
+                f"  - Cross-team request: {ctr['title']} → {ctr['target_dept']} ({ctr['status']})"
+            )
     return "\n".join(lines)
 
 

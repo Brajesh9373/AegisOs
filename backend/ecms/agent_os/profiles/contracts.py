@@ -31,22 +31,12 @@ __all__ = [
     "parse_step_envelope",
 ]
 
-_IDENTIFIER_RE: Final[re.Pattern[str]] = re.compile(
-    r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
-)
+_IDENTIFIER_RE: Final[re.Pattern[str]] = re.compile(r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$")
 _ENVIRONMENT_NAME_RE: Final[re.Pattern[str]] = re.compile(r"^[A-Z][A-Z0-9_]{0,127}$")
 _VERSION_RE: Final[re.Pattern[str]] = re.compile(r"^[0-9A-Za-z][0-9A-Za-z.+-]{0,127}$")
 MAX_ENVELOPE_BYTES: Final[int] = 64 * 1024
 
-type JSONValue = (
-    dict[str, JSONValue]
-    | list[JSONValue]
-    | str
-    | int
-    | float
-    | bool
-    | None
-)
+type JSONValue = dict[str, JSONValue] | list[JSONValue] | str | int | float | bool | None
 
 
 class EnvelopeValidationError(ValueError):

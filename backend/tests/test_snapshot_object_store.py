@@ -19,12 +19,8 @@ async def test_snapshot_object_store_streams_bounded_chunks(tmp_path: Path) -> N
         content_type="application/vnd.apache.arrow.file",
     )
     info = await store.stat_object("org/v1/points.arrow")
-    chunks = [
-        chunk
-        async for chunk in store.iter_object("org/v1/points.arrow", chunk_size=4)
-    ]
+    chunks = [chunk async for chunk in store.iter_object("org/v1/points.arrow", chunk_size=4)]
 
     assert info.size == 10
     assert info.content_type == "application/vnd.apache.arrow.file"
     assert chunks == [b"0123", b"4567", b"89"]
-

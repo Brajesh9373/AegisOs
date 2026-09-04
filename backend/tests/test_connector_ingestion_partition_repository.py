@@ -498,9 +498,7 @@ async def test_same_revision_manifest_can_be_ingested_by_multiple_jobs() -> None
         )
         await session.flush()
         assert (
-            await ConnectorIngestionManifestRepository(session).get_for_job(
-                "job-2", "org-1"
-            )
+            await ConnectorIngestionManifestRepository(session).get_for_job("job-2", "org-1")
         ) is not None
     await engine.dispose()
 

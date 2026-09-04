@@ -7,7 +7,6 @@ knowledge, not configuration.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 from sqlalchemy import delete, select
@@ -125,15 +124,21 @@ class ProjectRepository:
                 ProjectConnector.project_id == p.id,
             )
             conns = (await self._session.execute(conn_stmt)).scalars().all()
-            out.append({
-                "project_id": p.workspace_id,
-                "name": p.name,
-                "description": p.description,
-                "group_id": p.group_id,
-                "created_at": p.created_at.isoformat() if p.created_at else "",
-                "connectors": [
-                    {"type": c.connector_type, "config": c.config, "persist_path": c.persist_path}
-                    for c in conns
-                ],
-            })
+            out.append(
+                {
+                    "project_id": p.workspace_id,
+                    "name": p.name,
+                    "description": p.description,
+                    "group_id": p.group_id,
+                    "created_at": p.created_at.isoformat() if p.created_at else "",
+                    "connectors": [
+                        {
+                            "type": c.connector_type,
+                            "config": c.config,
+                            "persist_path": c.persist_path,
+                        }
+                        for c in conns
+                    ],
+                }
+            )
         return out

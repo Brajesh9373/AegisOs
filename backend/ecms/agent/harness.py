@@ -6,9 +6,8 @@ after every AgentLoop run. Connects the runtime to the CollaborationPanel UI.
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger("ecms.harness")
@@ -31,22 +30,29 @@ class AgentHarness:
             return
 
         try:
-            from ecms.persistence.database.rest_session import db_session
             from sqlalchemy import text
 
-            now = datetime.now(timezone.utc).isoformat()
+            from ecms.persistence.database.rest_session import db_session
+
+            now = datetime.now(UTC).isoformat()
             async with db_session() as session:
                 if error:
-                    await session.execute(text(
-                        "UPDATE agents SET execution_count = COALESCE(execution_count, 0) + 1, "
-                        "last_active_at = :t, error_count_30d = COALESCE(error_count_30d, 0) + 1 "
-                        "WHERE id = :aid"
-                    ), {"aid": self._agent_id, "t": now})
+                    await session.execute(
+                        text(
+                            "UPDATE agents SET execution_count = COALESCE(execution_count, 0) + 1, "
+                            "last_active_at = :t, error_count_30d = COALESCE(error_count_30d, 0) + 1 "
+                            "WHERE id = :aid"
+                        ),
+                        {"aid": self._agent_id, "t": now},
+                    )
                 else:
-                    await session.execute(text(
-                        "UPDATE agents SET execution_count = COALESCE(execution_count, 0) + 1, "
-                        "last_active_at = :t WHERE id = :aid"
-                    ), {"aid": self._agent_id, "t": now})
+                    await session.execute(
+                        text(
+                            "UPDATE agents SET execution_count = COALESCE(execution_count, 0) + 1, "
+                            "last_active_at = :t WHERE id = :aid"
+                        ),
+                        {"aid": self._agent_id, "t": now},
+                    )
 
             logger.info("[HARNESS-%s] Tracked run | success=%s", self._agent_id[:8], error is None)
         except Exception as e:
@@ -56,14 +62,20 @@ class AgentHarness:
     async def get_agent_kpis(agent_id: str) -> dict[str, Any]:
         """Fetch live KPIs for an agent."""
         try:
-            from ecms.persistence.database.rest_session import db_session
             from sqlalchemy import text
 
+            from ecms.persistence.database.rest_session import db_session
+
             async with db_session() as session:
-                row = (await session.execute(text(
-                    "SELECT execution_count, last_active_at, error_count_30d, active_workspaces "
-                    "FROM agents WHERE id = :aid"
-                ), {"aid": agent_id})).first()
+                row = (
+                    await session.execute(
+                        text(
+                            "SELECT execution_count, last_active_at, error_count_30d, active_workspaces "
+                            "FROM agents WHERE id = :aid"
+                        ),
+                        {"aid": agent_id},
+                    )
+                ).first()
 
                 if row:
                     return {

@@ -140,8 +140,12 @@ async def graph_edges(
         "edges": [
             {
                 **e.model_dump(),
-                "source_name": (await graph.find_node(e.source)).display_name if (await graph.find_node(e.source)) else e.source,
-                "target_name": (await graph.find_node(e.target)).display_name if (await graph.find_node(e.target)) else e.target,
+                "source_name": (await graph.find_node(e.source)).display_name
+                if (await graph.find_node(e.source))
+                else e.source,
+                "target_name": (await graph.find_node(e.target)).display_name
+                if (await graph.find_node(e.target))
+                else e.target,
             }
             for e in paged
         ],
@@ -158,6 +162,7 @@ async def graph_node_detail(node_id: str, request: Request) -> dict[str, Any]:
     node = await graph.find_node(node_id)
     if node is None:
         from fastapi.responses import JSONResponse
+
         return JSONResponse({"error": "not_found"}, status_code=404)
     edges = await graph._store.edges_of(node_id)
     return {
@@ -165,8 +170,12 @@ async def graph_node_detail(node_id: str, request: Request) -> dict[str, Any]:
         "edges": [
             {
                 **e.model_dump(),
-                "source_name": (await graph.find_node(e.source)).display_name if (await graph.find_node(e.source)) else e.source,
-                "target_name": (await graph.find_node(e.target)).display_name if (await graph.find_node(e.target)) else e.target,
+                "source_name": (await graph.find_node(e.source)).display_name
+                if (await graph.find_node(e.source))
+                else e.source,
+                "target_name": (await graph.find_node(e.target)).display_name
+                if (await graph.find_node(e.target))
+                else e.target,
             }
             for e in edges
         ],
@@ -180,6 +189,7 @@ async def graph_expand(node_id: str, request: Request, hops: int = 1) -> dict[st
     node = await graph.find_node(node_id)
     if node is None:
         from fastapi.responses import JSONResponse
+
         return JSONResponse({"error": "not_found"}, status_code=404)
     subgraph = await graph.expand(node_id, max_hops=hops)
     return subgraph.model_dump()
@@ -196,7 +206,8 @@ async def graph_search(request: Request, q: str, limit: int = 20) -> dict[str, A
         all_nodes = await store.all_nodes()
         query_lower = q.lower()
         results = [
-            n for n in all_nodes
+            n
+            for n in all_nodes
             if query_lower in n.display_name.lower() or query_lower in n.canonical_name.lower()
         ][:limit]
     return {"results": [n.model_dump() for n in results]}

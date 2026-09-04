@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from typing import Any, Sequence
+from collections.abc import Sequence
+from datetime import datetime
+from typing import Any
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -161,9 +162,7 @@ class AgentRunStepRepository:
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_by_run(
-        self, run_id: str, organization_id: str
-    ) -> Sequence[AgentRunStep]:
+    async def get_by_run(self, run_id: str, organization_id: str) -> Sequence[AgentRunStep]:
         """Get all steps for a run, ordered by step_index."""
         stmt = (
             select(AgentRunStep)
@@ -176,9 +175,7 @@ class AgentRunStepRepository:
         result = await self._session.execute(stmt)
         return result.scalars().all()
 
-    async def get_latest_step(
-        self, run_id: str, organization_id: str
-    ) -> AgentRunStep | None:
+    async def get_latest_step(self, run_id: str, organization_id: str) -> AgentRunStep | None:
         """Get the most recent step for a run."""
         stmt = (
             select(AgentRunStep)

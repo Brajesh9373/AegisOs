@@ -29,9 +29,7 @@ class _Queue:
     async def set_metric(self, _name: str, _value: float) -> None:
         return None
 
-    async def retry_or_exhaust(
-        self, _delivery: IngestionJob, *, max_deliveries: int
-    ) -> bool:
+    async def retry_or_exhaust(self, _delivery: IngestionJob, *, max_deliveries: int) -> bool:
         return max_deliveries > 1
 
 
@@ -65,9 +63,7 @@ class _Store:
     async def cancel(self, _job_id: str) -> None:
         raise AssertionError("unchanged revision must not cancel")
 
-    async def fail(
-        self, _job_id: str, _error: str, *, retrying: bool
-    ) -> None:
+    async def fail(self, _job_id: str, _error: str, *, retrying: bool) -> None:
         raise AssertionError(f"unchanged revision must not fail: retrying={retrying}")
 
 
@@ -119,9 +115,7 @@ async def test_unchanged_revision_completes_without_graph_rewrite(
     )
     worker._workspace = _Workspace(tmp_path / "repository")  # type: ignore[assignment]
 
-    await worker.process(
-        IngestionJob(message_id="1-0", job_id="job-1", organization_id="org-1")
-    )
+    await worker.process(IngestionJob(message_id="1-0", job_id="job-1", organization_id="org-1"))
 
     assert store.stages == ["cloning"]
     assert store.completed is True
@@ -157,9 +151,7 @@ async def test_terminal_database_state_survives_redis_ack_outage(
     )
     worker._workspace = _Workspace(tmp_path / "repository")  # type: ignore[assignment]
 
-    await worker.process(
-        IngestionJob(message_id="2-0", job_id="job-2", organization_id="org-1")
-    )
+    await worker.process(IngestionJob(message_id="2-0", job_id="job-2", organization_id="org-1"))
 
     assert store.completed is True
     assert queue.acknowledged is False

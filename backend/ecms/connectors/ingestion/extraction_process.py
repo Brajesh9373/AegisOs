@@ -91,9 +91,7 @@ class PostgresExtractionStore:
                 partition.attempt += 1
                 partition.started_at = partition.started_at or now
             partition.lease_expires_at = now + timedelta(seconds=self._lease_seconds)
-            manifest = await session.get(
-                ConnectorIngestionManifest, partition.manifest_id
-            )
+            manifest = await session.get(ConnectorIngestionManifest, partition.manifest_id)
             if (
                 manifest is None
                 or manifest.state != "ready"
@@ -144,9 +142,7 @@ class PostgresExtractionStore:
                 or partition.state not in {"claimed", "extracting"}
             ):
                 return False
-            partition.lease_expires_at = utcnow() + timedelta(
-                seconds=self._lease_seconds
-            )
+            partition.lease_expires_at = utcnow() + timedelta(seconds=self._lease_seconds)
             return True
 
     async def cancellation_requested(self, work: PartitionWork) -> bool:
@@ -160,40 +156,31 @@ class PostgresExtractionStore:
             )
             return state in {"cancel_requested", "cancelled"}
 
-    async def register_batch(
-        self, work: PartitionWork, batch: StagedBatch, worker_id: str
-    ) -> bool:
+    async def register_batch(self, work: PartitionWork, batch: StagedBatch, worker_id: str) -> bool:
         """Persist immutable batch metadata idempotently."""
         async with db_session() as session:
             await _owned_partition(session, work.id, worker_id)
             if session.bind is not None and session.bind.dialect.name == "postgresql":
                 await session.execute(
-                    text(
-                        "SELECT pg_advisory_xact_lock("
-                        "hashtextextended(:quota_key, 0))"
-                    ),
+                    text("SELECT pg_advisory_xact_lock(hashtextextended(:quota_key, 0))"),
                     {"quota_key": f"connector-staged:{work.organization_id}"},
                 )
             existing = await session.scalar(
                 select(ConnectorIngestionStageBatch).where(
                     ConnectorIngestionStageBatch.partition_id == work.id,
-                    ConnectorIngestionStageBatch.sequence_number
-                    == batch.sequence_number,
+                    ConnectorIngestionStageBatch.sequence_number == batch.sequence_number,
                 )
             )
             if existing is not None:
-                if (
-                    existing.checksum != batch.checksum
-                    or existing.object_key != batch.object_key
-                ):
+                if existing.checksum != batch.checksum or existing.object_key != batch.object_key:
                     raise ValueError("staged sequence conflicts with immutable batch")
                 return False
             staged_bytes = int(
                 await session.scalar(
-                    select(func.coalesce(func.sum(ConnectorIngestionStageBatch.byte_count), 0))
-                    .where(
-                        ConnectorIngestionStageBatch.organization_id
-                        == work.organization_id,
+                    select(
+                        func.coalesce(func.sum(ConnectorIngestionStageBatch.byte_count), 0)
+                    ).where(
+                        ConnectorIngestionStageBatch.organization_id == work.organization_id,
                         ConnectorIngestionStageBatch.state.in_(("staged", "writing")),
                     )
                 )
@@ -245,9 +232,7 @@ class PostgresExtractionStore:
             partition = await _owned_partition(session, work.id, worker_id)
             partition.state = "staged"
 
-    async def failed_attempt(
-        self, work: PartitionWork, worker_id: str, error: Exception
-    ) -> None:
+    async def failed_attempt(self, work: PartitionWork, worker_id: str, error: Exception) -> None:
         """Release a failed lease for bounded redelivery without exposing secrets."""
         async with db_session() as session:
             partition = await session.get(ConnectorIngestionPartition, work.id)
@@ -258,14 +243,10 @@ class PostgresExtractionStore:
             partition.lease_expires_at = None
             partition.error_summary = f"{type(error).__name__}: {error}"[:2_000]
 
-    async def exhausted(
-        self, delivery: ExtractionDelivery, error: Exception
-    ) -> None:
+    async def exhausted(self, delivery: ExtractionDelivery, error: Exception) -> None:
         """Make exhaustion and parent failure durable before stream acknowledgement."""
         async with db_session() as session:
-            partition = await session.get(
-                ConnectorIngestionPartition, delivery.partition_id
-            )
+            partition = await session.get(ConnectorIngestionPartition, delivery.partition_id)
             if (
                 partition is None
                 or partition.job_id != delivery.job_id
@@ -325,9 +306,7 @@ async def run() -> None:
     store = PostgresExtractionStore(
         workspace=Path(settings.connector_ingestion_workspace),
         lease_seconds=settings.connector_ingestion_stale_after_seconds,
-        max_staged_bytes_per_org=(
-            settings.connector_ingestion_max_staged_bytes_per_org
-        ),
+        max_staged_bytes_per_org=(settings.connector_ingestion_max_staged_bytes_per_org),
     )
     worker = ExtractionWorker(
         extraction_queue,
@@ -337,9 +316,7 @@ async def run() -> None:
             graph_queue=graph_queue,
             worker_id=worker_id,
             chunk_size=settings.connector_ingestion_chunk_size,
-            max_batch_encoded_bytes=(
-                settings.connector_ingestion_max_batch_encoded_bytes
-            ),
+            max_batch_encoded_bytes=(settings.connector_ingestion_max_batch_encoded_bytes),
         ),
         max_deliveries=settings.connector_ingestion_max_deliveries,
         stale_after_ms=settings.connector_ingestion_stale_after_seconds * 1_000,

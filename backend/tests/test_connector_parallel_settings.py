@@ -29,8 +29,6 @@ def test_parallel_ingestion_is_disabled_with_bounded_defaults() -> None:
         ("connector_ingestion_max_batch_encoded_bytes", 0),
     ],
 )
-def test_parallel_ingestion_rejects_unbounded_zero_values(
-    field: str, value: int
-) -> None:
+def test_parallel_ingestion_rejects_unbounded_zero_values(field: str, value: int) -> None:
     with pytest.raises(ValidationError):
         AppSettings(**{field: value})

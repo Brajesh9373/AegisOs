@@ -113,9 +113,7 @@ def build_ba_cognition_service(
         timeout=settings.agent_os_dsh_timeout_seconds,
         dsh_home=Path(settings.agent_os_dsh_home),
         dsh_executable=(
-            Path(settings.agent_os_dsh_executable)
-            if settings.agent_os_dsh_executable
-            else None
+            Path(settings.agent_os_dsh_executable) if settings.agent_os_dsh_executable else None
         ),
         max_task_bytes=settings.agent_os_dsh_max_task_bytes,
         max_command_bytes=settings.agent_os_dsh_max_command_bytes,

@@ -10,7 +10,6 @@ from __future__ import annotations
 from typing import Any
 
 import falkordb
-
 from legacy_ecms.config import get_settings
 
 
@@ -25,7 +24,8 @@ class PreferencesStore:
         if self._graph is None:
             s = get_settings()
             db = falkordb.FalkorDB(
-                host=s.falkordb_host, port=s.falkordb_port,
+                host=s.falkordb_host,
+                port=s.falkordb_port,
                 password=s.falkordb_password or None,
             )
             self._graph = db.select_graph(s.falkordb_database)

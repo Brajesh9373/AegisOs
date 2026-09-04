@@ -25,7 +25,9 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS project_id TEXT")
     op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS model TEXT")
-    op.execute("ALTER TABLE business_projects ADD COLUMN IF NOT EXISTS team_status TEXT DEFAULT 'pending'")
+    op.execute(
+        "ALTER TABLE business_projects ADD COLUMN IF NOT EXISTS team_status TEXT DEFAULT 'pending'"
+    )
     op.execute("CREATE INDEX IF NOT EXISTS ix_agents_project_id ON agents (project_id)")
 
 

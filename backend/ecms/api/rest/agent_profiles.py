@@ -11,14 +11,13 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 
-from ecms.agent_os.scope_analyzer import analyze_profile_scopes, ScopeAnalyzer
+from ecms.agent_os.scope_analyzer import analyze_profile_scopes
 from ecms.persistence.database.rest_session import db_session
 from ecms.persistence.models.agent_profile import AgentProfile
-from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/agent-profiles")
 
@@ -26,6 +25,7 @@ router = APIRouter(prefix="/api/agent-profiles")
 # ─────────────────────────────────────────────────────────────────────────────
 # Pydantic Models for API
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class ProfileStageInput(BaseModel):
     stage_id: str
@@ -82,7 +82,9 @@ class ProfileCreateInput(BaseModel):
 
     # Scope configurations
     memory_scope: dict[str, Any] = Field(default_factory=dict, description="Memory access config")
-    knowledge_scope: dict[str, Any] = Field(default_factory=dict, description="Knowledge graph config")
+    knowledge_scope: dict[str, Any] = Field(
+        default_factory=dict, description="Knowledge graph config"
+    )
     tool_scope: dict[str, Any] = Field(default_factory=dict, description="Tool permissions")
 
     # AI recommendations (filled by backend)
@@ -155,6 +157,7 @@ class ProfileOutput(BaseModel):
 # Helper Functions
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _profile_to_output(profile: AgentProfile) -> ProfileOutput:
     """Convert AgentProfile ORM model to API output."""
     return ProfileOutput(
@@ -195,14 +198,16 @@ def _get_installed_plugin_profiles() -> list[dict[str, Any]]:
         catalog = get_ba_profile_catalog()
         ba = catalog.resolve("business-analyst")
         spec = ba.profile_spec
-        profiles.append({
-            "profile_id": spec.profile_id,
-            "version": spec.version,
-            "name": "Business Analyst",
-            "description": "Analyzes requirements, clarifies with stakeholders, and produces structured requirements packages",
-            "stages": [{"stage_id": s.stage_id} for s in spec.stages],
-            "source": "plugin",
-        })
+        profiles.append(
+            {
+                "profile_id": spec.profile_id,
+                "version": spec.version,
+                "name": "Business Analyst",
+                "description": "Analyzes requirements, clarifies with stakeholders, and produces structured requirements packages",
+                "stages": [{"stage_id": s.stage_id} for s in spec.stages],
+                "source": "plugin",
+            }
+        )
     except Exception:
         pass
 
@@ -213,14 +218,16 @@ def _get_installed_plugin_profiles() -> list[dict[str, Any]]:
         catalog = get_compliance_officer_profile_catalog()
         co = catalog.resolve("compliance-officer")
         spec = co.profile_spec
-        profiles.append({
-            "profile_id": spec.profile_id,
-            "version": spec.version,
-            "name": "Compliance Officer",
-            "description": "Reviews agent actions for policy compliance and generates audit reports",
-            "stages": [{"stage_id": s.stage_id} for s in spec.stages],
-            "source": "plugin",
-        })
+        profiles.append(
+            {
+                "profile_id": spec.profile_id,
+                "version": spec.version,
+                "name": "Compliance Officer",
+                "description": "Reviews agent actions for policy compliance and generates audit reports",
+                "stages": [{"stage_id": s.stage_id} for s in spec.stages],
+                "source": "plugin",
+            }
+        )
     except Exception:
         pass
 
@@ -230,6 +237,7 @@ def _get_installed_plugin_profiles() -> list[dict[str, Any]]:
 # ─────────────────────────────────────────────────────────────────────────────
 # API Endpoints
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("")
 async def list_agent_profiles(
@@ -368,9 +376,15 @@ async def create_agent_profile(
             system_prompt=profile_data.system_prompt,
             user_prompt_template=profile_data.user_prompt_template,
             stages=[s.model_dump() for s in profile_data.stages] if profile_data.stages else None,
-            memory_scope=profile_data.scope_recommendations.get("memory_scope") if profile_data.scope_recommendations else profile_data.memory_scope,
-            knowledge_scope=profile_data.scope_recommendations.get("knowledge_scope") if profile_data.scope_recommendations else profile_data.knowledge_scope,
-            tool_scope=profile_data.scope_recommendations.get("tool_scope") if profile_data.scope_recommendations else profile_data.tool_scope,
+            memory_scope=profile_data.scope_recommendations.get("memory_scope")
+            if profile_data.scope_recommendations
+            else profile_data.memory_scope,
+            knowledge_scope=profile_data.scope_recommendations.get("knowledge_scope")
+            if profile_data.scope_recommendations
+            else profile_data.knowledge_scope,
+            tool_scope=profile_data.scope_recommendations.get("tool_scope")
+            if profile_data.scope_recommendations
+            else profile_data.tool_scope,
             scope_recommendations=profile_data.scope_recommendations,
             model_provider=profile_data.model_provider,
             model_name=profile_data.model_name,
@@ -425,7 +439,10 @@ async def get_db_profile(profile_id: str) -> ProfileOutput:
         if not profile:
             raise HTTPException(
                 status_code=404,
-                detail={"error": "PROFILE-NOT-FOUND", "message": f"Database profile {profile_id} not found"},
+                detail={
+                    "error": "PROFILE-NOT-FOUND",
+                    "message": f"Database profile {profile_id} not found",
+                },
             )
 
         return _profile_to_output(profile)
@@ -540,12 +557,19 @@ async def apply_recommendations(profile_id: str) -> ProfileOutput:
         if not profile.scope_recommendations:
             raise HTTPException(
                 status_code=400,
-                detail={"error": "NO-RECOMMENDATIONS", "message": "No scope recommendations available. Run analyze first."},
+                detail={
+                    "error": "NO-RECOMMENDATIONS",
+                    "message": "No scope recommendations available. Run analyze first.",
+                },
             )
 
         # Apply recommended scopes
-        profile.memory_scope = profile.scope_recommendations.get("memory_scope", profile.memory_scope)
-        profile.knowledge_scope = profile.scope_recommendations.get("knowledge_scope", profile.knowledge_scope)
+        profile.memory_scope = profile.scope_recommendations.get(
+            "memory_scope", profile.memory_scope
+        )
+        profile.knowledge_scope = profile.scope_recommendations.get(
+            "knowledge_scope", profile.knowledge_scope
+        )
         profile.tool_scope = profile.scope_recommendations.get("tool_scope", profile.tool_scope)
 
         await session.commit()

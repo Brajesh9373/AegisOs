@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import logging
 import os
-import sys
 
 from telegram.ext import (
     ApplicationBuilder,
@@ -28,11 +27,11 @@ from telegram.ext import (
 from ecms.telegram.handlers import (
     handle_correct,
     handle_free_form,
+    handle_learn,
     handle_search,
     handle_start,
     handle_stats,
     handle_teach,
-    handle_learn,
 )
 
 logger = logging.getLogger("ecms.telegram")
@@ -67,10 +66,12 @@ def create_app():
     app.add_handler(CommandHandler("stats", handle_stats, filters=auth))
 
     # Free-form messages (auto-ingest, only from authorized users)
-    app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND & auth,
-        handle_free_form,
-    ))
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND & auth,
+            handle_free_form,
+        )
+    )
 
     return app
 

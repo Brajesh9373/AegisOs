@@ -12,22 +12,28 @@ from pathlib import Path
 from typing import Any
 
 import falkordb
-
 from legacy_ecms.config import get_settings
 from legacy_ecms.memory.stores.file_store import FileMemoryStore
 
-# ── CommandCode tool integration ──────────────────────────────────────
+from ecms.agent.access_engine import filter_atom_results_async, filter_graph_results
 
+# ── CommandCode tool integration ──────────────────────────────────────
 from ecms.agent.commandcode_tools import (
     CC_TOOL_DEFINITIONS,
     ToolContext,
-    get_tools_for_mode,
     cc_invoke_tool,
+    get_tools_for_mode,
+)
+from ecms.agent.commandcode_tools import (
     set_context as cc_set_context,
 )
-from ecms.agent.org_tools import ORG_TOOL_DEFINITIONS, ORG_TOOL_NAMES, invoke_org_tool, set_org_context, get_org_context
 from ecms.agent.orchestrator import SPAWN_SUBAGENT_TOOL, spawn_subagent
-from ecms.agent.access_engine import filter_atom_results_async, filter_graph_results
+from ecms.agent.org_tools import (
+    ORG_TOOL_DEFINITIONS,
+    ORG_TOOL_NAMES,
+    get_org_context,
+    invoke_org_tool,
+)
 
 _CC_CONTEXT: ToolContext | None = None
 
@@ -50,8 +56,14 @@ ECMS_TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {"type": "string", "description": "Search query. Use keywords from the user's question."},
-                    "limit": {"type": "integer", "description": "Max results (default 10, max 20)."},
+                    "query": {
+                        "type": "string",
+                        "description": "Search query. Use keywords from the user's question.",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max results (default 10, max 20).",
+                    },
                 },
                 "required": ["query"],
             },
@@ -65,7 +77,10 @@ ECMS_TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "cypher": {"type": "string", "description": "Cypher query. Example: MATCH (u:UKO) WHERE u.name CONTAINS 'auth' RETURN u.name, u.type"},
+                    "cypher": {
+                        "type": "string",
+                        "description": "Cypher query. Example: MATCH (u:UKO) WHERE u.name CONTAINS 'auth' RETURN u.name, u.type",
+                    },
                 },
                 "required": ["cypher"],
             },
@@ -79,8 +94,14 @@ ECMS_TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "atom_id": {"type": "string", "description": "The atom ID to expand from (e.g., 'GB-ECOS-ARCHITECTURE')."},
-                    "depth": {"type": "integer", "description": "Relationship depth (1 = direct neighbors, 2 = neighbors of neighbors)."},
+                    "atom_id": {
+                        "type": "string",
+                        "description": "The atom ID to expand from (e.g., 'GB-ECOS-ARCHITECTURE').",
+                    },
+                    "depth": {
+                        "type": "integer",
+                        "description": "Relationship depth (1 = direct neighbors, 2 = neighbors of neighbors).",
+                    },
                 },
                 "required": ["atom_id"],
             },
@@ -95,8 +116,14 @@ ECMS_TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "pattern": {"type": "string", "description": "Grep pattern. Example: 'class JwtAuth' or 'def create_user'."},
-                    "path": {"type": "string", "description": "Optional subdirectory to search in (default: entire workspace)."},
+                    "pattern": {
+                        "type": "string",
+                        "description": "Grep pattern. Example: 'class JwtAuth' or 'def create_user'.",
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "Optional subdirectory to search in (default: entire workspace).",
+                    },
                 },
                 "required": ["pattern"],
             },
@@ -111,7 +138,10 @@ ECMS_TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "File path relative to workspace root or absolute. Example: 'backend/ecms/api/app.py'."},
+                    "path": {
+                        "type": "string",
+                        "description": "File path relative to workspace root or absolute. Example: 'backend/ecms/api/app.py'.",
+                    },
                 },
                 "required": ["path"],
             },
@@ -126,7 +156,10 @@ ECMS_TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "term": {"type": "string", "description": "Term to understand. Example: 'loan_status', 'JwtAuthenticationService'."},
+                    "term": {
+                        "type": "string",
+                        "description": "Term to understand. Example: 'loan_status', 'JwtAuthenticationService'.",
+                    },
                 },
                 "required": ["term"],
             },
@@ -215,7 +248,10 @@ ECMS_TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {"type": "string", "description": "What to search for in past conversations."},
+                    "query": {
+                        "type": "string",
+                        "description": "What to search for in past conversations.",
+                    },
                 },
                 "required": ["query"],
             },
@@ -231,7 +267,10 @@ ECMS_TOOL_DEFINITIONS: list[dict[str, Any]] = [
                 "type": "object",
                 "properties": {
                     "name": {"type": "string", "description": "Procedure name."},
-                    "description": {"type": "string", "description": "What this procedure accomplishes."},
+                    "description": {
+                        "type": "string",
+                        "description": "What this procedure accomplishes.",
+                    },
                     "steps": {"type": "string", "description": "Comma-separated list of steps."},
                 },
                 "required": ["name", "description", "steps"],
@@ -246,7 +285,10 @@ ECMS_TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "task": {"type": "string", "description": "Task description to match against known procedures."},
+                    "task": {
+                        "type": "string",
+                        "description": "Task description to match against known procedures.",
+                    },
                 },
                 "required": ["task"],
             },
@@ -291,8 +333,14 @@ ECMS_TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "pattern_type": {"type": "string", "description": "Type: 'best_practice', 'known_bug', 'optimization', or 'convention'."},
-                    "description": {"type": "string", "description": "What was learned. Example: 'SQL Validator catches 95% of syntax errors using Rule X'."},
+                    "pattern_type": {
+                        "type": "string",
+                        "description": "Type: 'best_practice', 'known_bug', 'optimization', or 'convention'.",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "What was learned. Example: 'SQL Validator catches 95% of syntax errors using Rule X'.",
+                    },
                 },
                 "required": ["pattern_type", "description"],
             },
@@ -306,8 +354,14 @@ ECMS_TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {"type": "string", "description": "What to search for in org knowledge."},
-                    "pattern_type": {"type": "string", "description": "Optional filter: 'best_practice', 'known_bug', 'optimization', 'convention'."},
+                    "query": {
+                        "type": "string",
+                        "description": "What to search for in org knowledge.",
+                    },
+                    "pattern_type": {
+                        "type": "string",
+                        "description": "Optional filter: 'best_practice', 'known_bug', 'optimization', 'convention'.",
+                    },
                 },
                 "required": ["query"],
             },
@@ -317,10 +371,15 @@ ECMS_TOOL_DEFINITIONS: list[dict[str, Any]] = [
 
 # ── Merged TOOL_DEFINITIONS: ECMS first (memory/graph), then CC (file/shell/web/planning) ──
 
-TOOL_DEFINITIONS = ECMS_TOOL_DEFINITIONS + [
-    t for t in CC_TOOL_DEFINITIONS
-    if t["function"]["name"] != "read_file"  # ECMS has its own read_file
-] + [SPAWN_SUBAGENT_TOOL]
+TOOL_DEFINITIONS = (
+    ECMS_TOOL_DEFINITIONS
+    + [
+        t
+        for t in CC_TOOL_DEFINITIONS
+        if t["function"]["name"] != "read_file"  # ECMS has its own read_file
+    ]
+    + [SPAWN_SUBAGENT_TOOL]
+)
 
 # ── Lazy singletons ───────────────────────────────────────────────────
 
@@ -340,7 +399,8 @@ def _get_falkordb() -> Any:
     if _falkordb_graph is None:
         s = get_settings()
         db = falkordb.FalkorDB(
-            host=s.falkordb_host, port=s.falkordb_port,
+            host=s.falkordb_host,
+            port=s.falkordb_port,
             password=s.falkordb_password or None,
         )
         _falkordb_graph = db.select_graph(s.falkordb_database)
@@ -450,8 +510,11 @@ async def expand_atom(atom_id: str, depth: int = 1) -> str:
 
 async def search_code(pattern: str, path: str = "/app") -> str:
     result = await asyncio.to_thread(
-        subprocess.run, ["grep", "-rnl", pattern, path],
-        capture_output=True, text=True, timeout=10,
+        subprocess.run,
+        ["grep", "-rnl", pattern, path],
+        capture_output=True,
+        text=True,
+        timeout=10,
     )
     if result.returncode not in (0, 1):
         return f"Search failed: {result.stderr.strip()}"
@@ -532,6 +595,7 @@ async def get_session(key: str) -> str:
 
 async def understand_term(term: str) -> str:
     from ecms.memory.semantic.concept_registry import get_registry
+
     registry = get_registry()
     return await registry.define(term)
 
@@ -541,6 +605,7 @@ async def understand_term(term: str) -> str:
 
 async def recall_past(query: str) -> str:
     from ecms.memory.episodic import get_event_store
+
     store = get_event_store()
     results = store.search(query, limit=5)
     if not results:
@@ -557,6 +622,7 @@ async def recall_past(query: str) -> str:
 
 async def learn_procedure(name: str, description: str, steps: str) -> str:
     from ecms.memory.procedural import get_procedure_store
+
     store = get_procedure_store()
     step_list = [s.strip() for s in steps.split(",") if s.strip()]
     proc_id = store.learn(name, description, step_list)
@@ -565,6 +631,7 @@ async def learn_procedure(name: str, description: str, steps: str) -> str:
 
 async def recall_procedure(task: str) -> str:
     from ecms.memory.procedural import get_procedure_store
+
     store = get_procedure_store()
     results = store.search(task, limit=3)
     if not results:
@@ -584,6 +651,7 @@ async def recall_procedure(task: str) -> str:
 
 async def remember(key: str, value: str) -> str:
     from ecms.memory.long_term import get_preferences_store
+
     store = get_preferences_store()
     store.set(key, value)
     return f"Long-term memory: {key} = {value}"
@@ -591,6 +659,7 @@ async def remember(key: str, value: str) -> str:
 
 async def recall(key: str) -> str:
     from ecms.memory.long_term import get_preferences_store
+
     store = get_preferences_store()
     val = store.get(key)
     return f"{key} = {val}" if val else f"No long-term value for '{key}'"
@@ -601,15 +670,19 @@ async def recall(key: str) -> str:
 
 async def publish_pattern(pattern_type: str, description: str) -> str:
     from ecms.memory.organization import get_org_learning
+
     org = get_org_learning()
     pid = org.publish(pattern_type, description)
     if pid:
-        return f"Pattern published (id: {pid}). All ECOS agents can now discover this {pattern_type}."
+        return (
+            f"Pattern published (id: {pid}). All ECOS agents can now discover this {pattern_type}."
+        )
     return "Failed to publish pattern. Graph may be unavailable."
 
 
 async def search_org(query: str, pattern_type: str | None = None) -> str:
     from ecms.memory.organization import get_org_learning
+
     org = get_org_learning()
     results = org.search(query, pattern_type=pattern_type, limit=5)
     if not results:
@@ -647,11 +720,25 @@ _ECMS_TOOL_MAP = {
 
 # CC tool names that get dispatched to cc_invoke_tool
 CC_TOOL_NAMES = {
-    "edit_file", "read_directory", "write_file", "read_multiple_files",
-    "grep", "glob", "shell_command", "monitor_command", "monitor_events",
-    "shell_tasks", "todo_write", "ask_user_question", "kill_shell",
-    "exit_plan_mode", "enter_plan_mode", "diagnostics",
-    "get_self_knowledge", "web_search", "web_fetch",
+    "edit_file",
+    "read_directory",
+    "write_file",
+    "read_multiple_files",
+    "grep",
+    "glob",
+    "shell_command",
+    "monitor_command",
+    "monitor_events",
+    "shell_tasks",
+    "todo_write",
+    "ask_user_question",
+    "kill_shell",
+    "exit_plan_mode",
+    "enter_plan_mode",
+    "diagnostics",
+    "get_self_knowledge",
+    "web_search",
+    "web_fetch",
 }
 
 
@@ -684,7 +771,8 @@ async def invoke_tool(name: str, arguments: dict[str, Any]) -> str:
 def get_effective_tools(plan_mode: bool = False) -> list[dict[str, Any]]:
     """Return the tool list for the current mode. ECMS tools + mode-filtered CC tools."""
     cc_tools_filtered = [
-        t for t in CC_TOOL_DEFINITIONS
+        t
+        for t in CC_TOOL_DEFINITIONS
         if t["function"]["name"] != "read_file"  # ECMS has its own read_file
     ]
     if plan_mode:

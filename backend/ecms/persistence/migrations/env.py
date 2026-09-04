@@ -10,18 +10,20 @@ from alembic import context
 from sqlalchemy import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from ecms.persistence.models import audit  # noqa: F401  (registers the model metadata)
-from ecms.persistence.models import project  # noqa: F401  (registers project models)
-from ecms.persistence.models import session  # noqa: F401  (registers session models)
-from ecms.persistence.models import session_context  # noqa: F401  (registers session context KV)
-from ecms.persistence.models import agent  # noqa: F401  (registers agent models)
-from ecms.persistence.models import project_agent_position  # noqa: F401  (registers project staffing models)
-from ecms.persistence.models import organization_member  # noqa: F401  (registers org member models)
-from ecms.persistence.models import governance_assignment  # noqa: F401  (registers governance models)
-from ecms.persistence.models import ba_stage_outcome  # noqa: F401  (registers BA durability models)
-from ecms.persistence.models import task  # noqa: F401  (registers task/dependency/CTR models)
-from ecms.persistence.models import access_policy  # noqa: F401  (registers policy models)
-from ecms.persistence.models import category  # noqa: F401  (registers category models)
+from ecms.persistence.models import (
+    access_policy,  # noqa: F401  (registers policy models)
+    agent,  # noqa: F401  (registers agent models)
+    audit,  # noqa: F401  (registers the model metadata)
+    ba_stage_outcome,  # noqa: F401  (registers BA durability models)
+    category,  # noqa: F401  (registers category models)
+    governance_assignment,  # noqa: F401  (registers governance models)
+    organization_member,  # noqa: F401  (registers org member models)
+    project,  # noqa: F401  (registers project models)
+    project_agent_position,  # noqa: F401  (registers project staffing models)
+    session,  # noqa: F401  (registers session models)
+    session_context,  # noqa: F401  (registers session context KV)
+    task,  # noqa: F401  (registers task/dependency/CTR models)
+)
 from ecms.persistence.models.base import Base
 
 config = context.config

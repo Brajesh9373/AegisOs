@@ -9,10 +9,8 @@ from __future__ import annotations
 
 import asyncio
 import subprocess
-import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 from ecms.providers.domain.connector import DiscoveredObject
 from ecms.providers.infrastructure.base import BaseConnector
@@ -20,9 +18,34 @@ from ecms.providers.infrastructure.base import BaseConnector
 __all__ = ["GitConnector"]
 
 _IGNORED_DIRS = {".git", "node_modules", "__pycache__", ".venv", "dist", "build", ".next", "venv"}
-_IGNORED_EXT = {".pyc", ".pyo", ".o", ".so", ".dll", ".exe", ".class", ".jar", ".war",
-                ".jpg", ".jpeg", ".png", ".gif", ".ico", ".svg", ".woff", ".woff2",
-                ".ttf", ".eot", ".mp3", ".mp4", ".avi", ".mov", ".zip", ".tar", ".gz"}
+_IGNORED_EXT = {
+    ".pyc",
+    ".pyo",
+    ".o",
+    ".so",
+    ".dll",
+    ".exe",
+    ".class",
+    ".jar",
+    ".war",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".ico",
+    ".svg",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
+    ".mp3",
+    ".mp4",
+    ".avi",
+    ".mov",
+    ".zip",
+    ".tar",
+    ".gz",
+}
 
 
 class GitConnector(BaseConnector):
@@ -97,20 +120,32 @@ class GitConnector(BaseConnector):
         if dest.exists():
             subprocess.run(
                 ["git", "-C", str(dest), "fetch", "--prune", "origin"],
-                check=False, capture_output=True, text=True, timeout=60,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=60,
             )
             subprocess.run(
                 ["git", "-C", str(dest), "checkout", self._branch],
-                check=False, capture_output=True, text=True, timeout=30,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
             subprocess.run(
                 ["git", "-C", str(dest), "pull", "--ff-only", "origin", self._branch],
-                check=False, capture_output=True, text=True, timeout=60,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=60,
             )
         else:
             subprocess.run(
                 ["git", "clone", "--branch", self._branch, url, str(dest)],
-                check=False, capture_output=True, text=True, timeout=120,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=120,
             )
 
     def _discover(self) -> list[DiscoveredObject]:
@@ -165,12 +200,18 @@ class GitConnector(BaseConnector):
         assert self._repo_path is not None
         result = subprocess.run(
             [
-                "git", "-C", str(self._repo_path), "log",
+                "git",
+                "-C",
+                str(self._repo_path),
+                "log",
                 f"--max-count={limit}",
                 "--pretty=format:%H%x1f%an%x1f%aI%x1f%s",
                 "--name-only",
             ],
-            capture_output=True, text=True, timeout=30, check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
         )
         if result.returncode != 0:
             return []

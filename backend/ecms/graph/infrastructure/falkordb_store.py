@@ -202,9 +202,7 @@ class FalkorDBCypherStore:
         return [_node_from_result(row) for row in result.result_set]
 
     async def all_edges(self) -> list[GraphEdge]:
-        result = await asyncio.to_thread(
-            self._graph.query, "MATCH ()-[e:Edge]->() RETURN e"
-        )
+        result = await asyncio.to_thread(self._graph.query, "MATCH ()-[e:Edge]->() RETURN e")
         edges: list[GraphEdge] = []
         for row in result.result_set:
             e = row[0]

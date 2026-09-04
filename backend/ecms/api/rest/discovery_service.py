@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException
@@ -26,7 +26,7 @@ logger = logging.getLogger("ecms.discovery.service")
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _row_to_dict(row) -> dict:
@@ -36,9 +36,15 @@ def _row_to_dict(row) -> dict:
 
 
 async def _load_session_for_update(session_id: str, db) -> dict:
-    row = (await db.execute(text("SELECT * FROM discovery_sessions WHERE id=:id FOR UPDATE"), {"id": session_id})).first()
+    row = (
+        await db.execute(
+            text("SELECT * FROM discovery_sessions WHERE id=:id FOR UPDATE"), {"id": session_id}
+        )
+    ).first()
     if not row:
-        raise HTTPException(status_code=404, detail={"error": "NOT-FOUND", "message": "Discovery session not found"})
+        raise HTTPException(
+            status_code=404, detail={"error": "NOT-FOUND", "message": "Discovery session not found"}
+        )
     d = _row_to_dict(row)
     if isinstance(d.get("messages"), str):
         d["messages"] = json.loads(d["messages"])
@@ -59,9 +65,17 @@ class DiscoveryService:
         """Atomic analyze using BA profile: succeed → CLARIFYING, fail → stay INGESTED, retry → idempotent."""
         # Load session data first - keep it in scope for the whole method
         async with db_session() as db:
-            row = (await db.execute(text("SELECT * FROM discovery_sessions WHERE id=:id FOR UPDATE"), {"id": session_id})).first()
+            row = (
+                await db.execute(
+                    text("SELECT * FROM discovery_sessions WHERE id=:id FOR UPDATE"),
+                    {"id": session_id},
+                )
+            ).first()
             if not row:
-                raise HTTPException(status_code=404, detail={"error": "NOT-FOUND", "message": "Discovery session not found"})
+                raise HTTPException(
+                    status_code=404,
+                    detail={"error": "NOT-FOUND", "message": "Discovery session not found"},
+                )
             sess = _row_to_dict(row)
             if isinstance(sess.get("messages"), str):
                 sess["messages"] = json.loads(sess["messages"])
@@ -82,20 +96,35 @@ class DiscoveryService:
                     }
 
             if stage not in ("INGESTED", "UNDERSTANDING"):
-                raise HTTPException(status_code=400, detail={"error": "INVALID-TRANSITION", "message": f"Cannot analyze from {stage}"})
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "error": "INVALID-TRANSITION",
+                        "message": f"Cannot analyze from {stage}",
+                    },
+                )
 
             source = (sess.get("source_text") or "").strip()
             if not source:
-                raise HTTPException(status_code=400, detail={"error": "NO-INPUT", "message": "No source text ingested yet"})
+                raise HTTPException(
+                    status_code=400,
+                    detail={"error": "NO-INPUT", "message": "No source text ingested yet"},
+                )
 
             if stage == "UNDERSTANDING":
-                await db.execute(text("UPDATE discovery_sessions SET stage='INGESTED', updated_at=:t WHERE id=:id"), {"t": _now(), "id": session_id})
+                await db.execute(
+                    text(
+                        "UPDATE discovery_sessions SET stage='INGESTED', updated_at=:t WHERE id=:id"
+                    ),
+                    {"t": _now(), "id": session_id},
+                )
 
             # Keep messages in scope for later use
             conversation = sess.get("messages", [])
 
         # Get knowledge context using the existing retrieval
         from ecms.agent.ba.agent import retrieve_knowledge
+
         knowledge_context = await retrieve_knowledge(source)
 
         # Execute understand stage through BA profile
@@ -109,6 +138,7 @@ class DiscoveryService:
 
         # Execute through LLM (reuse existing BA agent for now)
         from ecms.agent.ba.agent import understand
+
         recap = await understand(source, knowledge_context=knowledge_context)
 
         # Execute clarify stage through BA profile
@@ -123,6 +153,7 @@ class DiscoveryService:
 
         # Execute clarify through existing BA agent
         from ecms.agent.ba.agent import clarify
+
         clarification = await clarify(source, knowledge_context=knowledge_context)
 
         # Validate results using profile
@@ -144,7 +175,12 @@ class DiscoveryService:
 
         # Persist results
         async with db_session() as db:
-            row = (await db.execute(text("SELECT messages, stage FROM discovery_sessions WHERE id=:id FOR UPDATE"), {"id": session_id})).first()
+            row = (
+                await db.execute(
+                    text("SELECT messages, stage FROM discovery_sessions WHERE id=:id FOR UPDATE"),
+                    {"id": session_id},
+                )
+            ).first()
             if row and row[1] == "CLARIFYING":
                 msgs = row[0] if isinstance(row[0], list) else json.loads(row[0] or "[]")
                 if len(msgs) >= 2:
@@ -159,7 +195,11 @@ class DiscoveryService:
                         "category_label": last.get("category_label"),
                     }
 
-            raw_row = (await db.execute(text("SELECT messages FROM discovery_sessions WHERE id=:id"), {"id": session_id})).first()
+            raw_row = (
+                await db.execute(
+                    text("SELECT messages FROM discovery_sessions WHERE id=:id"), {"id": session_id}
+                )
+            ).first()
             raw = raw_row[0] if raw_row and raw_row[0] else []
             if isinstance(raw, list):
                 msgs = raw
@@ -170,8 +210,21 @@ class DiscoveryService:
 
             now = _now()
             msgs.append({"role": "assistant", "content": recap, "timestamp": now})
-            msgs.append({"role": "assistant", "content": clarification["content"], "timestamp": now, "category": clarification["category"], "category_label": clarification["category_label"]})
-            await db.execute(text("UPDATE discovery_sessions SET messages=:m, stage='CLARIFYING', updated_at=:t WHERE id=:id"), {"m": json.dumps(msgs), "t": now, "id": session_id})
+            msgs.append(
+                {
+                    "role": "assistant",
+                    "content": clarification["content"],
+                    "timestamp": now,
+                    "category": clarification["category"],
+                    "category_label": clarification["category_label"],
+                }
+            )
+            await db.execute(
+                text(
+                    "UPDATE discovery_sessions SET messages=:m, stage='CLARIFYING', updated_at=:t WHERE id=:id"
+                ),
+                {"m": json.dumps(msgs), "t": now, "id": session_id},
+            )
 
         return {
             "session_id": session_id,
@@ -184,9 +237,16 @@ class DiscoveryService:
 
     async def get_session(self, session_id: str) -> dict:
         async with db_session() as db:
-            row = (await db.execute(text("SELECT * FROM discovery_sessions WHERE id=:id"), {"id": session_id})).first()
+            row = (
+                await db.execute(
+                    text("SELECT * FROM discovery_sessions WHERE id=:id"), {"id": session_id}
+                )
+            ).first()
             if not row:
-                raise HTTPException(status_code=404, detail={"error": "NOT-FOUND", "message": "Discovery session not found"})
+                raise HTTPException(
+                    status_code=404,
+                    detail={"error": "NOT-FOUND", "message": "Discovery session not found"},
+                )
             d = _row_to_dict(row)
             if isinstance(d.get("messages"), str):
                 d["messages"] = json.loads(d["messages"])

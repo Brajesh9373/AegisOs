@@ -258,13 +258,9 @@ async def resolve_discovery_identity(request: Request) -> DiscoveryIdentity:
             # Verify user exists and is active
             user_id, user_roles = await _active_user(session, verified_identity.subject)
             # Resolve organization from tenant claim
-            organization_id = await _trusted_organization_id(
-                session, verified_identity.tenant_id
-            )
+            organization_id = await _trusted_organization_id(session, verified_identity.tenant_id)
             # Check membership - this is the key production check
-            member_id, member_roles = await _check_membership(
-                session, user_id, organization_id
-            )
+            member_id, member_roles = await _check_membership(session, user_id, organization_id)
         return DiscoveryIdentity(
             user_id=member_id,
             organization_id=organization_id,
@@ -304,8 +300,7 @@ async def load_discovery_session(
                 "AND (:is_admin = 1 OR discovery_sessions.owner_id = :user_id) "
                 "AND (discovery_sessions.project_id IS NULL OR ("
                 "business_projects.organization_id = :organization_id "
-                "AND (:is_admin = 1 OR business_projects.ownerid = :user_id)))"
-                + lock_clause
+                "AND (:is_admin = 1 OR business_projects.ownerid = :user_id)))" + lock_clause
             ),
             {
                 "session_id": session_id,

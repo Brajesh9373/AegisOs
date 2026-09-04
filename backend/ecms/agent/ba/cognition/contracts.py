@@ -128,11 +128,15 @@ class BAExecutionContext:
             "retention_policy": self.retention_policy,
         }
         invalid = [
-            name for name, value in required.items() if not isinstance(value, str) or not value.strip()
+            name
+            for name, value in required.items()
+            if not isinstance(value, str) or not value.strip()
         ]
         if invalid:
             raise ValueError(f"BA execution context requires: {', '.join(invalid)}")
-        if any(not isinstance(scope_id, str) or not scope_id.strip() for scope_id in self.scope_ids):
+        if any(
+            not isinstance(scope_id, str) or not scope_id.strip() for scope_id in self.scope_ids
+        ):
             raise ValueError("scope_ids must contain only non-empty strings")
         object.__setattr__(self, "scope_ids", tuple(sorted(set(self.scope_ids))))
 
@@ -186,7 +190,11 @@ class PromptCitation:
             "source_version": self.source_version,
             "trust_state": self.trust_state,
         }
-        invalid = [name for name, value in fields.items() if not isinstance(value, str) or not value.strip()]
+        invalid = [
+            name
+            for name, value in fields.items()
+            if not isinstance(value, str) or not value.strip()
+        ]
         if invalid:
             raise ValueError(f"prompt citation requires: {', '.join(invalid)}")
 
@@ -204,7 +212,11 @@ class ContextEvidence:
         """Reject malformed evidence before it can become a prompt snapshot."""
         if not isinstance(self.content, str) or not self.content.strip():
             raise ValueError("context evidence content must be a non-empty string")
-        if not isinstance(self.score, (int, float)) or isinstance(self.score, bool) or not isfinite(self.score):
+        if (
+            not isinstance(self.score, (int, float))
+            or isinstance(self.score, bool)
+            or not isfinite(self.score)
+        ):
             raise ValueError("context evidence score must be finite")
         if not isinstance(self.classification, str) or not self.classification.strip():
             raise ValueError("context evidence classification must not be empty")
@@ -377,7 +389,10 @@ class BAExecutionResponse:
         ):
             raise ValueError("execution duration_seconds must be a non-negative finite number")
         metadata = dict(self.runtime_metadata)
-        if any(not isinstance(key, str) or not isinstance(value, str) for key, value in metadata.items()):
+        if any(
+            not isinstance(key, str) or not isinstance(value, str)
+            for key, value in metadata.items()
+        ):
             raise ValueError("runtime_metadata must contain only string keys and values")
         object.__setattr__(self, "runtime_metadata", MappingProxyType(metadata))
 

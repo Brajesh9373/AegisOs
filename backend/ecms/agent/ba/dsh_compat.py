@@ -141,8 +141,7 @@ async def ba_finalize(
             requirements = FinalizedRequirements.model_validate(payload)
         except Exception as exc:
             raise DSHExecutionError(
-                "DSH BA finalize stage returned an invalid FinalizedRequirements object: "
-                f"{exc}"
+                f"DSH BA finalize stage returned an invalid FinalizedRequirements object: {exc}"
             ) from exc
         return requirements.to_frontend()
 

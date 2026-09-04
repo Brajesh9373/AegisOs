@@ -37,9 +37,7 @@ def test_manifest_is_content_addressed_order_independent_and_immutable() -> None
 def test_manifest_checksum_changes_with_content_or_extractor() -> None:
     original = build_manifest([ManifestSource("app.ts", b"const value = 1")])
     changed = build_manifest([ManifestSource("app.ts", b"const value = 2")])
-    custom = build_manifest(
-        [ManifestSource("app.ts", b"const value = 1", extractor_type="custom")]
-    )
+    custom = build_manifest([ManifestSource("app.ts", b"const value = 1", extractor_type="custom")])
 
     assert original.checksum != changed.checksum
     assert original.checksum != custom.checksum

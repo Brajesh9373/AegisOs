@@ -23,11 +23,15 @@ def upgrade() -> None:
         op.add_column("agents", sa.Column("role_description", sa.Text(), nullable=True))
     if not _has_column("agents", "skills"):
         op.add_column("agents", sa.Column("skills", sa.JSON(), nullable=True))
-    op.alter_column("agents", "designation", existing_type=sa.String(255), nullable=True, server_default="")
+    op.alter_column(
+        "agents", "designation", existing_type=sa.String(255), nullable=True, server_default=""
+    )
 
 
 def downgrade() -> None:
-    op.alter_column("agents", "designation", existing_type=sa.String(255), nullable=False, server_default=None)
+    op.alter_column(
+        "agents", "designation", existing_type=sa.String(255), nullable=False, server_default=None
+    )
 
 
 def _has_column(table_name: str, column_name: str) -> bool:

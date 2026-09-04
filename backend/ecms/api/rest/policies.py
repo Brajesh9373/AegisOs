@@ -27,6 +27,7 @@ class CreatePolicyRequest(BaseModel):
 @router.get("")
 async def list_policies():
     from sqlalchemy import select
+
     from ecms.persistence.models.access_policy import AccessPolicy
 
     async with db_session() as s:
@@ -37,8 +38,9 @@ async def list_policies():
 
 @router.post("")
 async def create_policy(body: CreatePolicyRequest):
-    from ecms.persistence.models.access_policy import AccessPolicy
     import uuid
+
+    from ecms.persistence.models.access_policy import AccessPolicy
 
     async with db_session() as s:
         policy = AccessPolicy(
@@ -62,7 +64,8 @@ async def create_policy(body: CreatePolicyRequest):
 
 @router.delete("/{policy_id}")
 async def delete_policy(policy_id: str):
-    from sqlalchemy import select, delete
+    from sqlalchemy import select
+
     from ecms.persistence.models.access_policy import AccessPolicy
 
     async with db_session() as s:
@@ -79,6 +82,7 @@ async def delete_policy(policy_id: str):
 @router.get("/recommendations")
 async def list_recommendations():
     from sqlalchemy import select
+
     from ecms.persistence.models.access_policy import PolicyRecommendation
 
     async with db_session() as s:
@@ -91,6 +95,7 @@ async def list_recommendations():
 async def trigger_recommendation(project_id: str = Query(...)):
     """Trigger analysis. Returns immediately with a task ID. Agent runs in background."""
     import asyncio
+
     from ecms.agent.policy_agent import recommend_policies_for_project
 
     task_id = f"policy-analysis-{project_id}"
@@ -105,6 +110,7 @@ async def trigger_recommendation(project_id: str = Query(...)):
             await recommend_policies_for_project(project_id)
         except Exception as e:
             import logging
+
             logging.getLogger("ecms.agent").warning("Policy analysis failed: %s", e)
         finally:
             # Allow re-triggering
@@ -112,7 +118,11 @@ async def trigger_recommendation(project_id: str = Query(...)):
 
     task = asyncio.create_task(_run())
     _running_tasks[task_id] = task
-    return {"status": "started", "task_id": task_id, "message": "Analysis running in background. Refresh recommendations in ~60 seconds."}
+    return {
+        "status": "started",
+        "task_id": task_id,
+        "message": "Analysis running in background. Refresh recommendations in ~60 seconds.",
+    }
 
 
 _running_tasks: dict[str, asyncio.Task] = {}
@@ -121,4 +131,5 @@ _running_tasks: dict[str, asyncio.Task] = {}
 @router.post("/recommendations/{rec_id}/approve")
 async def approve_recommendation(rec_id: str, reviewer_id: str = Query("agent-cto")):
     from ecms.agent.policy_agent import approve_recommendation as approve
+
     return await approve(rec_id, reviewer_id)
