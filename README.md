@@ -1,7 +1,5 @@
 # AegisOS (AI Workforce OS)
 
-> ⚠️ Not related to Nagios - This is an **AI Agent Operating System**
-> 
 > 🏢 Enterprise AI Workforce Operating System | 🌐 Live: https://aegisos.tailb5c137.ts.net/
 
 <p align="center">
