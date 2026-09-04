@@ -15,7 +15,7 @@ from ecms.api.graphql.router import create_graphql_router
 from ecms.api.middleware.context import RequestContextMiddleware
 from ecms.api.middleware.observability import MetricsMiddleware, TracingMiddleware
 from ecms.api.middleware.rate_limit import RateLimitMiddleware
-from ecms.api.rest import auth, cognition, health, metrics, system, projects, session_chat, agents, policies, categories, categorize
+from ecms.api.rest import auth, cognition, health, metrics, system, projects, session_chat, agents, policies, categories, categorize, agent_profiles
 from ecms.api.rest.platform import router as platform_router
 from ecms.api.rest.discovery import router as discovery_router
 from ecms.api.rest.meetings import router as meetings_router
@@ -109,6 +109,7 @@ def create_app(sdk: EcmsSDK | None = None) -> FastAPI:
     app.include_router(projects.router)
     app.include_router(auth.router)
     app.include_router(agents.router)
+    app.include_router(agent_profiles.router)
     app.include_router(policies.router)
     app.include_router(categories.router)
     app.include_router(categorize.router)

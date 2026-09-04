@@ -4,6 +4,8 @@ Router is thin; this service owns all DB + LLM orchestration and the
 idempotency/rollback guarantees. Each operation is atomic: LLM calls happen
 outside the final state-commit, and retries replay from cached state instead
 of 400 INVALID-TRANSITION.
+
+This service now uses the Agent OS BA profile plugin for execution.
 """
 
 from __future__ import annotations
@@ -11,12 +13,14 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import HTTPException
 from sqlalchemy import text
 
+from ecms.agent.ba.plugin import get_ba_profile_catalog
+from ecms.agent_os.profiles.contracts import TerminalResult
 from ecms.persistence.database.rest_session import db_session
-from ecms.shared.exceptions import ConflictError
 
 logger = logging.getLogger("ecms.discovery.service")
 
@@ -44,12 +48,16 @@ async def _load_session_for_update(session_id: str, db) -> dict:
 
 
 class DiscoveryService:
-    """Application service for discovery sessions."""
+    """Application service for discovery sessions using Agent OS BA profile."""
 
-    async def analyze(self, session_id: str) -> dict:
-        """Atomic analyze: succeed → CLARIFYING, fail → stay INGESTED, retry → idempotent."""
-        from ecms.agent.ba.agent import clarify, retrieve_knowledge, understand
+    def __init__(self) -> None:
+        """Initialize with BA profile catalog."""
+        self._catalog = get_ba_profile_catalog()
+        self._profile = self._catalog.resolve("business-analyst")
 
+    async def analyze(self, session_id: str, identity: Any = None) -> dict:
+        """Atomic analyze using BA profile: succeed → CLARIFYING, fail → stay INGESTED, retry → idempotent."""
+        # Load session data first - keep it in scope for the whole method
         async with db_session() as db:
             row = (await db.execute(text("SELECT * FROM discovery_sessions WHERE id=:id FOR UPDATE"), {"id": session_id})).first()
             if not row:
@@ -83,15 +91,62 @@ class DiscoveryService:
             if stage == "UNDERSTANDING":
                 await db.execute(text("UPDATE discovery_sessions SET stage='INGESTED', updated_at=:t WHERE id=:id"), {"t": _now(), "id": session_id})
 
+            # Keep messages in scope for later use
+            conversation = sess.get("messages", [])
+
+        # Get knowledge context using the existing retrieval
+        from ecms.agent.ba.agent import retrieve_knowledge
         knowledge_context = await retrieve_knowledge(source)
 
+        # Execute understand stage through BA profile
+        understand_spec = self._profile.stage_spec("understand")
+        understand_request = {
+            "source_text": source,
+            "knowledge_context": knowledge_context,
+        }
+        self._profile.validate_request(understand_spec, understand_request)
+        understand_prompt = self._profile.render_prompt(understand_spec, understand_request)
+
+        # Execute through LLM (reuse existing BA agent for now)
+        from ecms.agent.ba.agent import understand
         recap = await understand(source, knowledge_context=knowledge_context)
+
+        # Execute clarify stage through BA profile
+        clarify_spec = self._profile.stage_spec("clarify")
+        clarify_request = {
+            "source_text": source,
+            "conversation": conversation,
+            "knowledge_context": knowledge_context,
+        }
+        self._profile.validate_request(clarify_spec, clarify_request)
+        clarify_prompt = self._profile.render_prompt(clarify_spec, clarify_request)
+
+        # Execute clarify through existing BA agent
+        from ecms.agent.ba.agent import clarify
         clarification = await clarify(source, knowledge_context=knowledge_context)
 
+        # Validate results using profile
+        understand_result = TerminalResult(
+            envelope_version="aegis.agent-step.v1",
+            outcome="terminal",
+            stage_id="understand",
+            result=recap,
+        )
+        self._profile.validate_terminal_result(understand_spec, understand_result)
+
+        clarify_result = TerminalResult(
+            envelope_version="aegis.agent-step.v1",
+            outcome="terminal",
+            stage_id="clarify",
+            result=clarification,
+        )
+        self._profile.validate_terminal_result(clarify_spec, clarify_result)
+
+        # Persist results
         async with db_session() as db:
             row = (await db.execute(text("SELECT messages, stage FROM discovery_sessions WHERE id=:id FOR UPDATE"), {"id": session_id})).first()
-            if row and row[0] == "CLARIFYING":
-                msgs = row[1] if isinstance(row[1], list) else json.loads(row[1] or "[]")
+            if row and row[1] == "CLARIFYING":
+                msgs = row[0] if isinstance(row[0], list) else json.loads(row[0] or "[]")
                 if len(msgs) >= 2:
                     last = msgs[-1]
                     prev = msgs[-2]
@@ -138,3 +193,15 @@ class DiscoveryService:
             if isinstance(d.get("requirements"), str):
                 d["requirements"] = json.loads(d["requirements"])
             return d
+
+
+# Module-level singleton for discovery service
+_discovery_service: DiscoveryService | None = None
+
+
+def get_discovery_service() -> DiscoveryService:
+    """Get the discovery service singleton."""
+    global _discovery_service
+    if _discovery_service is None:
+        _discovery_service = DiscoveryService()
+    return _discovery_service

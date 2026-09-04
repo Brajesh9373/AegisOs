@@ -9,6 +9,7 @@ import { KnowledgeGraph } from '../components/KnowledgeGraph';
 import { CollaborationPanel } from '../components/CollaborationPanel';
 import { OrganizationPanel } from '../components/OrganizationPanel';
 import { AvailableAgentsPanel } from '../components/AvailableAgentsPanel';
+import { AgentProfiles } from './AgentProfiles';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -490,6 +491,15 @@ export function Administration() {
                   onEdit={openEditForm}
                   onDelete={handleDeleteAgent}
                 />
+              </div>
+            )
+          },
+          {
+            key: 'agent-profiles',
+            label: 'Agent Profiles',
+            children: (
+              <div>
+                <AgentProfiles />
               </div>
             )
           },

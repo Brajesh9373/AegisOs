@@ -358,7 +358,8 @@ async def finalize(source_text: str, conversation: list[dict], knowledge_context
             logger.warning("[ba.finalize] attempt %d validation failed: %s", attempt, exc)
             messages.append({
                 "role": "assistant",
-                "content": None,
+                # The Anthropic-compatible gateway rejects null message content.
+                "content": "",
                 "tool_calls": [{
                     "id": tool_calls[0].id,
                     "type": "function",
@@ -436,7 +437,8 @@ async def design_team(
             logger.warning("[ba.design_team] attempt %d validation failed: %s", attempt, exc)
             messages.append({
                 "role": "assistant",
-                "content": None,
+                # The Anthropic-compatible gateway rejects null message content.
+                "content": "",
                 "tool_calls": [{
                     "id": tool_calls[0].id,
                     "type": "function",

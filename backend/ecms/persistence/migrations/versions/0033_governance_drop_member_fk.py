@@ -9,8 +9,8 @@ Revises: 0032
 
 from alembic import op
 
-revision = "0033"
-down_revision = "0032"
+revision = "0033_governance_drop_member_fk"
+down_revision = "0032_queue_ticket_fields"
 branch_labels = None
 depends_on = None
 

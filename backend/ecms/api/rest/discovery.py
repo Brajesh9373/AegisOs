@@ -20,7 +20,14 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
+from sqlalchemy import text
 
+from ecms.api.rest.discovery_auth import (
+    DiscoveryIdentity,
+    load_discovery_project,
+    load_discovery_session,
+    resolve_discovery_identity,
+)
 from ecms.persistence.database.rest_session import db_session
 from ecms.shared.context import bind_context
 from ecms.infrastructure.telemetry.tracing import traced_span
@@ -89,98 +96,87 @@ def _error(code: str, message: str, status: int = 400):
     raise HTTPException(status_code=status, detail={"error": code, "message": message})
 
 
-async def _get_current_user(request: Request) -> dict:
-    auth = request.headers.get("Authorization", "")
-    token = auth.removeprefix("Bearer ").strip()
-    if not token:
-        _error("AUTH-4011", "Missing token", 401)
+async def _load_session(session_id: str, identity: DiscoveryIdentity) -> dict:
+    """Load a discovery session only within the caller's owner/tenant scope."""
     async with db_session() as session:
-        from sqlalchemy import text
-        row = (await session.execute(
-            text("SELECT * FROM auth_sessions WHERE token = :t"), {"t": token}
-        )).first()
-        if not row:
-            _error("AUTH-4012", "Invalid session", 401)
-        sess = _row_to_dict(row)
-        user_row = (await session.execute(
-            text("SELECT * FROM users WHERE id = :id"), {"id": sess["userid"]}
-        )).first()
-        if not user_row:
-            _error("AUTH-4013", "User not found", 401)
-        return _row_to_dict(user_row)
+        result = await load_discovery_session(session, session_id, identity)
+    if isinstance(result.get("messages"), str):
+        result["messages"] = json.loads(result["messages"])
+    if isinstance(result.get("requirements"), str):
+        result["requirements"] = json.loads(result["requirements"])
+    return result
 
 
-async def _load_session(session_id: str) -> dict:
+async def _transition(session_id: str, to_stage: str, identity: DiscoveryIdentity) -> None:
+    """Validate and persist an access-scoped stage transition."""
     async with db_session() as session:
-        from sqlalchemy import text
-        row = (await session.execute(
-            text("SELECT * FROM discovery_sessions WHERE id = :id"),
-            {"id": session_id},
-        )).first()
-        if not row:
-            _error("NOT-FOUND", "Discovery session not found", 404)
-        d = _row_to_dict(row)
-        # Deserialize JSONB fields.
-        if isinstance(d.get("messages"), str):
-            d["messages"] = json.loads(d["messages"])
-        if isinstance(d.get("requirements"), str):
-            d["requirements"] = json.loads(d["requirements"])
-        return d
-
-
-async def _transition(session_id: str, to_stage: str):
-    """Validate and persist a stage transition."""
-    async with db_session() as session:
-        from sqlalchemy import text
-        row = (await session.execute(
-            text("SELECT stage FROM discovery_sessions WHERE id = :id"),
-            {"id": session_id},
-        )).first()
-        if not row:
-            _error("NOT-FOUND", "Session not found", 404)
-        current = row[0]
+        discovered = await load_discovery_session(session, session_id, identity, for_update=True)
+        current = discovered["stage"]
         allowed = _TRANSITIONS.get(current, set())
         if to_stage not in allowed:
-            _error("INVALID-TRANSITION",
-                   f"Cannot move from {current} to {to_stage}", 400)
-        await session.execute(text(
-            "UPDATE discovery_sessions SET stage=:s, updated_at=:t WHERE id=:id"
-        ), {"s": to_stage, "t": _now(), "id": session_id})
+            _error("INVALID-TRANSITION", f"Cannot move from {current} to {to_stage}", 400)
+        from sqlalchemy import text
+
+        await session.execute(
+            text("UPDATE discovery_sessions SET stage=:stage, updated_at=:now WHERE id=:id"),
+            {"stage": to_stage, "now": _now(), "id": session_id},
+        )
 
 
 async def _append_message(
     session_id: str,
+    identity: DiscoveryIdentity,
     role: str,
     content: str,
     *,
     category: str | None = None,
     category_label: str | None = None,
-):
-    """Append a message to the session's message thread."""
+) -> list[dict]:
+    """Append to an access-scoped discovery conversation."""
     async with db_session() as session:
-        from sqlalchemy import text
-        row = (await session.execute(
-            text("SELECT messages FROM discovery_sessions WHERE id = :id"),
-            {"id": session_id},
-        )).first()
-        raw = row[0] if row and row[0] else []
-        # asyncpg returns JSONB as list; sqlite returns JSON string.
+        discovered = await load_discovery_session(session, session_id, identity, for_update=True)
+        raw = discovered.get("messages") or []
+        # asyncpg returns JSONB as a list; SQLite returns a JSON string.
         if isinstance(raw, list):
-            msgs = raw
+            messages = raw
         elif isinstance(raw, str):
-            msgs = json.loads(raw)
+            messages = json.loads(raw)
         else:
-            msgs = []
+            messages = []
         message = {"role": role, "content": content, "timestamp": _now()}
         if category:
             message["category"] = category
         if category_label:
             message["category_label"] = category_label
-        msgs.append(message)
-        await session.execute(text(
-            "UPDATE discovery_sessions SET messages=:m, updated_at=:t WHERE id=:id"
-        ), {"m": json.dumps(msgs), "t": _now(), "id": session_id})
-        return msgs
+        messages.append(message)
+        from sqlalchemy import text
+
+        await session.execute(
+            text("UPDATE discovery_sessions SET messages=:messages, updated_at=:now WHERE id=:id"),
+            {"messages": json.dumps(messages), "now": _now(), "id": session_id},
+        )
+        return messages
+
+
+async def _get_ba_cognition_service(request: Request):
+    """Return the request-bound DSH cognition service only when it is available.
+
+    Application composition is responsible for installing ``ba_cognition`` on
+    ``app.state``. The object must expose an async ``execute(...)`` method with
+    the ``BACognitionService`` contract. Keeping this guard at the route
+    boundary makes the integration fail closed until that composition exists.
+    """
+    service = getattr(request.app.state, "ba_cognition", None)
+    execute = getattr(service, "execute", None)
+    if not callable(execute):
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "BA-COGNITION-UNAVAILABLE",
+                "message": "Business Analyst cognition is unavailable",
+            },
+        )
+    return service
 
 
 # ---------------------------------------------------------------------------
@@ -204,7 +200,7 @@ async def transcribe_audio(request: Request):
     Returns {"text": "..."} with the transcribed text.
     Uses the same API credentials as the BA agent.
     """
-    await _get_current_user(request)
+    await resolve_discovery_identity(request)
 
     form = await request.form()
     audio_file = form.get("audio")
@@ -249,16 +245,29 @@ async def transcribe_audio(request: Request):
 
 @router.post("/sessions")
 async def create_session(body: CreateSessionBody, request: Request):
-    await _get_current_user(request)
+    identity = await resolve_discovery_identity(request)
+    project_id = body.project_id
     sid = _uuid()
     now = _now()
     async with db_session() as session:
-        from sqlalchemy import text
-        await session.execute(text(
-            "INSERT INTO discovery_sessions "
-            "(id, project_id, stage, source_text, transcript, messages, requirements, ai_model_id, created_at, updated_at) "
-            "VALUES (:id, :pid, 'DRAFT', NULL, NULL, '[]', NULL, NULL, :t, :t)"
-        ), {"id": sid, "pid": body.project_id, "t": now})
+        if project_id:
+            await load_discovery_project(session, project_id, identity)
+        await session.execute(
+            text(
+                "INSERT INTO discovery_sessions "
+                "(id, project_id, owner_id, organization_id, stage, source_text, transcript, "
+                "messages, requirements, ai_model_id, created_at, updated_at) "
+                "VALUES (:id, :project_id, :owner_id, :organization_id, 'DRAFT', NULL, NULL, "
+                "'[]', NULL, NULL, :now, :now)"
+            ),
+            {
+                "id": sid,
+                "project_id": project_id,
+                "owner_id": identity.user_id,
+                "organization_id": identity.organization_id,
+                "now": now,
+            },
+        )
     return {"session_id": sid, "stage": "DRAFT"}
 
 
@@ -274,18 +283,19 @@ class IngestBody(BaseModel):
 
 @router.post("/{session_id}/ingest")
 async def ingest(session_id: str, body: IngestBody, request: Request):
-    await _get_current_user(request)
-    await _transition(session_id, "INGESTED")
+    identity = await resolve_discovery_identity(request)
+    await _transition(session_id, "INGESTED", identity)
 
     source = body.text or body.file_content or ""
     if not source.strip():
         _error("EMPTY-INPUT", "Provide text or file_content", 400)
 
     async with db_session() as session:
-        from sqlalchemy import text
-        await session.execute(text(
-            "UPDATE discovery_sessions SET source_text=:st, updated_at=:t WHERE id=:id"
-        ), {"st": source.strip(), "t": _now(), "id": session_id})
+        await load_discovery_session(session, session_id, identity, for_update=True)
+        await session.execute(
+            text("UPDATE discovery_sessions SET source_text=:source, updated_at=:now WHERE id=:id"),
+            {"source": source.strip(), "now": _now(), "id": session_id},
+        )
 
     return {"session_id": session_id, "stage": "INGESTED", "length": len(source)}
 
@@ -297,13 +307,14 @@ async def ingest(session_id: str, body: IngestBody, request: Request):
 
 @router.post("/{session_id}/analyze")
 async def analyze(session_id: str, request: Request):
-    user = await _get_current_user(request)
-    bind_context(session_id=session_id, user_id=user.get("id"))
+    identity = await resolve_discovery_identity(request)
+    bind_context(session_id=session_id, user_id=identity.user_id)
     with traced_span("discovery.analyze"):
-        from ecms.api.rest.discovery_service import DiscoveryService
-        svc = DiscoveryService()
+        from ecms.api.rest.discovery_service import get_discovery_service
+
+        svc = get_discovery_service()
         try:
-            return await svc.analyze(session_id)
+            return await svc.analyze(session_id, identity)
         except HTTPException:
             raise
         except Exception as exc:  # noqa: BLE001
@@ -329,21 +340,21 @@ class ChatBody(BaseModel):
 
 @router.post("/{session_id}/chat")
 async def chat(session_id: str, body: ChatBody, request: Request):
-    user = await _get_current_user(request)
-    bind_context(session_id=session_id, user_id=user.get("id"))
+    identity = await resolve_discovery_identity(request)
+    bind_context(session_id=session_id, user_id=identity.user_id)
     with traced_span("discovery.chat"):
-        sess = await _load_session(session_id)
+        sess = await _load_session(session_id, identity)
         if sess["stage"] != "CLARIFYING":
             _error("WRONG-STAGE", f"Expected CLARIFYING, got {sess['stage']}", 400)
 
-        conversation = await _append_message(session_id, "user", body.message)
+        conversation = await _append_message(session_id, identity, "user", body.message)
 
         if _is_finalize_intent(body.message):
             reply = (
                 "Understood. I have enough to move forward. Set the meeting cadence, "
                 "then generate the requirements package for review."
             )
-            await _append_message(session_id, "assistant", reply)
+            await _append_message(session_id, identity, "assistant", reply)
             return {
                 "session_id": session_id,
                 "stage": "CLARIFYING",
@@ -375,6 +386,7 @@ async def chat(session_id: str, body: ChatBody, request: Request):
 
         await _append_message(
             session_id,
+            identity,
             "assistant",
             reply,
             category=clarification["category"] if clarification else None,
@@ -404,8 +416,8 @@ class FinalizeBody(BaseModel):
 
 @router.get("/{session_id}/finalize-status")
 async def finalize_status(session_id: str, request: Request):
-    await _get_current_user(request)
-    sess = await _load_session(session_id)
+    identity = await resolve_discovery_identity(request)
+    sess = await _load_session(session_id, identity)
     stage = sess.get("stage") or ""
     transcript = sess.get("transcript") or ""
     progress = {}
@@ -428,10 +440,10 @@ async def finalize_status(session_id: str, request: Request):
 
 @router.post("/{session_id}/finalize")
 async def finalize(session_id: str, body: FinalizeBody, request: Request):
-    user = await _get_current_user(request)
-    bind_context(session_id=session_id, user_id=user.get("id"))
+    identity = await resolve_discovery_identity(request)
+    bind_context(session_id=session_id, user_id=identity.user_id)
     with traced_span("discovery.finalize"):
-        sess = await _load_session(session_id)
+        sess = await _load_session(session_id, identity)
         if sess["stage"] not in ("CLARIFYING", "FINALIZING"):
             _error("WRONG-STAGE", f"Cannot finalize from {sess['stage']}", 400)
 
@@ -442,7 +454,7 @@ async def finalize(session_id: str, body: FinalizeBody, request: Request):
 
         knowledge_context = await retrieve_knowledge(source, conversation)
 
-        await _transition(session_id, "FINALIZING")
+        await _transition(session_id, "FINALIZING", identity)
         try:
             async with db_session() as session:
                 from sqlalchemy import text

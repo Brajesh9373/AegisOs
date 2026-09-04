@@ -19,9 +19,9 @@ logger = logging.getLogger("ecms.ba.model")
 def _get_settings_fallback() -> dict:
     """Get model config from environment when no DB row exists."""
     return {
-        "model": os.environ.get("LLM_MODEL", os.environ.get("ECMS_LLM_MODEL", "gpt-4o")),
-        "api_key": os.environ.get("OPENAI_API_KEY", os.environ.get("ECMS_OPENAI_API_KEY", "")),
-        "base_url": os.environ.get("OPENAI_BASE_URL", os.environ.get("ECMS_OPENAI_BASE_URL", "")),
+        "model": os.environ.get("LLM_MODEL", os.environ.get("ECMS_LLM_MODEL", "glm-5")),
+        "api_key": os.environ.get("ANTHROPIC_AUTH_TOKEN", os.environ.get("OPENAI_API_KEY", os.environ.get("ECMS_OPENAI_API_KEY", ""))),
+        "base_url": os.environ.get("ANTHROPIC_BASE_URL", os.environ.get("OPENAI_BASE_URL", os.environ.get("ECMS_OPENAI_BASE_URL", ""))),
     }
 
 

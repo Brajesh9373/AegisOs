@@ -18,6 +18,7 @@ from ecms.persistence.models import agent  # noqa: F401  (registers agent models
 from ecms.persistence.models import project_agent_position  # noqa: F401  (registers project staffing models)
 from ecms.persistence.models import organization_member  # noqa: F401  (registers org member models)
 from ecms.persistence.models import governance_assignment  # noqa: F401  (registers governance models)
+from ecms.persistence.models import ba_stage_outcome  # noqa: F401  (registers BA durability models)
 from ecms.persistence.models import task  # noqa: F401  (registers task/dependency/CTR models)
 from ecms.persistence.models import access_policy  # noqa: F401  (registers policy models)
 from ecms.persistence.models import category  # noqa: F401  (registers category models)

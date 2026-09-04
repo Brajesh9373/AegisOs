@@ -13,8 +13,8 @@ from alembic import op
 
 from ecms.persistence.models.category import DEFAULT_CATEGORIES
 
-revision: str = "0012"
-down_revision: str | None = "0011"
+revision: str = "0012_categories"
+down_revision: str | None = "0011_connector_persist_path"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

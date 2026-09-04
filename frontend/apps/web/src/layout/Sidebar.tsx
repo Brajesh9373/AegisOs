@@ -60,6 +60,11 @@ export function Sidebar() {
               Workspace
             </Link>
           </li>
+          <li>
+            <Link to="/agent-profiles" style={linkStyle}>
+              Agent Profiles
+            </Link>
+          </li>
           <li style={{ marginTop: '2rem' }}>
             <Link to="/settings" style={linkStyle}>
               Settings

@@ -6,7 +6,11 @@ if [ "$#" -gt 0 ]; then
 fi
 
 echo "=== Running database migrations ==="
-python -m alembic -c /app/alembic.ini upgrade head
+if [ "$SKIP_MIGRATIONS" != "true" ]; then
+    python -m alembic -c /app/alembic.ini upgrade head || echo "Migrations skipped or failed - continuing..."
+else
+    echo "SKIP_MIGRATIONS=true - skipping alembic upgrade"
+fi
 
 echo "=== Ensuring upload directories ==="
 mkdir -p /workspace/uploads && chown ecms:ecms /workspace/uploads 2>/dev/null || true

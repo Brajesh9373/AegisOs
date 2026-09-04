@@ -6,7 +6,7 @@ from enum import StrEnum
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 __all__ = ["AppSettings", "Profile", "get_settings", "reload_settings"]
@@ -29,7 +29,11 @@ class Profile(StrEnum):
 class AppSettings(BaseSettings):
     """Typed application settings loaded from ``ECMS_``-prefixed environment variables."""
 
-    model_config = SettingsConfigDict(env_prefix="ECMS_", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="ECMS_",
+        extra="ignore",
+        populate_by_name=True,
+    )
 
     app_name: str = Field(default="ecms", description="Canonical platform name.")
     environment: Profile = Field(
@@ -183,6 +187,106 @@ class AppSettings(BaseSettings):
     connector_git_fetch_timeout_seconds: int = Field(default=300, ge=10)
     connector_ingestion_snapshot_timeout_seconds: int = Field(default=1_800, ge=30)
 
+    # DSH is the shared Agent OS subprocess boundary. Credentials remain in the
+    # process environment because DSHRuntime owns the child-env allowlist; these
+    # fields deliberately describe only bounded non-secret execution policy.
+    #
+    # Legacy ECMS_BA_DSH_* variables remain validation aliases during rollout.
+    # They must be removed only after deployment configuration has migrated.
+    ba_runtime_mode: Literal["dsh", "test"] = Field(
+        default="dsh",
+        description="Business Analyst execution runtime; production permits DSH only.",
+    )
+    agent_os_dsh_executable: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "ECMS_AGENT_OS_DSH_EXECUTABLE",
+            "ECMS_BA_DSH_EXECUTABLE",
+        ),
+        description="Optional deployment-pinned DSH executable path; no PATH lookup occurs.",
+    )
+    agent_os_dsh_home: str = Field(
+        default="/var/lib/ecms/dsh",
+        validation_alias=AliasChoices(
+            "ECMS_AGENT_OS_DSH_HOME",
+            "ECMS_BA_DSH_HOME",
+        ),
+        description="Parent directory for isolated, content-addressed DSH profile homes.",
+    )
+    agent_os_dsh_timeout_seconds: float = Field(
+        default=300,
+        gt=0,
+        le=1_800,
+        validation_alias=AliasChoices(
+            "ECMS_AGENT_OS_DSH_TIMEOUT_SECONDS",
+            "ECMS_BA_DSH_TIMEOUT_SECONDS",
+        ),
+    )
+    agent_os_dsh_shutdown_grace_seconds: float = Field(
+        default=5,
+        gt=0,
+        le=60,
+        validation_alias=AliasChoices(
+            "ECMS_AGENT_OS_DSH_SHUTDOWN_GRACE_SECONDS",
+            "ECMS_BA_DSH_SHUTDOWN_GRACE_SECONDS",
+        ),
+    )
+    agent_os_dsh_profile_lock_timeout_seconds: float = Field(
+        default=30,
+        gt=0,
+        le=300,
+        validation_alias=AliasChoices(
+            "ECMS_AGENT_OS_DSH_PROFILE_LOCK_TIMEOUT_SECONDS",
+            "ECMS_BA_DSH_PROFILE_LOCK_TIMEOUT_SECONDS",
+        ),
+    )
+    agent_os_dsh_max_task_bytes: int = Field(
+        default=96 * 1024,
+        ge=1_024,
+        le=512 * 1024,
+        validation_alias=AliasChoices(
+            "ECMS_AGENT_OS_DSH_MAX_TASK_BYTES",
+            "ECMS_BA_DSH_MAX_TASK_BYTES",
+        ),
+    )
+    agent_os_dsh_max_command_bytes: int = Field(
+        default=112 * 1024,
+        ge=1_024,
+        le=768 * 1024,
+        validation_alias=AliasChoices(
+            "ECMS_AGENT_OS_DSH_MAX_COMMAND_BYTES",
+            "ECMS_BA_DSH_MAX_COMMAND_BYTES",
+        ),
+    )
+    agent_os_dsh_max_stdout_bytes: int = Field(
+        default=1 * 1024 * 1024,
+        ge=1_024,
+        le=8 * 1024 * 1024,
+        validation_alias=AliasChoices(
+            "ECMS_AGENT_OS_DSH_MAX_STDOUT_BYTES",
+            "ECMS_BA_DSH_MAX_STDOUT_BYTES",
+        ),
+    )
+    agent_os_dsh_max_stderr_bytes: int = Field(
+        default=256 * 1024,
+        ge=1_024,
+        le=2 * 1024 * 1024,
+        validation_alias=AliasChoices(
+            "ECMS_AGENT_OS_DSH_MAX_STDERR_BYTES",
+            "ECMS_BA_DSH_MAX_STDERR_BYTES",
+        ),
+    )
+    ba_prompt_max_source_bytes: int = Field(default=24 * 1024, ge=1_024, le=256 * 1024)
+    ba_prompt_max_conversation_bytes: int = Field(default=32 * 1024, ge=1_024, le=256 * 1024)
+    ba_prompt_max_evidence_items: int = Field(default=12, ge=1, le=64)
+    ba_prompt_max_evidence_bytes: int = Field(default=24 * 1024, ge=1_024, le=256 * 1024)
+    ba_prompt_max_graph_nodes: int = Field(default=24, ge=1, le=256)
+    ba_prompt_max_graph_edges: int = Field(default=40, ge=1, le=512)
+    ba_prompt_max_graph_bytes: int = Field(default=12 * 1024, ge=1_024, le=256 * 1024)
+    ba_prompt_max_bytes: int = Field(default=96 * 1024, ge=8 * 1024, le=512 * 1024)
+    ba_canonical_projection_required: bool = Field(default=True)
+    ba_projection_worker_heartbeat_ttl_seconds: int = Field(default=120, ge=30, le=3_600)
+
     @model_validator(mode="after")
     def reject_production_chaos_delay(self) -> AppSettings:
         """Prevent the qualification-only build delay from entering production."""
@@ -200,6 +304,19 @@ class AppSettings(BaseSettings):
             raise ValueError(
                 "parallel connector ingestion currently requires exactly one graph writer"
             )
+        if self.agent_os_dsh_max_command_bytes < self.agent_os_dsh_max_task_bytes:
+            raise ValueError(
+                "agent_os_dsh_max_command_bytes must be at least agent_os_dsh_max_task_bytes"
+            )
+        if self.ba_prompt_max_bytes < self.ba_prompt_max_source_bytes:
+            raise ValueError("ba_prompt_max_bytes must cover ba_prompt_max_source_bytes")
+        if self.ba_prompt_max_bytes > self.agent_os_dsh_max_task_bytes:
+            raise ValueError("ba_prompt_max_bytes must not exceed agent_os_dsh_max_task_bytes")
+        if self.environment == Profile.PRODUCTION:
+            if self.ba_runtime_mode != "dsh":
+                raise ValueError("production BA execution requires ba_runtime_mode=dsh")
+            if not self.ba_canonical_projection_required:
+                raise ValueError("production BA execution requires canonical projection")
         return self
 
     @property

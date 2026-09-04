@@ -14,8 +14,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0038"
-down_revision: str | None = "0037"
+revision: str = "0038_normalize_governance_member_ids"
+down_revision: str | None = "0037_expand_agent_certification_portfolios"
 branch_labels: Sequence[str] | None = None
 depends_on: Sequence[str] | None = None
 

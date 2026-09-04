@@ -14,8 +14,8 @@ from collections.abc import Sequence
 from alembic import op
 import sqlalchemy as sa
 
-revision: str = "0034"
-down_revision: str | None = "0033"
+revision: str = "0034_org_tool_assignments"
+down_revision: str | None = "0033_governance_drop_member_fk"
 branch_labels: Sequence[str] | None = None
 depends_on: Sequence[str] | None = None
 

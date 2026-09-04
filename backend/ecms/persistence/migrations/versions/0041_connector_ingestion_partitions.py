@@ -11,8 +11,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0041"
-down_revision: str | None = "0040"
+revision: str = "0041_connector_ingestion_partitions"
+down_revision: str | None = "0040_connector_ingestion_jobs"
 branch_labels: Sequence[str] | None = None
 depends_on: Sequence[str] | None = None
 

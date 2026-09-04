@@ -1,0 +1,143 @@
+{
+  "test_cases": [
+    {
+      "name": "Simple Migration Project",
+      "native_results": [
+        {
+          "stage": "understand",
+          "latency": 4.5960307121276855,
+          "success": true,
+          "error": null
+        },
+        {
+          "stage": "clarify",
+          "latency": 8.576032638549805,
+          "success": true,
+          "error": null
+        },
+        {
+          "stage": "finalize",
+          "latency": 17.427801609039307,
+          "success": true,
+          "error": null
+        }
+      ],
+      "dsh_results": [
+        {
+          "stage": "understand",
+          "latency": 0.590343713760376,
+          "success": false,
+          "error": "DSH execution failed: DSH execution failed (code 1): file:///home/brajesh_kurkure/.nvm/versions/node/v22.23.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:543\n\t\tif (template === void 0) throw new Error(`${binName}: profile ${JSON.stringify(name)} does not exist; create it with 'dsh plugin --profile ${name} add <package>'`);\n\t\t                               ^\n\nError: dsh: profile \"business-analyst\" does not exist; create it with 'dsh plugin --profile business-analyst add <package>'\n    at loadProfile (file:///home/brajesh_kurkure/.nvm/versions/node/v22.23.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:543:34)\n    at prepareProfile (file:///home/brajesh_kurkure/.nvm/versions/node/v22.23.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-DG5t9aNs.js:142:18)\n    at composeProfile (file:///home/brajesh_kurkure/.nvm/versions/node/v22.23.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-DG5t9aNs.js:167:18)\n    at runProfile (file:///home/brajesh_kurkure/.nvm/versions/node/v22.23.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-DG5t9aNs.js:221:19)\n    at file:///home/brajesh_kurkure/.nvm/versions/node/v22.23.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:133:9\n\nNode.js v22.23.2\n"
+        }
+      ],
+      "analysis": {
+        "test_name": "Simple Migration Project",
+        "comparison": {
+          "understand": {
+            "native_latency": 4.5960307121276855,
+            "dsh_latency": 0.590343713760376,
+            "latency_diff": -4.00568699836731,
+            "latency_diff_pct": -87.15535750876036,
+            "native_success": true,
+            "dsh_success": false
+          }
+        }
+      }
+    },
+    {
+      "name": "Complex Integration Project",
+      "native_results": [
+        {
+          "stage": "understand",
+          "latency": 2.696357250213623,
+          "success": true,
+          "error": null
+        },
+        {
+          "stage": "clarify",
+          "latency": 2.928987979888916,
+          "success": true,
+          "error": null
+        },
+        {
+          "stage": "finalize",
+          "latency": 18.720908164978027,
+          "success": true,
+          "error": null
+        }
+      ],
+      "dsh_results": [
+        {
+          "stage": "understand",
+          "latency": 0.7729415893554688,
+          "success": false,
+          "error": "DSH execution failed: DSH execution failed (code 1): file:///home/brajesh_kurkure/.nvm/versions/node/v22.23.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:543\n\t\tif (template === void 0) throw new Error(`${binName}: profile ${JSON.stringify(name)} does not exist; create it with 'dsh plugin --profile ${name} add <package>'`);\n\t\t                               ^\n\nError: dsh: profile \"business-analyst\" does not exist; create it with 'dsh plugin --profile business-analyst add <package>'\n    at loadProfile (file:///home/brajesh_kurkure/.nvm/versions/node/v22.23.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:543:34)\n    at prepareProfile (file:///home/brajesh_kurkure/.nvm/versions/node/v22.23.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-DG5t9aNs.js:142:18)\n    at composeProfile (file:///home/brajesh_kurkure/.nvm/versions/node/v22.23.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-DG5t9aNs.js:167:18)\n    at runProfile (file:///home/brajesh_kurkure/.nvm/versions/node/v22.23.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-DG5t9aNs.js:221:19)\n    at file:///home/brajesh_kurkure/.nvm/versions/node/v22.23.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:133:9\n\nNode.js v22.23.2\n"
+        }
+      ],
+      "analysis": {
+        "test_name": "Complex Integration Project",
+        "comparison": {
+          "understand": {
+            "native_latency": 2.696357250213623,
+            "dsh_latency": 0.7729415893554688,
+            "latency_diff": -1.9234156608581543,
+            "latency_diff_pct": -71.33385832703618,
+            "native_success": true,
+            "dsh_success": false
+          }
+        }
+      }
+    },
+    {
+      "name": "Ambiguous Requirements",
+      "native_results": [
+        {
+          "stage": "understand",
+          "latency": 1.7081990242004395,
+          "success": true,
+          "error": null
+        },
+        {
+          "stage": "clarify",
+          "latency": 3.6046173572540283,
+          "success": true,
+          "error": null
+        },
+        {
+          "stage": "finalize",
+          "latency": 19.546586751937866,
+          "success": true,
+          "error": null
+        }
+      ],
+      "dsh_results": [
+        {
+          "stage": "understand",
+          "latency": 0.3904578685760498,
+          "success": false,
+          "error": "DSH execution failed: DSH execution failed (code 1): file:///home/brajesh_kurkure/.nvm/versions/node/v22.23.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:543\n\t\tif (template === void 0) throw new Error(`${binName}: profile ${JSON.stringify(name)} does not exist; create it with 'dsh plugin --profile ${name} add <package>'`);\n\t\t                               ^\n\nError: dsh: profile \"business-analyst\" does not exist; create it with 'dsh plugin --profile business-analyst add <package>'\n    at loadProfile (file:///home/brajesh_kurkure/.nvm/versions/node/v22.23.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:543:34)\n    at prepareProfile (file:///home/brajesh_kurkure/.nvm/versions/node/v22.23.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-DG5t9aNs.js:142:18)\n    at composeProfile (file:///home/brajesh_kurkure/.nvm/versions/node/v22.23.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-DG5t9aNs.js:167:18)\n    at runProfile (file:///home/brajesh_kurkure/.nvm/versions/node/v22.23.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-DG5t9aNs.js:221:19)\n    at file:///home/brajesh_kurkure/.nvm/versions/node/v22.23.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:133:9\n\nNode.js v22.23.2\n"
+        }
+      ],
+      "analysis": {
+        "test_name": "Ambiguous Requirements",
+        "comparison": {
+          "understand": {
+            "native_latency": 1.7081990242004395,
+            "dsh_latency": 0.3904578685760498,
+            "latency_diff": -1.3177411556243896,
+            "latency_diff_pct": -77.14213255924248,
+            "native_success": true,
+            "dsh_success": false
+          }
+        }
+      }
+    }
+  ],
+  "summary": {
+    "native_avg_latency": 8.86728016535441,
+    "dsh_avg_latency": 0.1948603524102105,
+    "native_success_rate": 100.0,
+    "dsh_success_rate": 0.0,
+    "total_tests": 3
+  }
+}

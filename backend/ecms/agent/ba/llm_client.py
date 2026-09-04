@@ -14,6 +14,7 @@ The client is intentionally thin — no prompt logic here, just infrastructure.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import random
 import time
@@ -138,14 +139,98 @@ class BaLlmClient:
         self.opts = opts or LlmCallOpts()
         self._openai_client = None
 
+    def _convert_tools_to_anthropic(self, tools: list[dict[str, Any]] | None) -> list[dict[str, Any]] | None:
+        """Convert OpenAI-style tools to Anthropic format.
+
+        OpenAI: {"type": "function", "function": {"name": "...", "parameters": {...}}}
+        Anthropic: {"name": "...", "input_schema": {...}}
+        """
+        if not tools:
+            return None
+
+        anthropic_tools = []
+        for tool in tools:
+            if tool.get("type") == "function":
+                func = tool.get("function", {})
+                anthropic_tool = {
+                    "name": func.get("name"),
+                    "description": func.get("description", ""),
+                    "input_schema": func.get("parameters", {"type": "object", "properties": {}})
+                }
+                anthropic_tools.append(anthropic_tool)
+            else:
+                # Already in Anthropic format or unknown - pass through
+                anthropic_tools.append(tool)
+
+        return anthropic_tools
+
+    def _normalize_response(self, anthropic_resp: Any) -> Any:
+        """Normalize Anthropic response to OpenAI format for backward compatibility."""
+        from types import SimpleNamespace
+
+        # Extract text content from Anthropic response
+        text_content = ""
+        if hasattr(anthropic_resp, 'content') and anthropic_resp.content:
+            for block in anthropic_resp.content:
+                if hasattr(block, 'type') and block.type == 'text':
+                    text_content += getattr(block, 'text', '')
+
+        # Extract tool calls if present
+        tool_calls = []
+        if hasattr(anthropic_resp, 'content'):
+            for block in anthropic_resp.content:
+                if hasattr(block, 'type') and block.type == 'tool_use':
+                    tool_calls.append(SimpleNamespace(
+                        id=getattr(block, 'id', ''),
+                        type='function',
+                        function=SimpleNamespace(
+                            name=getattr(block, 'name', ''),
+                            arguments=json.dumps(getattr(block, 'input', {}))
+                        )
+                    ))
+
+        # Create OpenAI-style response object
+        message = SimpleNamespace(
+            role='assistant',
+            content=text_content,
+            tool_calls=tool_calls if tool_calls else None
+        )
+
+        choice = SimpleNamespace(
+            index=0,
+            message=message,
+            finish_reason=getattr(anthropic_resp, 'stop_reason', 'stop')
+        )
+
+        response = SimpleNamespace(
+            id=getattr(anthropic_resp, 'id', ''),
+            object='chat.completion',
+            created=int(time.time()),
+            model=getattr(anthropic_resp, 'model', self.model),
+            choices=[choice],
+            usage=SimpleNamespace(
+                prompt_tokens=getattr(getattr(anthropic_resp, 'usage', None), 'input_tokens', 0),
+                completion_tokens=getattr(getattr(anthropic_resp, 'usage', None), 'output_tokens', 0),
+                total_tokens=getattr(getattr(anthropic_resp, 'usage', None), 'input_tokens', 0) +
+                           getattr(getattr(anthropic_resp, 'usage', None), 'output_tokens', 0)
+            )
+        )
+
+        return response
+
     def _get_openai_client(self):
         if self._openai_client is None:
-            from openai import AsyncOpenAI
+            # Use Anthropic SDK for GLM-5 custom endpoint
+            from anthropic import AsyncAnthropic
 
-            base = self.base_url
-            if base and not base.rstrip("/").endswith("/v1"):
-                base = base.rstrip("/") + "/v1"
-            self._openai_client = AsyncOpenAI(api_key=self.api_key, base_url=base or None)
+            self._openai_client = AsyncAnthropic(
+                api_key=self.api_key,
+                base_url=self.base_url,
+                default_headers={
+                    "X-Claude-Code-Session-Id": "ba-agent-session",
+                    "Authorization": f"Bearer {self.api_key}"
+                }
+            )
         return self._openai_client
 
     async def chat(
@@ -170,26 +255,39 @@ class BaLlmClient:
         for attempt in range(self.opts.max_retries + 1):
             try:
                 t0 = time.perf_counter()
+
+                # Convert OpenAI-style messages to Anthropic format
+                anthropic_messages = []
+                system_prompt = None
+                for msg in messages:
+                    if msg.get("role") == "system":
+                        system_prompt = msg.get("content")
+                    else:
+                        anthropic_messages.append(msg)
+
                 kwargs: dict[str, Any] = {
                     "model": self.model,
-                    "messages": messages,
-                    "temperature": temperature,
+                    "messages": anthropic_messages,
+                    "max_tokens": max_tokens or 4096,
                 }
+                if system_prompt:
+                    kwargs["system"] = system_prompt
                 if tools is not None:
-                    kwargs["tools"] = tools
-                if tool_choice is not None:
-                    kwargs["tool_choice"] = tool_choice
-                if max_tokens is not None:
-                    kwargs["max_tokens"] = max_tokens
+                    # Convert OpenAI tool format to Anthropic format
+                    kwargs["tools"] = self._convert_tools_to_anthropic(tools)
+                if temperature != 0.0:
+                    kwargs["temperature"] = temperature
 
                 resp = await asyncio.wait_for(
-                    client.chat.completions.create(**kwargs),
+                    client.messages.create(**kwargs),
                     timeout=self.opts.timeout_s,
                 )
                 _record_success(self.model, self.base_url)
                 elapsed = int((time.perf_counter() - t0) * 1000)
                 logger.info("[ba.llm_client] success model=%s latency_ms=%d attempt=%d", self.model, elapsed, attempt)
-                return resp
+
+                # Normalize Anthropic response to OpenAI format for compatibility
+                return self._normalize_response(resp)
 
             except asyncio.TimeoutError as exc:
                 last_exc = exc

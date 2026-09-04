@@ -7,8 +7,8 @@ Revises: 0031
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0032"
-down_revision = "0031"
+revision = "0032_queue_ticket_fields"
+down_revision = "0031_agent_automation_features"
 branch_labels = None
 depends_on = None
 

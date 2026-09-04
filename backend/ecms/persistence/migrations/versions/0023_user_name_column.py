@@ -10,8 +10,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision = "0023"
-down_revision = "0022"
+revision = "0023_user_name_column"
+down_revision = "0022_agent_project_model"
 branch_labels = None
 depends_on = None
 
