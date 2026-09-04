@@ -1,8 +1,65 @@
 # AegisOS
 
-Enterprise AI Workforce Operating System
+<p align="center">
 
-AegisOS is the execution layer for AI-native organizations. It connects enterprise systems, turns fragmented information into governed knowledge, and coordinates AI workers with memory, evaluations, guardrails, and human approvals.
+[![License](https://img.shields.io/github/license/Brajesh9373/AegisOs?style=flat&color=blue)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&style=flat)](https://python.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?logo=typescript&style=flat)](https://typescriptlang.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-009688?logo=fastapi&style=flat)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&style=flat)](https://react.dev)
+[![Docker](https://img.shields.io/badge/Docker-24.0+-2496ED?logo=docker&style=flat)](https://docker.com)
+[![Last Commit](https://img.shields.io/github/last-commit/Brajesh9373/AegisOs/main?style=flat&color=green)](https://github.com/Brajesh9373/AegisOs/commits/main)
+
+</p>
+
+<h3 align="center">Enterprise AI Workforce Operating System</h3>
+
+<p align="center">
+AegisOS is the execution layer for AI-native organizations. Connect enterprise systems, turn fragmented information into governed knowledge, and coordinate AI workers with memory, evaluations, guardrails, and human approvals.
+</p>
+
+<p align="center">
+<a href="https://github.com/Brajesh9373/AegisOs"><strong>Explore the docs »</strong></a>
+<a href="http://localhost:3000"><strong>View Demo</strong></a>
+ ·
+<a href="https://github.com/Brajesh9373/AegisOs/issues">Report Bug</a>
+ ·
+<a href="https://github.com/Brajesh9373/AegisOs/issues">Request Feature</a>
+</p>
+
+## ⚡ Quickstart
+
+```bash
+# Clone the repository
+git clone https://github.com/Brajesh9373/AegisOs.git
+cd AegisOs
+
+# Start the full stack with Docker
+docker compose -f docker/docker-compose.yml up -d
+
+# Access the application
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:8000
+# API Docs: http://localhost:8000/docs
+```
+
+**Requirements:** Docker 24+, 8GB RAM, 20GB disk space
+
+### Start Building AI Agents
+
+```python
+# Define an agent profile with AI-suggested scopes
+from ecms.agent_os.scope_analyzer import analyze_profile_scopes
+
+# Get AI recommendations for memory, knowledge, and tool access
+recommendations = await analyze_profile_scopes(
+    name="Data Engineer",
+    description="Manages ETL pipelines and data workflows",
+    system_prompt="You are a data engineer specializing in...",
+    role="Engineer"
+)
+# Returns: {memory_scope, knowledge_scope, tool_scope}
+```
 
 ## Vision
 
@@ -11,6 +68,15 @@ We are building the enterprise execution layer for AI-native organizations.
 Instead of replacing enterprise software with AI, we let organizations keep control while AI assists execution through governed agents, workflows, memory, knowledge graphs, and human approvals.
 
 The platform is designed around one principle: AI should be able to move work forward, but every important action must remain observable, explainable, permissioned, and recoverable.
+
+## Why AegisOS?
+
+- **🤖 AI Agents with Governance** — Business Analyst, Compliance Officer, and custom agents with memory, knowledge graphs, and human-in-the-loop approvals
+- **🔗 Multi-Source Connectors** — Ingest from Git, GitHub, GitLab, Jira, Confluence, Slack with async parallel extraction
+- **🧠 Knowledge Graph** — FalkorDB-backed cognitive graph with AST code analysis and WebGL visualization
+- **💾 Enterprise Memory** — 6 memory layers: working, episodic, semantic, procedural, long-term, organizational
+- **🛡️ Built-in Guardrails** — Per-role templates, RBAC/ABAC policies, human approval queues
+- **📊 Full Observability** — Prometheus, Grafana, Loki, Tempo integrated out of the box
 
 ## Current Features
 
@@ -203,6 +269,20 @@ pnpm dev
 - [Testing](docs/testing.md)
 - [Integration guide](docs/integration-guide.md)
 
+## Contributing
+
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details on how to set up the development environment and submit pull requests.
+
+## Code of Conduct
+
+Please read our [Code of Conduct](CODE_OF_CONDUCT.md) to keep our community approachable and respectable.
+
 ## License
 
 This project is licensed under the [Apache License 2.0](LICENSE).
+
+---
+
+<p align="center">
+⭐ Star us on GitHub — it helps us grow! | 🐛 <a href="https://github.com/Brajesh9373/AegisOs/issues">Open an Issue</a> | 💬 <a href="https://github.com/Brajesh9373/AegisOs/discussions">Join Discussion</a>
+</p>
