@@ -326,6 +326,160 @@ async def analyze_scopes(
     }
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Agent Instantiation API - must be before POST "" to avoid route conflicts
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class AgentInstantiateInput(BaseModel):
+    """Input for instantiating an agent from a profile."""
+
+    profile_id: str = Field(..., description="Profile ID to instantiate")
+    system_prompt_override: str | None = Field(
+        None, description="Override the profile's system prompt"
+    )
+    model_name_override: str | None = Field(
+        None, description="Override the profile's model"
+    )
+    temperature_override: float | None = Field(
+        None, ge=0, le=2, description="Override the profile's temperature"
+    )
+    custom_scopes: dict[str, Any] | None = Field(
+        None, description="Override scopes (memory, knowledge, tool)"
+    )
+
+
+class AgentInstanceOutput(BaseModel):
+    """Output for an instantiated agent."""
+
+    instance_id: str
+    profile_id: str
+    name: str
+    role: str | None
+    system_prompt: str
+    stages: list[dict[str, Any]]
+    memory_scope: dict[str, Any]
+    knowledge_scope: dict[str, Any]
+    tool_scope: dict[str, Any]
+    llm_config: dict[str, Any]
+    execution_budget: dict[str, Any]
+    created: bool
+
+
+# Global factory instance
+_agent_factory: "AgentFactory | None" = None
+
+
+def _get_agent_factory() -> "AgentFactory":
+    """Get or create the global agent factory."""
+    global _agent_factory
+    if _agent_factory is None:
+        # Use the shared singleton from runtime
+        from ecms.agent_os.runtime import _agent_factory as runtime_factory
+
+        _agent_factory = runtime_factory
+    return _agent_factory
+
+
+@router.post("/instantiate", response_model=AgentInstanceOutput)
+async def instantiate_agent(
+    data: AgentInstantiateInput,
+) -> AgentInstanceOutput:
+    """Instantiate an agent from a profile.
+
+    This creates a runtime agent instance with the profile's configured
+    scopes, system prompt, stages, and model settings.
+    """
+    factory = _get_agent_factory()
+
+    overrides = {}
+    if data.system_prompt_override:
+        overrides["system_prompt"] = data.system_prompt_override
+    if data.model_name_override:
+        overrides["model_name"] = data.model_name_override
+    if data.temperature_override is not None:
+        overrides["temperature"] = data.temperature_override
+    if data.custom_scopes:
+        overrides.update(data.custom_scopes)
+
+    try:
+        # Use create_execution_context to enable scope enforcement
+        instance = await factory.create_execution_context(data.profile_id, **overrides)
+        return AgentInstanceOutput(
+            instance_id=instance.instance_id,
+            profile_id=instance.profile_id,
+            name=instance.name,
+            role=instance.role,
+            system_prompt=instance.system_prompt,
+            stages=instance.stages,
+            memory_scope=instance.memory_scope,
+            knowledge_scope=instance.knowledge_scope,
+            tool_scope=instance.tool_scope,
+            llm_config=instance.model_config,
+            execution_budget=instance.execution_budget,
+            created=True,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/instantiate")
+async def list_agent_instances() -> dict[str, Any]:
+    """List all active agent instances."""
+    factory = _get_agent_factory()
+    instances = factory.list_instances()
+    return {
+        "instances": [
+            {
+                "instance_id": i.instance_id,
+                "profile_id": i.profile_id,
+                "name": i.name,
+                "role": i.role,
+            }
+            for i in instances
+        ],
+        "total": len(instances),
+    }
+
+
+@router.get("/instantiate/{instance_id}", response_model=AgentInstanceOutput)
+async def get_agent_instance(instance_id: str) -> AgentInstanceOutput:
+    """Get an active agent instance by ID."""
+    factory = _get_agent_factory()
+    instance = factory.get(instance_id)
+    if not instance:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Agent instance '{instance_id}' not found",
+        )
+    return AgentInstanceOutput(
+        instance_id=instance.instance_id,
+        profile_id=instance.profile_id,
+        name=instance.name,
+        role=instance.role,
+        system_prompt=instance.system_prompt,
+        stages=instance.stages,
+        memory_scope=instance.memory_scope,
+        knowledge_scope=instance.knowledge_scope,
+        tool_scope=instance.tool_scope,
+        llm_config=instance.model_config,
+        execution_budget=instance.execution_budget,
+        created=False,
+    )
+
+
+@router.delete("/instantiate/{instance_id}")
+async def destroy_agent_instance(instance_id: str) -> dict[str, Any]:
+    """Destroy an agent instance."""
+    factory = _get_agent_factory()
+    if factory.remove(instance_id):
+        return {"message": f"Agent instance '{instance_id}' destroyed", "destroyed": True}
+    raise HTTPException(
+        status_code=404,
+        detail=f"Agent instance '{instance_id}' not found",
+    )
+
+
 @router.post("")
 async def create_agent_profile(
     profile_data: ProfileCreateInput,

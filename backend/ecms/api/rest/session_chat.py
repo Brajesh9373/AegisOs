@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import uuid
 from pathlib import Path
 
@@ -18,6 +19,8 @@ from fastapi.responses import StreamingResponse
 from legacy_ecms.config import get_settings
 from legacy_ecms.memory.cognitive_orchestrator import CognitiveOrchestrator
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["router", "sync_all_memory"]
 
@@ -145,9 +148,11 @@ async def session_chat(session_id: str, body: ChatRequest):
     await _SessionRepo.persist_message(session_id, "user", body.prompt)
 
     from ecms.agent.loop import AgentLoop
+    from ecms.agent.tools import set_scope_enforcer
 
     # Load agent profile synchronously before creating AgentLoop
     agent_profile = None
+    scope_enforcer = None
     if body.agent_id:
         try:
             from sqlalchemy import text as _text
@@ -168,6 +173,44 @@ async def session_chat(session_id: str, body: ChatRequest):
                     agent_profile = d
         except Exception:
             pass
+
+        # Check if there's an active AgentInstance for this agent_id
+        # and set up scope enforcement
+        try:
+            from ecms.agent_os.runtime import _agent_factory
+
+            instance = None
+            # First try: body.agent_id could be an instance_id like "agent-xxx"
+            if body.agent_id and body.agent_id.startswith("agent-"):
+                instance = _agent_factory.get(body.agent_id)
+
+            # Second try: body.agent_id could be a profile_id like "business-analyst"
+            if not instance and body.agent_id:
+                instance = _agent_factory.get_by_profile_id(body.agent_id)
+
+            # Third try: list all instances and match by any field
+            if not instance and body.agent_id:
+                for inst in _agent_factory.list_instances():
+                    if inst.profile_id == body.agent_id or inst.instance_id == body.agent_id:
+                        instance = inst
+                        break
+
+            if instance:
+                from ecms.agent_os.runtime.agent_factory import ScopeEnforcer
+
+                scope_enforcer = ScopeEnforcer(instance)
+                set_scope_enforcer(scope_enforcer)
+                logger.info(
+                    "[%s] Enabled scope enforcement for agent %s (instance: %s, profile: %s)",
+                    session_id[:8],
+                    body.agent_id,
+                    instance.instance_id,
+                    instance.profile_id,
+                )
+        except Exception as e:
+            logger.warning(
+                "[%s] Failed to set up scope enforcement: %s", session_id[:8], e
+            )
 
     queue: asyncio.Queue[dict | None] = asyncio.Queue()
 
@@ -218,6 +261,13 @@ async def session_chat(session_id: str, body: ChatRequest):
             agent_profile=agent_profile,
         )
         answer, trace = await loop.run(body.prompt)
+
+        # Clean up scope enforcement after agent completes
+        if scope_enforcer:
+            from ecms.agent.tools import set_scope_enforcer
+
+            set_scope_enforcer(None)
+            logger.info("[%s] Cleared scope enforcement", session_id[:8])
 
         # Detect [_FINALIZE_READY_] marker in agent response
         show_finalize = False

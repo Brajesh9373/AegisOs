@@ -34,6 +34,7 @@ from ecms.agent.org_tools import (
     get_org_context,
     invoke_org_tool,
 )
+from ecms.agent_os.runtime.agent_factory import ScopeEnforcer
 
 _CC_CONTEXT: ToolContext | None = None
 
@@ -693,6 +694,22 @@ async def search_org(query: str, pattern_type: str | None = None) -> str:
     return "\n".join(lines)
 
 
+# ── Scope enforcement context (thread-local for per-agent enforcement) ────
+
+_scope_enforcer: ScopeEnforcer | None = None
+
+
+def set_scope_enforcer(enforcer: ScopeEnforcer | None) -> None:
+    """Set the current scope enforcer for tool invocation checks."""
+    global _scope_enforcer
+    _scope_enforcer = enforcer
+
+
+def get_scope_enforcer() -> ScopeEnforcer | None:
+    """Get the current scope enforcer if set."""
+    return _scope_enforcer
+
+
 # ── Tool dispatcher (ECMS first, then CC) ─────────────────────────────
 
 _ECMS_TOOL_MAP = {
@@ -743,6 +760,19 @@ CC_TOOL_NAMES = {
 
 
 async def invoke_tool(name: str, arguments: dict[str, Any]) -> str:
+    # Check scope enforcement if enforcer is set
+    enforcer = get_scope_enforcer()
+    if enforcer:
+        # Check rate limits and restrictions first
+        rate_ok, rate_reason = enforcer.check_rate_limit(name)
+        if not rate_ok:
+            return f"Tool '{name}' blocked: {rate_reason}"
+
+        # Check allowed tools list
+        allowed, reason = enforcer.can_use_tool(name)
+        if not allowed:
+            return f"Tool '{name}' blocked: {reason}"
+
     # Try ECMS tools first
     func = _ECMS_TOOL_MAP.get(name)
     if func:

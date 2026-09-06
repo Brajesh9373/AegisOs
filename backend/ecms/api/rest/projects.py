@@ -3,10 +3,13 @@
 Now backed by PostgreSQL for project/connector metadata, with FalkorDB for
 knowledge graph data (node counts, breakdowns, etc.). Delete cascades across
 ALL stores: DB, FalkorDB, Mem0/Qdrant, Redis sessions, GBrain disk files.
+
+New Project flow notifies the BA agent via the DSH SDK Session Manager.
 """
 
 import os
 import shutil
+import uuid
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
@@ -23,6 +26,13 @@ class DeleteProjectRequest(BaseModel):
 class EditProjectRequest(BaseModel):
     workspace_id: str
     name: str | None = None
+
+
+class CreateProjectRequest(BaseModel):
+    title: str
+    requirements: str
+    workspace_id: str | None = None
+    description: str | None = None
 
 
 def _get_falkordb_graph():
@@ -370,6 +380,67 @@ async def delete_project(workspace_id: str) -> dict:
         "mem0_deleted": mem0_deleted,
         "redis_sessions_cleared": redis_deleted,
         "gbrain_deleted": gbrain_deleted,
+    }
+
+
+@router.post("")
+async def create_project(body: CreateProjectRequest) -> dict:
+    """Create a new project and notify the BA agent for analysis.
+
+    This is the "New Project" flow in AegisOS. When a user creates a project:
+    1. Project is persisted in PostgreSQL
+    2. BA agent is notified via the Message Router
+    3. BA agent analyzes requirements and creates a specification
+    """
+    workspace_id = body.workspace_id or f"ws-{uuid.uuid4().hex[:12]}"
+
+    # Persist project in PostgreSQL
+    try:
+        from ecms.persistence.database.rest_session import db_session as pg_session
+        from ecms.persistence.repositories.project import ProjectRepository
+
+        async with pg_session() as session:
+            repo = ProjectRepository(session)
+            await repo.upsert(
+                project_id=f"proj:{workspace_id}",
+                workspace_id=workspace_id,
+                name=body.title,
+                description=body.description,
+            )
+    except Exception as e:
+        return {"created": False, "error": f"Failed to persist project: {e}"}
+
+    # Notify BA agent via Message Router (fire-and-forget)
+    try:
+        from ecms.agent_os.runtime.message_router import get_router
+
+        router = get_router()
+        await router.aegisos.handle_new_project(
+            project={
+                "id": workspace_id,
+                "title": body.title,
+                "requirements": body.requirements,
+                "description": body.description,
+            },
+            user={
+                "id": "current_user",  # Would come from auth context in production
+                "name": "User",
+            },
+        )
+        ba_notified = True
+    except Exception as e:
+        # Don't fail the project creation if BA notification fails
+        ba_notified = False
+        import logging
+        logging.getLogger("ecms.api.projects").warning(
+            "Failed to notify BA agent: %s", e
+        )
+
+    return {
+        "project_id": workspace_id,
+        "title": body.title,
+        "status": "created",
+        "ba_notified": ba_notified,
     }
 
 
