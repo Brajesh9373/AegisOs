@@ -32,8 +32,9 @@ AegisOS is the execution layer for AI-native organizations. Connect enterprise s
 ## ⚡ Quickstart
 
 ```bash
-# Clone the repository
-git clone https://github.com/varunmishra2801/AegisOs
+# Clone the repository (--recurse-submodules pulls in DSH,
+# the DeepSeek Harness checkout the agent hierarchy launches from)
+git clone --recurse-submodules https://github.com/varunmishra2801/AegisOs
 cd AegisOs
 
 # Start the full stack with Docker
