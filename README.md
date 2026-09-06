@@ -33,7 +33,7 @@ AegisOS is the execution layer for AI-native organizations. Connect enterprise s
 
 ```bash
 # Clone the repository
-git clone https://github.com/Brajesh9373/AegisOs.git
+git clone https://github.com/varunmishra2801/AegisOs
 cd AegisOs
 
 # Start the full stack with Docker
