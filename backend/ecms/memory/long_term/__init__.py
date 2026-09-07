@@ -9,9 +9,6 @@ from __future__ import annotations
 
 from typing import Any
 
-import falkordb
-from legacy_ecms.config import get_settings
-
 
 class PreferencesStore:
     """FalkorDB-backed preference store. Uses :Preference nodes."""
@@ -21,7 +18,13 @@ class PreferencesStore:
         self._graph: Any = None
 
     def _get_graph(self) -> Any:
+        # Deferred imports: the package must stay importable where falkordb
+        # or legacy_ecms are not installed (unit tests, sqlite-only deploys).
         if self._graph is None:
+            import falkordb
+
+            from legacy_ecms.config import get_settings
+
             s = get_settings()
             db = falkordb.FalkorDB(
                 host=s.falkordb_host,
