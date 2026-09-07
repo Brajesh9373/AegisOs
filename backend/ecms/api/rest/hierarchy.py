@@ -423,5 +423,16 @@ async def publish_pattern(body: PublishPatternRequest, request: Request) -> dict
 @router.get("/patterns")
 async def search_patterns(query: str, request: Request, limit: int = 3) -> list[dict]:
     """Find org patterns matching a query."""
-    await _ensure_memory_bridge(request)
+    _ensure_memory_bridge(request)
     return await _bridge_or_400(request).search_patterns(query, limit=limit)
+
+
+@router.get("/memory/search")
+async def search_memory(
+    query: str, request: Request, agent_id: str = "", limit: int = 3
+) -> dict:
+    """Agent-initiated episodic search (backs the memory_search_episodes DSH tool)."""
+    await _ensure_memory_bridge(request)
+    bridge = _bridge_or_400(request)
+    results = await bridge.search_episodes(query, limit=limit)
+    return {"results": [f"{r['display_name']}: {r['description']}" for r in results]}

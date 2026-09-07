@@ -240,6 +240,21 @@ class DSHSDKSessionManager:
     DEFAULT_DSH_REPO = "/home/brajesh_kurkure/Projects/AegisOs/DSH"
     DEFAULT_DSH_LAUNCHER = "node --import tsx/esm apps/cli/src/bin.ts"
 
+    # AegisOS memory tools (DSH plugin): symlinked into each agent home so the
+    # loader resolves it without touching the shipped bundles. The tools call
+    # back to the ECMS backend over HTTP (AEGISOS_API_URL).
+    MEMORY_TOOL_PACKAGE = "packages/experimental/tool-agent-memory"
+    MEMORY_TOOL_NAME = "@deepseek-ai/dsh-tool-agent-memory"
+    MEMORY_TOOL_NAMES = [
+        "memory_search_episodes",
+        "memory_search_procedures",
+        "memory_learn_procedure",
+        "memory_get_preferences",
+        "memory_set_preference",
+        "memory_search_patterns",
+        "memory_publish_pattern",
+    ]
+
     def __init__(
         self,
         dsh_executable: str | Path | None = None,
@@ -972,6 +987,62 @@ If you need to spawn your own subagents, you may do so (max depth: {child_depth 
 
     # ── Internal: cordis.patch.yml Generation ────────────────────────────
 
+    def _link_memory_tool(self, agent_dsh_home: Path) -> None:
+        """Symlink the memory tool package into an agent home's node_modules.
+
+        Lets the profile loader resolve `@deepseek-ai/dsh-tool-agent-memory`
+        from the DSH workspace (with its pnpm-linked peers) without modifying
+        shipped bundles. No-ops when the workspace package is absent.
+        """
+        source = Path(self.DEFAULT_DSH_REPO) / self.MEMORY_TOOL_PACKAGE
+        if not (source / "package.json").exists():
+            logger.warning("Memory tool package missing at %s; agents run without memory tools", source)
+            return
+        target_dir = agent_dsh_home / "node_modules" / "@deepseek-ai"
+        target_dir.mkdir(parents=True, exist_ok=True)
+        link = target_dir / "dsh-tool-agent-memory"
+        try:
+            if link.is_symlink() or link.exists():
+                link.unlink()
+            link.symlink_to(source)
+        except OSError as e:
+            logger.warning("Could not link memory tools for %s: %s", agent_dsh_home, e)
+
+    def _memory_tool_patch(self) -> dict[str, Any]:
+        """Cordis insert entry mounting the memory tools (base URL from env).
+
+        Returned as a separate overlay file (see `_write_tools_patch`): the
+        manager passes cordis.patch.yml both as the profile user layer and as
+        a --patch overlay, so an insert living in cordis.patch.yml would apply
+        twice and fail with a duplicate entry id. Id-targeted rows are
+        idempotent and stay in cordis.patch.yml.
+        """
+        return {
+            "insert": [
+                {
+                    "id": "tool-agent-memory",
+                    "name": self.MEMORY_TOOL_NAME,
+                    "config": {
+                        "baseUrl": os.environ.get("AEGISOS_API_URL", "http://127.0.0.1:8000"),
+                    },
+                }
+            ]
+        }
+
+    def _write_tools_patch(self, agent_dsh_home: Path) -> Path:
+        """Write the insert-only overlay (tool rows) next to cordis.patch.yml."""
+        tools_path = agent_dsh_home / "tools.patch.yml"
+        tools_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(tools_path, "w") as f:
+            yaml.dump([self._memory_tool_patch()], f, default_flow_style=False, sort_keys=False)
+        return tools_path
+
+    def _with_memory_tools(self, allowed_tools: list[str]) -> list[str]:
+        """Append memory tool names to a tool allow-list (unless wildcarded)."""
+        if "*" in allowed_tools or "all" in allowed_tools:
+            return allowed_tools
+        return [*allowed_tools, *[t for t in self.MEMORY_TOOL_NAMES if t not in allowed_tools]]
+
     def _generate_cordis_patch_from_profile(
         self,
         agent_dsh_home: Path,
@@ -1003,20 +1074,25 @@ If you need to spawn your own subagents, you may do so (max depth: {child_depth 
                 "config": {"maxDepth": DEFAULT_MAX_DEPTH.get(instance.role, 2)},
             })
 
-        # Apply tool restrictions from profile
+        # Apply tool restrictions from profile (+ memory tools, unless wildcarded)
         allowed_tools = instance.tool_scope.get("allowed_tools", [])
         if allowed_tools:
             patch.append({
                 "id": "tools",
                 "name": "@deepseek-ai/dsh-tools",
-                "config": {"mode": "native", "allowedTools": allowed_tools},
+                "config": {"mode": "native", "allowedTools": self._with_memory_tools(list(allowed_tools))},
             })
 
+        # AegisOS memory tools live in a separate overlay file (inserts must
+        # not sit in cordis.patch.yml: it applies twice — user layer plus
+        # --patch — and a doubled insert fails as a duplicate entry id).
         patch_path = agent_dsh_home / "cordis.patch.yml"
         patch_path.parent.mkdir(parents=True, exist_ok=True)
         with open(patch_path, "w") as f:
             yaml.dump(patch, f, default_flow_style=False, sort_keys=False)
 
+        self._link_memory_tool(agent_dsh_home)
+        self._write_tools_patch(agent_dsh_home)
         return patch_path
 
     # ── Internal: Process Launch ─────────────────────────────────────────
@@ -1169,10 +1245,13 @@ If you need to spawn your own subagents, you may do so (max depth: {child_depth 
                 "config": {"maxDepth": 3},
             })
 
+        # AegisOS memory tools live in a separate overlay file (see above).
         patch_path = agent_dsh_home / "cordis.patch.yml"
         with open(patch_path, "w") as f:
             yaml.dump(patch, f, default_flow_style=False, sort_keys=False)
 
+        self._link_memory_tool(agent_dsh_home)
+        self._write_tools_patch(agent_dsh_home)
         return patch_path
 
     async def _launch_dsh_process(self, session: SDKAgentSession) -> None:
@@ -1218,6 +1297,13 @@ If you need to spawn your own subagents, you may do so (max depth: {child_depth 
                 "--patch", str(session.cordis_patch_path),
             ]
             cwd = self.DEFAULT_DSH_REPO
+
+        # Insert-only overlay (memory tool row): applies once, after the user
+        # layer, so inserts never double-apply.
+        if session.cordis_patch_path is not None:
+            tools_patch = Path(session.cordis_patch_path).parent / "tools.patch.yml"
+            if tools_patch.exists():
+                cmd += ["--patch", str(tools_patch)]
 
         logger.info("Launching DSH for agent %s: %s", agent_id := session.agent_id, " ".join(cmd))
 

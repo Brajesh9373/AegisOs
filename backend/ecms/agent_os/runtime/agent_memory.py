@@ -197,6 +197,36 @@ class AgentMemoryBridge:
         """Reload persisted episodes into the in-memory index (startup)."""
         return await self.episodes.backfill()
 
+    async def search_episodes(
+        self, query: str, limit: int = 3
+    ) -> list[dict[str, Any]]:
+        """Return newest-first episodic matches as structured records.
+
+        Used by the agent-initiated `memory_search_episodes` DSH tool (unlike
+        `recall`, which formats prompt context).
+        """
+        try:
+            results = await self._memory.retrieve(query, limit=limit + 7)
+        except Exception as e:
+            logger.warning("Episode search failed: %s", e)
+            return []
+        ordered = _recent_first(results)
+        episodes = [uco for uco in ordered if _is_episode(uco)][:limit]
+        records = []
+        for uco in episodes:
+            custom = getattr(uco, "custom_attributes", {}) or {}
+            records.append(
+                {
+                    "display_name": getattr(uco, "display_name", ""),
+                    "description": getattr(uco, "description", ""),
+                    "summary": getattr(uco, "summary", "") or "",
+                    "agent_id": custom.get("agent_id", "")
+                    if isinstance(custom, dict)
+                    else "",
+                }
+            )
+        return records
+
     async def learn_procedure(
         self,
         name: str,
