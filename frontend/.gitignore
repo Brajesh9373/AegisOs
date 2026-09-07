@@ -86,3 +86,5 @@ Thumbs.db
 sprint_*.py
 temp/
 cache/
+# ...but not the memory package's cache/ source directory
+!packages/memory/src/cache/

@@ -31,6 +31,7 @@ from ecms.api.rest import (
     categorize,
     cognition,
     health,
+    hierarchy,
     metrics,
     policies,
     projects,
@@ -130,6 +131,7 @@ def create_app(sdk: EcmsSDK | None = None) -> FastAPI:
     app.include_router(auth.router)
     app.include_router(agents.router)
     app.include_router(agent_profiles.router)
+    app.include_router(hierarchy.router)
     app.include_router(policies.router)
     app.include_router(categories.router)
     app.include_router(categorize.router)

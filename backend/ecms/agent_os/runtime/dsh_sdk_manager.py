@@ -185,6 +185,9 @@ class SDKAgentSession:
     max_subagent_depth: int = 3     # Configurable per agent
     parent_agent_id: str | None = None  # If this session is a child, the parent's ID
 
+    # ECMS memory scope from the AgentProfile (read/write/categories)
+    memory_scope: dict[str, Any] = field(default_factory=dict)
+
     # Callbacks
     _response_callbacks: list[Callable[[str, AgentMessage], Awaitable[None]]] = field(
         default_factory=list
@@ -242,6 +245,7 @@ class DSHSDKSessionManager:
         dsh_executable: str | Path | None = None,
         base_dsh_home: str | Path = "/tmp/dsh-homes",
         base_workspace: str | Path = "/tmp/agent-workspaces",
+        memory_bridge: Any | None = None,
     ) -> None:
         # Default to repo launcher if dsh_executable not specified
         if dsh_executable is None:
@@ -250,6 +254,9 @@ class DSHSDKSessionManager:
             self._dsh_executable = str(dsh_executable)
         self._base_dsh_home = Path(base_dsh_home)
         self._base_workspace = Path(base_workspace)
+        # Optional ECMS memory bridge (recall before prompt, record after).
+        # None keeps the manager on DSH session memory only.
+        self.memory_bridge = memory_bridge
         self._sessions: dict[str, SDKAgentSession] = {}
         self._session_tasks: dict[str, asyncio.Task] = {}
         self._monitor_task: asyncio.Task | None = None
@@ -259,6 +266,11 @@ class DSHSDKSessionManager:
     def sessions(self) -> dict[str, SDKAgentSession]:
         """Get all active sessions."""
         return dict(self._sessions)
+
+    async def ensure_started(self) -> None:
+        """Start the manager if it is not running yet (idempotent)."""
+        if not self._running:
+            await self.start()
 
     async def start(self) -> None:
         """Start the session manager and heartbeat monitor."""
@@ -352,6 +364,7 @@ class DSHSDKSessionManager:
             api_key=api_key,
             cordis_patch_path=cordis_patch_path,
             last_heartbeat=time.time(),
+            memory_scope=dict(instance.memory_scope or {}),
         )
 
         if response_callback:
@@ -484,6 +497,7 @@ class DSHSDKSessionManager:
             cordis_patch_path=cordis_patch_path,
             last_heartbeat=time.time(),
             max_subagent_depth=DEFAULT_MAX_DEPTH.get(role, 2),
+            memory_scope=dict(instance.memory_scope or {}),
         )
 
         if response_callback:
@@ -511,6 +525,44 @@ class DSHSDKSessionManager:
             agent_id, profile_id, role, session.session_id,
         )
         return session
+
+    async def spawn_team_from_profiles(
+        self,
+        specs: list[tuple[str, str]],
+        api_key: str,
+        *,
+        extra_system_prompt: str | None = None,
+    ) -> dict[str, SDKAgentSession]:
+        """Spawn several profile-based agents concurrently.
+
+        Launches all DSH subprocesses in parallel (each boot is ~1-2s warm)
+        instead of sequentially. Returns agent_id → session in spec order.
+
+        Args:
+            specs: (profile_id, agent_id) pairs, e.g. HOE + engineers.
+            api_key: LLM API key shared by the team.
+            extra_system_prompt: Optional context appended to every profile.
+
+        Raises:
+            RuntimeError: If any member fails to spawn (already-running
+                members are left up; callers should stop the team).
+        """
+        await self.ensure_started()
+        sessions = await asyncio.gather(*[            self.spawn_agent_from_profile(
+                profile_id=profile_id,
+                agent_id=agent_id,
+                api_key=api_key,
+                extra_system_prompt=extra_system_prompt,
+            )
+            for profile_id, agent_id in specs
+        ])
+        return dict(zip([agent_id for _, agent_id in specs], sessions))
+
+    async def stop_team(self, agent_ids: list[str]) -> None:
+        """Stop several agents concurrently (best-effort per member)."""
+        await asyncio.gather(*[
+            self.stop_agent(agent_id) for agent_id in agent_ids
+        ], return_exceptions=True)
 
     async def spawn_child_in_parent_session(
         self,
@@ -1396,6 +1448,26 @@ If you need to spawn your own subagents, you may do so (max depth: {child_depth 
                 session.status = "working"
                 response = await self._process_message(session, message)
 
+                # ECMS memory write: store the exchange as an episodic UCO
+                # (scope-gated; skipped for error fallbacks and when no
+                # bridge is attached).
+                if (
+                    self.memory_bridge is not None
+                    and not response.startswith("ERROR:")
+                    and response != "Agent did not respond within timeout period"
+                ):
+                    try:
+                        await self.memory_bridge.record_exchange(
+                            session.agent_id,
+                            message.content,
+                            response,
+                            session.memory_scope or None,
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            "Memory write failed for %s: %s", session.agent_id, e
+                        )
+
                 # Notify callbacks
                 for callback in session._response_callbacks:
                     try:
@@ -1430,6 +1502,25 @@ If you need to spawn your own subagents, you may do so (max depth: {child_depth 
         match responses to requests.
         """
         prompt = message.format_for_agent(session.agent_id)
+
+        # ECMS memory recall: prepend relevant past knowledge (scope-gated).
+        # Empty when no bridge is attached, scope denies reading, or the
+        # index has nothing relevant — the prompt is then sent unchanged.
+        if self.memory_bridge is not None:
+            try:
+                context = await self.memory_bridge.recall(
+                    message.content,
+                    session.memory_scope or None,
+                    agent_id=session.agent_id,
+                )
+            except Exception as e:
+                logger.warning("Memory recall failed for %s: %s", session.agent_id, e)
+                context = ""
+            if context:
+                prompt = (
+                    "[AegisOS memory — relevant past knowledge]\n"
+                    f"{context}\n\n---\n{prompt}"
+                )
 
         process = session.process
         if not process or process.returncode is not None:

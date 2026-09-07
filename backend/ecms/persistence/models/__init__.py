@@ -1,6 +1,12 @@
 """SQLAlchemy ORM models."""
 
 from ecms.persistence.models.agent_session import AgentSession
+from ecms.persistence.models.agent_episode import AgentEpisode
+from ecms.persistence.models.agent_memory_layers import (
+    AgentPreference,
+    AgentProcedure,
+    OrgPattern,
+)
 from ecms.persistence.models.agent_profile import AgentProfile
 from ecms.persistence.models.ba_stage_outcome import BACandidate, BAPromotionOutbox, BAStageReceipt
 from ecms.persistence.models.connector_ingestion_job import ConnectorIngestionJob
@@ -22,6 +28,10 @@ from ecms.persistence.models.project_agent_position import (
 
 __all__ = [
     "AgentSession",
+    "AgentEpisode",
+    "AgentPreference",
+    "AgentProcedure",
+    "OrgPattern",
     "AgentProfile",
     "BACandidate",
     "BAPromotionOutbox",

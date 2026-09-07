@@ -65,6 +65,11 @@ export function Sidebar() {
               Agent Profiles
             </Link>
           </li>
+          <li>
+            <Link to="/engineering-team" style={linkStyle}>
+              Engineering Team
+            </Link>
+          </li>
           <li style={{ marginTop: '2rem' }}>
             <Link to="/settings" style={linkStyle}>
               Settings

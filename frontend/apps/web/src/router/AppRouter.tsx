@@ -28,6 +28,7 @@ import { BudgetEstimation } from '../pages/BudgetEstimation';
 import { Proposal } from '../pages/Proposal';
 import { ProjectInitialization } from '../pages/ProjectInitialization';
 import { AgentProfiles } from '../pages/AgentProfiles';
+import { EngineeringTeam } from '../pages/EngineeringTeam';
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode, requiredRole?: string }) {
   const [auth, setAuth] = useState<{ allowed: boolean, loading: boolean }>({ allowed: false, loading: true });
@@ -89,6 +90,7 @@ export function AppRouter() {
           <Route path="artifacts" element={<Artifacts />} />
           <Route path="administration" element={<Administration />} />
           <Route path="agent-profiles" element={<AgentProfiles />} />
+          <Route path="engineering-team" element={<EngineeringTeam />} />
         </Route>
         
         <Route path="/projects/:id/workspace" element={<ProtectedRoute><ProjectWorkspace /></ProtectedRoute>} />
