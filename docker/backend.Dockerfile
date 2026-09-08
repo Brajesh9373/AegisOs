@@ -17,11 +17,13 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app/legacy/src:/app \
     PATH="/app/.venv/bin:/usr/local/bin:$PATH"
 
-# Git (for provider clone) + Node.js 20 (for JS/TS analysis) + build tools + redis-tools
+# Git (for provider clone + DSH) + Node.js 22 (DSH harness requires ^22.19)
+# + pnpm (DSH workspaces) + build tools + redis-tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates bsdextrautils git redis-tools && \
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y nodejs && \
+    npm install -g pnpm@11 && \
     rm -rf /var/lib/apt/lists/*
 RUN npm install -g acorn acorn-walk command-code
 
@@ -31,6 +33,16 @@ COPY --from=builder /app/.venv /app/.venv
 COPY backend/ecms ./ecms
 COPY backend/config ./config
 COPY backend/alembic.ini ./alembic.ini
+
+# DeepSeek Harness (AegisOS fork): the DSH agent hierarchy spawns
+# `node --import tsx/esm apps/cli/src/bin.ts --profile sdk` from this checkout.
+# Full install (devDeps included: tsx runs the TS sources directly) followed
+# by the host library build; lib/ outputs are build artifacts, not git content.
+ARG DSH_REF=aegisos-sdk
+RUN git clone --branch ${DSH_REF} --depth 50 https://github.com/Brajesh9373/deepseek-harness.git /app/DSH && \
+    cd /app/DSH && pnpm install --ignore-scripts && \
+    npm run build:lib:host && \
+    chown -R ecms:ecms /app/DSH
 
 # Legacy providers — Git, MySQL, Jira connectors + pipeline + memory
 # --no-deps: all legacy runtime deps already covered by main backend (pymysql,
@@ -63,7 +75,9 @@ COPY docker/grafana /deploy/grafana
 
 USER ecms
 ENV ECMS_CLI_BINARY=command-code \
-    ECMS_WORKSPACE_DIR=/workspace
+    ECMS_WORKSPACE_DIR=/workspace \
+    DSH_REPO=/app/DSH \
+    AEGISOS_API_URL=http://127.0.0.1:8000
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"

@@ -915,6 +915,11 @@ async def _load_project_for_route(session, project_id: str) -> tuple[str, dict]:
 
 async def _get_current_user(request: Request) -> dict:
     """Extract user from Bearer token via auth_sessions table."""
+    from ecms.api.service_auth import service_user
+
+    service = service_user(request.headers)
+    if service is not None:
+        return service
     auth = request.headers.get("Authorization", "")
     token = auth.removeprefix("Bearer ").strip()
     if not token:

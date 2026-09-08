@@ -33,6 +33,15 @@ def upgrade() -> None:
         "ix_org_tool_assignments_member", "org_tool_assignments", ["organization_member_id"]
     )
     op.create_index("ix_org_tool_assignments_tool", "org_tool_assignments", ["tool_name"])
+    if op.get_bind().dialect.name == "sqlite":
+        # No ALTER-constraint support; a unique index enforces the same rule.
+        op.create_index(
+            "uq_org_tool_member_tool",
+            "org_tool_assignments",
+            ["organization_member_id", "tool_name"],
+            unique=True,
+        )
+        return
     op.create_unique_constraint(
         "uq_org_tool_member_tool",
         "org_tool_assignments",

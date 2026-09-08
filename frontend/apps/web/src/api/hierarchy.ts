@@ -59,6 +59,21 @@ export interface HierarchyDelegateResponse {
   duration_ms: number;
 }
 
+export interface HierarchyKickoffDelegation {
+  label: string;
+  task: string;
+  to_agent: string;
+  response: string | null;
+}
+
+export interface HierarchyKickoffResponse {
+  team_id: string;
+  project_id: string;
+  breakdown: string;
+  delegations: HierarchyKickoffDelegation[];
+  review_note: string;
+}
+
 function toApiError(res: Response, details: string): ApiErrorResponse {
   return {
     code: `HTTP-${res.status}`,
@@ -151,6 +166,17 @@ export function delegateTask(
     to_agent: toAgent,
     task,
     timeout
+  });
+}
+
+/** Autonomously start a bound project team (breakdown, delegate, review). */
+export function kickoffTeam(
+  projectId: string,
+  opts: { brief?: string; timeoutEach?: number } = {}
+): Promise<HierarchyKickoffResponse> {
+  return post<HierarchyKickoffResponse>(`/api/hierarchy/teams/by-project/${projectId}/kickoff`, {
+    brief: opts.brief,
+    timeout_each: opts.timeoutEach ?? 300
   });
 }
 

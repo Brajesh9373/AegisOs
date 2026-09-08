@@ -6,6 +6,7 @@ import { ExecutionEngine, ExecutionState, StepExecutor } from '@aegisos/executio
 import { GeminiProvider, OpenAIProvider } from '@aegisos/provider-openai';
 import { eventBus } from '@aegisos/shared';
 import { WorkflowFactory, WorkflowGraph, WorkflowNodeType } from '@aegisos/workflow';
+import { registerEcmsRoutes } from './routes/ecms.js';
 
 const app = express();
 app.use(cors());
@@ -54,23 +55,17 @@ const requireAuth = asyncHandler(async (req: Request, res: Response, next: NextF
   next();
 });
 
+// ECMS-owned surfaces (discovery, live hierarchy, workspace): explicit routes
+// registered ahead of the legacy mocks below so Express matches them first.
+registerEcmsRoutes(app, requireAuth, asyncHandler);
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
 // Custom Error Class
-export class ApiError extends Error {
-  statusCode: number;
-  code: string;
-  details: any;
-  constructor(statusCode: number, code: string, message: string, details: any = null) {
-    super(message);
-    this.name = 'ApiError';
-    this.statusCode = statusCode;
-    this.code = code;
-    this.details = details;
-  }
-}
+import { ApiError } from './errors.js';
+export { ApiError };
 
 
 

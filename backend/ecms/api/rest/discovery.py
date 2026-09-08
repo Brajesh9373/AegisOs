@@ -105,6 +105,11 @@ async def _get_current_user(request: Request) -> dict:
     """
     from datetime import datetime
 
+    from ecms.api.service_auth import service_user
+
+    service = service_user(request.headers)
+    if service is not None:
+        return service
     auth = request.headers.get("Authorization", "")
     token = auth.removeprefix("Bearer ").strip()
     if not token:
@@ -1634,14 +1639,23 @@ async def _run_team_design(project_id: str, requirements: dict, conversation: li
         await _set_team_status(project_id, "ready")
         logger.info("[discovery] team ready for project %s (%d positions)", project_id, len(rows))
 
-        # Bind a live DSH engineering team (HOE + Frontend/Backend) and hand
-        # it the BA brief. Best-effort: workspace positions above are the
-        # source of truth; DSH agents add live execution on top.
+        # Bind a live DSH engineering team (HOE + Frontend/Backend), hand it
+        # the BA brief, then kick off autonomous execution (HOE breaks down
+        # the work, delegates to engineers, reviews results). Best-effort:
+        # workspace positions above are the source of truth; DSH agents add
+        # live execution on top.
         try:
-            from ecms.api.rest.hierarchy import spawn_team_for_project
+            from ecms.api.rest.hierarchy import kickoff_project_team, spawn_team_for_project
 
             handoff = _ba_handoff_brief(project_id, requirements, conversation)
             await spawn_team_for_project(project_id, handoff=handoff)
+            try:
+                await kickoff_project_team(project_id)
+            except Exception as kickoff_exc:
+                logger.warning(
+                    "[discovery] DSH kickoff skipped for project %s: %s",
+                    project_id, kickoff_exc,
+                )
         except Exception as exc:
             logger.warning(
                 "[discovery] DSH team spawn skipped for project %s: %s",

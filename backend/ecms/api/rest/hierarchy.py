@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -238,7 +239,7 @@ async def spawn_team_for_project(
 
     short = project_id[:8]
     members = [
-        TeamMemberSpec(profile_id=p, agent_id=f"proj-{short}-{a}")
+        TeamMemberSpec(profile_id=p, agent_id=f"{a}-{short}")
         for p, a in DEFAULT_TEAM
     ]
     team_id = f"team-proj-{short}-{uuid.uuid4().hex[:6]}"
@@ -379,6 +380,26 @@ class SpawnForProjectRequest(BaseModel):
     handoff: str | None = None
 
 
+class KickoffRequest(BaseModel):
+    brief: str | None = None
+    timeout_each: float = Field(default=300.0, le=900.0)
+
+
+class KickoffDelegation(BaseModel):
+    label: str
+    task: str
+    to_agent: str
+    response: str | None
+
+
+class KickoffResponse(BaseModel):
+    team_id: str
+    project_id: str
+    breakdown: str
+    delegations: list[KickoffDelegation]
+    review_note: str
+
+
 @router.post("/teams/spawn-for-project", response_model=TeamInfo)
 async def spawn_for_project(body: SpawnForProjectRequest) -> TeamInfo:
     """Get-or-create the DSH team for a project, with an optional HOE brief."""
@@ -388,6 +409,177 @@ async def spawn_for_project(body: SpawnForProjectRequest) -> TeamInfo:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Project team spawn failed: {e}")
+
+
+def _parse_kickoff_tasks(breakdown: str) -> list[tuple[str, str]]:
+    """Extract (FRONTEND|BACKEND, task) pairs from an HOE breakdown.
+
+    Expected line format: `FRONTEND: do X` / `BACKEND: do Y`. Lines in any
+    other shape are ignored (the caller falls back to broadcast).
+    """
+    tasks = []
+    for line in breakdown.splitlines():
+        match = re.match(r"^\s*(FRONTEND|BACKEND)\s*:\s*(.+?)\s*$", line)
+        if match:
+            tasks.append((match.group(1), match.group(2)))
+    return tasks[:4]
+
+
+async def kickoff_project_team(
+    project_id: str, brief: str | None = None, timeout_each: float = 300.0
+) -> KickoffResponse:
+    """Autonomously start project execution: breakdown, delegate, review.
+
+    1. Ensures the project team exists (spawning with the brief as handoff
+       when it does not).
+    2. Asks the HOE to break the work into FRONTEND/BACKEND-labeled tasks.
+    3. Delegates each task to the matching engineer in parallel.
+    4. Reports the outcomes back to the HOE for review.
+    """
+    import logging as _logging
+
+    _logger = _logging.getLogger("ecms.api.hierarchy")
+    await _ensure_memory_bridge(None)
+    manager = get_session_manager()
+    await manager.ensure_started()
+
+    team = get_team_for_project(project_id)
+    if team is None:
+        team = (await spawn_team_for_project(project_id, handoff=brief)).team_id
+        team = get_team_for_project(project_id)
+        if team is None:  # pragma: no cover - defensive
+            raise RuntimeError(f"Team spawn did not register for project {project_id}")
+    team_id = team.team_id
+    by_profile = {m.profile_id: m.agent_id for m in team.members}
+    hoe_id = by_profile.get("head-of-engineering")
+    fe_id = next((a for p, a in by_profile.items() if "frontend" in p), None)
+    be_id = next((a for p, a in by_profile.items() if "backend" in p), None)
+    if hoe_id is None or fe_id is None or be_id is None:
+        raise RuntimeError(f"Team {team_id} is missing HOE/frontend/backend members")
+
+    brief_block = f"\nProject brief:\n{brief}\n" if brief else "\n"
+    breakdown_prompt = (
+        "Split the project work below into 2-4 concrete implementation tasks "
+        "and assign each to one engineer. Your reply must contain ONLY task "
+        "lines in exactly this format, one per line, nothing else:\n"
+        "FRONTEND: <task for the frontend engineer>\n"
+        "BACKEND: <task for the backend engineer>\n"
+        "Example:\n"
+        "FRONTEND: Build the status page layout with service health cards\n"
+        "BACKEND: Create the GET /health API returning service statuses"
+        f"{brief_block}"
+    )
+    reformat_prompt = (
+        "Reformat your task list now. Reply with ONLY lines in exactly "
+        "this format, one per line, no other text:\n"
+        "FRONTEND: <task>\nBACKEND: <task>"
+    )
+    breakdown, parsed = "", []
+    # Up to two breakdown attempts, always with the full prompt: a rotated
+    # session never saw the brief in its DSH log (platform memory still
+    # injects past episodes). An ERROR run means no text at all — often a
+    # malformed tool call poisoning that session's replay — so rotate to a
+    # clean session and retry. A conversational (unparseable but real) answer
+    # gets one reformat follow-up instead.
+    for _ in range(2):
+        breakdown, _ = await send_message_to_agent(
+            team_id, hoe_id, breakdown_prompt,
+            sender_name="Kickoff", timeout=timeout_each,
+        )
+        if breakdown.startswith("ERROR:"):
+            _logger.warning(
+                "Kickoff breakdown errored for %s; rotating session", project_id
+            )
+            manager.rotate_session(hoe_id)
+            continue
+        parsed = _parse_kickoff_tasks(breakdown)
+        if parsed:
+            break
+        _logger.info(
+            "Kickoff breakdown unparseable for %s; requesting reformat", project_id
+        )
+        breakdown, _ = await send_message_to_agent(
+            team_id,
+            hoe_id,
+            reformat_prompt,
+            sender_name="Kickoff",
+            timeout=min(timeout_each, 120.0),
+        )
+        parsed = _parse_kickoff_tasks(breakdown)
+        break
+    if breakdown.startswith("ERROR:"):
+        raise RuntimeError(f"HOE breakdown failed: {breakdown}")
+    targets = {"FRONTEND": fe_id, "BACKEND": be_id}
+    assignments = [(targets[label], task) for label, task in parsed if label in targets]
+    if not assignments:
+        _logger.warning("Kickoff breakdown unparseable for %s; broadcasting", project_id)
+        fallback_task = (
+            "Start on the highest-priority work you own for this project. "
+            "Report what you did and what remains."
+            f"{brief_block}\nHOE notes:\n{breakdown}"
+        )
+        results = await asyncio.gather(
+            *[manager.delegate_task(hoe_id, aid, fallback_task, timeout=timeout_each)
+              for aid in (fe_id, be_id)],
+            return_exceptions=True,
+        )
+        delegations = [
+            KickoffDelegation(
+                label="BROADCAST", task=fallback_task[:200],
+                to_agent=aid,
+                response=None if isinstance(res, Exception) else res,
+            )
+            for aid, res in zip((fe_id, be_id), results)
+        ]
+    else:
+        results = await asyncio.gather(
+            *[manager.delegate_task(hoe_id, aid, task, timeout=timeout_each)
+              for aid, task in assignments],
+            return_exceptions=True,
+        )
+        delegations = [
+            KickoffDelegation(
+                label="FRONTEND" if aid == fe_id else "BACKEND",
+                task=task[:200],
+                to_agent=aid,
+                response=None if isinstance(res, Exception) else res,
+            )
+            for (aid, task), res in zip(assignments, results)
+        ]
+
+    review_lines = [
+        f"- {d.label} ({d.to_agent}): {(d.response or 'no response')[:300]}"
+        for d in delegations
+    ]
+    review_note = (
+        "Teammates reported back on the kickoff tasks:\n" + "\n".join(review_lines)
+        + "\nReply briefly: what is done, what remains, and your next move."
+    )
+    await manager.ingest_message(
+        hoe_id,
+        AgentMessage(
+            source="system", sender_id="kickoff", sender_name="Kickoff",
+            content=review_note, channel_id=f"project-{project_id}",
+            metadata={"type": "kickoff_review", "project_id": project_id},
+        ),
+    )
+    return KickoffResponse(
+        team_id=team_id, project_id=project_id, breakdown=breakdown,
+        delegations=delegations, review_note=review_note,
+    )
+
+
+@router.post("/teams/by-project/{project_id}/kickoff", response_model=KickoffResponse)
+async def kickoff_team(project_id: str, body: KickoffRequest) -> KickoffResponse:
+    """Autonomously start a bound project team (breakdown, delegate, review)."""
+    try:
+        return await kickoff_project_team(
+            project_id, brief=body.brief, timeout_each=body.timeout_each
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Project kickoff failed: {e}")
 
 
 @router.get("/teams/by-project/{project_id}", response_model=TeamInfo)

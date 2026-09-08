@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createTeam,
   delegateTask,
+  kickoffTeam,
   sendMessage,
   teamStatus,
   hierarchyKeys,
@@ -45,5 +46,16 @@ export function useDelegateTask(teamId: string) {
   return useMutation({
     mutationFn: (args: { fromAgent: string; toAgent: string; task: string }) =>
       delegateTask(teamId, args.fromAgent, args.toAgent, args.task)
+  });
+}
+
+export function useKickoffTeam() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { projectId: string; brief?: string }) =>
+      kickoffTeam(args.projectId, { brief: args.brief }),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: hierarchyKeys.teams });
+    }
   });
 }

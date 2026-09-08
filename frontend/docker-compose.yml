@@ -11,6 +11,11 @@ services:
       HOST: 0.0.0.0
       PORT: 3001
       DATABASE_URL: postgresql://ecms:ecms@postgres:5432/ecms
+      # ECMS Python backend (discovery, hierarchy, workspace). localhost only
+      # fits a host-run BFF; in compose set ECMS_BACKEND_URL to a reachable
+      # address (ECMS service DNS or host gateway) in the .env file.
+      ECMS_BACKEND_URL: ${ECMS_BACKEND_URL:-http://localhost:8000}
+      ECMS_SERVICE_TOKEN: ${ECMS_SERVICE_TOKEN:-}
     extra_hosts:
       - 'postgres:host-gateway'
     volumes:

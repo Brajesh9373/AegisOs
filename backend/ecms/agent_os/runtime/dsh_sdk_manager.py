@@ -175,9 +175,15 @@ class SDKAgentSession:
     # Run-completion tracking for session/prompt: the prompt response only
     # carries {messageId}; the agent's text arrives later via session.event
     # notifications, and run end is signaled by session.status → idle.
-    # _process_message arms these before sending; the status handler resolves.
+    # _process_message arms these before sending; the status/event handlers
+    # resolve via _check_run_done. Idle alone is not enough: tool-heavy runs
+    # can report idle mid-run, so completion also requires an assistant
+    # message or a turn/end event.
     _awaiting_run: bool = False
     _saw_running: bool = False
+    _saw_idle: bool = False
+    _saw_assistant: bool = False
+    _saw_turn_end: bool = False
     _run_idle: asyncio.Event | None = None
 
     # Delegation tracking (for multi-level delegation)
@@ -204,6 +210,9 @@ class SDKAgentSession:
         """Arm run-completion tracking before sending a session/prompt."""
         self._awaiting_run = True
         self._saw_running = False
+        self._saw_idle = False
+        self._saw_assistant = False
+        self._saw_turn_end = False
         if self._run_idle is None:
             self._run_idle = asyncio.Event()
         else:
@@ -234,10 +243,13 @@ class DSHSDKSessionManager:
     # SDK server config
     SDK_PORT_BASE = 9500           # Base port for SDK JSON-RPC (agent gets port + index)
 
-    # DSH SDK must be launched from the repo, not the global binary.
+    # DSH SDK must be launched from a repo checkout, not the global binary.
     # The global `dsh` (0.1.1-rc.2) doesn't ship dsh-sdk-app and has version mismatches.
+    # Override with DSH_REPO in containers (default: this dev checkout).
     # Use: node --import tsx/esm apps/cli/src/bin.ts --profile sdk
-    DEFAULT_DSH_REPO = "/home/brajesh_kurkure/Projects/AegisOs/DSH"
+    DEFAULT_DSH_REPO = os.environ.get(
+        "DSH_REPO", "/home/brajesh_kurkure/Projects/AegisOs/DSH"
+    )
     DEFAULT_DSH_LAUNCHER = "node --import tsx/esm apps/cli/src/bin.ts"
 
     # AegisOS memory tools (DSH plugin): symlinked into each agent home so the
@@ -578,6 +590,22 @@ class DSHSDKSessionManager:
         await asyncio.gather(*[
             self.stop_agent(agent_id) for agent_id in agent_ids
         ], return_exceptions=True)
+
+    def rotate_session(self, agent_id: str) -> str:
+        """Start a fresh DSH session for an agent in the same live process.
+
+        The next prompt creates a new server-side session with a clean event
+        log, which recovers from poisoned history (e.g. a malformed tool call
+        the model emitted that breaks every later turn's replay). Platform
+        memory still injects past episodes, so cross-message knowledge is
+        preserved. Returns the new session id.
+        """
+        session = self._sessions.get(agent_id)
+        if not session:
+            raise ValueError(f"Agent {agent_id} not running")
+        session.session_id = f"{agent_id}-session-{uuid.uuid4().hex[:8]}"
+        logger.info("Rotated session for agent %s -> %s", agent_id, session.session_id)
+        return session.session_id
 
     async def spawn_child_in_parent_session(
         self,
@@ -1356,6 +1384,27 @@ If you need to spawn your own subagents, you may do so (max depth: {child_depth 
         except (ProcessLookupError, OSError):
             pass
 
+    def _check_run_done(self, session: SDKAgentSession) -> None:
+        """Resolve run completion when the run provably finished.
+
+        Requires the running → idle transition AND run output (an assistant
+        message or a turn/end marker). Idle alone is not completion: tool-heavy
+        runs can report idle between tool calls, which previously resolved
+        early with just the prompt ack ({messageId}) as the "response".
+        """
+        if not session._awaiting_run:
+            return
+        if not (session._saw_running and session._saw_idle):
+            return
+        if not (session._saw_assistant or session._saw_turn_end):
+            # Mid-run idle (e.g. between tool calls): wait for the next cycle.
+            session._saw_running = False
+            session._saw_idle = False
+            return
+        session._awaiting_run = False
+        if session._run_idle is not None:
+            session._run_idle.set()
+
     async def _read_stdout(self, session: SDKAgentSession) -> None:
         """Read DSH stdout (JSON-RPC notifications)."""
         process = session.process
@@ -1472,10 +1521,9 @@ If you need to spawn your own subagents, you may do so (max depth: {child_depth 
             if session._awaiting_run:
                 if status == "running":
                     session._saw_running = True
-                elif status == "idle" and session._saw_running:
-                    session._awaiting_run = False
-                    if session._run_idle is not None:
-                        session._run_idle.set()
+                elif status == "idle":
+                    session._saw_idle = True
+                self._check_run_done(session)
 
         elif method == "session.event":
             # Durable session event — correlate with pending requests
@@ -1485,6 +1533,13 @@ If you need to spawn your own subagents, you may do so (max depth: {child_depth 
             # Store events in pending requests for response assembly
             for pending in session.pending_requests.values():
                 pending.events.append(event)
+
+            if session._awaiting_run:
+                if event_type == "assistant/message":
+                    session._saw_assistant = True
+                elif event_type == "turn/end":
+                    session._saw_turn_end = True
+                self._check_run_done(session)
 
             logger.debug(
                 "[DSH:%s event] %s",
@@ -1719,11 +1774,30 @@ If you need to spawn your own subagents, you may do so (max depth: {child_depth 
             if text:
                 return text
 
-        # Strategy 3: Return raw result as string
+        # Strategy 3: the run ended without assistant text. Surface the
+        # turn failure loudly instead of the ack: returning {messageId} here
+        # once caused downstream broadcasts of garbage response IDs.
+        reason = self._turn_error(pending)
+        if reason:
+            return f"ERROR: agent run produced no text ({reason})"
         if result is not None:
             return str(result)
 
         return "Agent returned no response"
+
+    @staticmethod
+    def _turn_error(pending: PendingRequest) -> str:
+        """Extract the last turn/end error reason from collected events."""
+        for event in reversed(pending.events):
+            if not isinstance(event, dict) or event.get("type") != "turn/end":
+                continue
+            reason = event.get("data", {}).get("reason", {})
+            if isinstance(reason, dict) and reason.get("kind") == "error":
+                error = reason.get("error", {})
+                if isinstance(error, dict):
+                    return str(error.get("message", "unknown turn error"))[:200]
+                return str(reason)[:200]
+        return ""
 
     @staticmethod
     def _event_text(event: dict[str, Any]) -> str:

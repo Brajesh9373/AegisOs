@@ -227,6 +227,12 @@ services:
       ECMS_EMBEDDING_DIM: "1536"
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_MANAGER_CHAT_ID: ${TELEGRAM_MANAGER_CHAT_ID}
+      # DSH agent hierarchy: LLM route for spawned HOE/engineer sessions.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
+      AEGISOS_API_URL: ${AEGISOS_API_URL:-http://127.0.0.1:8000}
+      # Trust token for the BFF service account (must match the BFF's ECMS_SERVICE_TOKEN).
+      ECMS_SERVICE_TOKEN: ${ECMS_SERVICE_TOKEN:-}
       COMMAND_CODE_API_KEY: ${COMMAND_CODE_API_KEY}
       ECMS_OPENAI_API_KEY: ${ECMS_OPENAI_API_KEY}
       ECMS_OPENAI_BASE_URL: https://api.commandcode.ai/provider/v1

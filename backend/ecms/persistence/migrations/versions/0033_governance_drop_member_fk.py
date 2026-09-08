@@ -16,6 +16,10 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # SQLite neither enforces named FK constraints nor supports dropping
+    # them; the constraint simply never exists there.
+    if op.get_bind().dialect.name == "sqlite":
+        return
     op.drop_constraint(
         "project_agent_governance_assignment_organization_member_id_fkey",
         "project_agent_governance_assignments",
