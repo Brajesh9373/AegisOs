@@ -159,6 +159,48 @@ flowchart TB
 6. **Execute** — AI agents use tools, memory, graph context, and guardrails to do real work
 7. **Govern** — Humans review, approve, pause, cancel, or audit actions at every boundary
 
+## Agent Hierarchy (DSH)
+
+Engineering work runs on persistent [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
+agents: a Head of Engineering (HOE) leading senior Frontend/Backend engineers,
+each with its own durable session, platform memory (episodic, procedural,
+preferences, org patterns), and agent-initiated memory tools.
+
+**Which DSH checkout.** `DSH/` is a git submodule pinned to our fork
+[`Brajesh9373/deepseek-harness`](https://github.com/Brajesh9373/deepseek-harness),
+branch `aegisos-sdk` — stock upstream plus the `dsh-tool-agent-memory`
+package, which upstream does not ship. `--recurse-submodules` on clone is
+required; `--branch aegisos-sdk` matters if you clone DSH separately.
+
+**Build requirement.** DSH resolves plugins from `lib/` build output, which
+is gitignored, so every fresh checkout must build once before spawning agents:
+
+```bash
+cd DSH
+pnpm install
+npm run build:lib:host
+```
+
+**Runtime environment** (backend process spawning the agents):
+
+| Variable | Meaning | Default |
+|---|---|---|
+| `DSH_REPO` | DSH checkout the launcher runs from | repo-local `DSH/` |
+| `ANTHROPIC_API_KEY` / `ANTHROPIC_BASE_URL` | LLM route for agent sessions | unset (spawn fails loud without a key) |
+| `AEGISOS_API_URL` | Backend URL the memory tools call back to | `http://127.0.0.1:8000` |
+| `ECMS_SERVICE_TOKEN` | Trust token letting the BFF call ECMS service-to-service | unset (BFF proxying disabled) |
+
+**Request flow.** Browser → Express BFF (`:3001`, owns browser auth) → explicit
+`/api/discovery/*`, `/api/hierarchy/*`, `/api/projects/:id/workspace*` routes
+→ ECMS Python backend (`:8000`) → per-agent `dsh --profile sdk` subprocesses
+from the fork above. The BFF serves everything else itself; ECMS never trusts
+browser tokens, only the service token.
+
+**Key surfaces.** `POST /api/hierarchy/teams/spawn-for-project`
+(spawn + BA handoff), `POST .../by-project/{id}/kickoff` (breakdown →
+delegate → review), `POST /api/projects/{id}/workspace/chat` (HOE reply),
+`Engineering Team` page in the UI (live spawn/chat/delegate console).
+
 ## Tech Stack
 
 - **Backend:** Python 3.12+, FastAPI, Pydantic v2, SQLAlchemy 2.0 async, Alembic, Strawberry GraphQL, uvicorn
