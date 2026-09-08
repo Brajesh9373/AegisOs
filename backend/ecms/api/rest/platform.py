@@ -2172,6 +2172,43 @@ async def get_project_document(project_id: str, document_id: str, request: Reque
         }
 
 
+async def _route_to_project_hoe(
+    project_id: str, content: str, sender_name: str
+) -> str | None:
+    """Send a workspace message to the project's live HOE agent.
+
+    Returns the HOE's AI reply, or None when no live team is bound (or the
+    agent stays silent) so callers fall back to their default behavior.
+    Lazily spawns the team when the project has positions ready but no DSH
+    team yet — without a BA handoff (that only happens at link time).
+    """
+    try:
+        from ecms.api.rest.hierarchy import (
+            get_team_for_project,
+            send_message_to_agent,
+            spawn_team_for_project,
+        )
+    except ImportError:
+        return None
+    try:
+        team = get_team_for_project(project_id)
+        if team is None:
+            team = await spawn_team_for_project(project_id)
+        hoe_id = next(
+            (m.agent_id for m in team.members if m.profile_id == "head-of-engineering"),
+            None,
+        )
+        if hoe_id is None:
+            return None
+        response, _duration = await send_message_to_agent(
+            team.team_id, hoe_id, content,
+            sender_name=sender_name, timeout=180.0,
+        )
+        return response
+    except Exception:
+        return None
+
+
 @router.post("/projects/{project_id}/workspace/chat")
 async def workspace_chat(project_id: str, body: dict, request: Request):
     user = await _get_current_user(request)
@@ -2235,6 +2272,15 @@ async def workspace_chat(project_id: str, body: dict, request: Request):
         f'Recorded workspace instruction for "{project.get("name", "Project")}": {message.strip()}'
     )
     reasoning = "The instruction is now represented as a real execution node for this project."
+
+    # Live DSH team bound to this project: route the message to the Head of
+    # Engineering and return its AI reply. Falls through to the canned update
+    # below when no team is bound or the agent stays silent.
+    hoe_reply: str | None = await _route_to_project_hoe(
+        project_id, message.strip(), user.get("name", "AegisOS")
+    )
+    if hoe_reply is not None:
+        reasoning = "The project's Head of Engineering (live DSH session) answered."
     decision = (
         "Queued the work against the current project worker hierarchy."
         if agent_id
@@ -2254,6 +2300,8 @@ async def workspace_chat(project_id: str, body: dict, request: Request):
             f"Worker Actions: {worker_actions}",
         ]
     )
+    if hoe_reply is not None:
+        reply = hoe_reply
 
     return {
         "success": True,

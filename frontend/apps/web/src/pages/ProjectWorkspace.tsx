@@ -348,6 +348,9 @@ export const ProjectWorkspace = () => {
   // status, …) — the Harness tab reads these directly, not the pruned tree nodes.
   const [teamAgents, setTeamAgents] = useState<any[]>([]);
   const [teamPositions, setTeamPositions] = useState<any[]>([]);
+  // Live DSH agents bound to this project (from /team `dsh_team` block):
+  // HOE + engineers with real session status. Null when no team is bound.
+  const [dshTeam, setDshTeam] = useState<any | null>(null);
   const [hirePosition, setHirePosition] = useState<any | null>(null);
   const [hiringPositionId, setHiringPositionId] = useState<string | null>(null);
   const [hireAgentForm] = Form.useForm();
@@ -521,6 +524,7 @@ export const ProjectWorkspace = () => {
     setWorkerTree(tree);
     setTeamPositions(positions);
     setTeamAgents(flattenTeamAgents(positions));
+    setDshTeam(res.dsh_team || null);
     setSelectedWorkerId(tree[0]?.id || '');
     setExpandedKeys(expandedNodeMap(tree));
     setTeamLoaded(true);
@@ -573,6 +577,26 @@ export const ProjectWorkspace = () => {
     poll();
     return () => { cancelled = true; if (timer) clearTimeout(timer); };
   }, [id, isLegacyDemoId]);
+
+  // Live DSH status refresh: once the team is ready, re-read the team
+  // endpoint every 10s for fresh `dsh_team` agent states (cheap read, no LLM).
+  // Only the live block updates — the org tree is left untouched.
+  useEffect(() => {
+    if (!id || isLegacyDemoId || !teamLoaded) return;
+    let cancelled = false;
+    let timer: any;
+    const refresh = async () => {
+      try {
+        const res = await ApiClient.get(`/discovery/projects/${id}/team`);
+        if (!cancelled) setDshTeam(res.dsh_team || null);
+      } catch {
+        // Team endpoint hiccup — keep the last known live state.
+      }
+      if (!cancelled) timer = setTimeout(refresh, 10000);
+    };
+    timer = setTimeout(refresh, 10000);
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [id, isLegacyDemoId, teamLoaded]);
 
   const openHireRequest = (positionOrNode: any) => {
     const position = teamPositions.find((p) => p.id === (positionOrNode.positionId || positionOrNode.id)) || positionOrNode;
@@ -1079,6 +1103,26 @@ export const ProjectWorkspace = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
                 <SectionLabel>Worker Hierarchy</SectionLabel>
               </div>
+              {dshTeam && Array.isArray(dshTeam.agents) && dshTeam.agents.length > 0 && (
+                <div style={{ marginBottom: 12, padding: '8px 10px', borderRadius: ui.radius.sm, background: ui.color.surface, border: `1px solid ${ui.color.border}` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                    <RobotOutlined style={{ fontSize: 11, color: ui.color.primary }} />
+                    <Text style={{ fontSize: 11, fontWeight: 600 }}>Live Agents · DSH</Text>
+                  </div>
+                  {dshTeam.agents.map((agent: any) => (
+                    <div key={agent.agent_id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
+                      <span style={{
+                        width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                        background: agent.status === 'working' ? '#1890ff' : agent.status === 'idle' ? '#52c41a' : '#ff4d4f'
+                      }} />
+                      <Text style={{ fontSize: 11 }} ellipsis={{ tooltip: agent.session_id }}>
+                        {agent.agent_id}
+                      </Text>
+                      <Text style={{ fontSize: 10, color: ui.color.textFaint }}>{agent.status}</Text>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {teamStatus === 'generating' || teamStatus === 'pending' ? (
                   <div style={{ padding: '8px 2px', display: 'flex', flexDirection: 'column', gap: 10 }}>

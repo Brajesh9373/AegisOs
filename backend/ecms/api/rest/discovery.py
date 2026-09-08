@@ -1454,6 +1454,74 @@ async def _load_active_organization_members() -> list[dict]:
     return members
 
 
+def _live_dsh_team(project_id: str) -> dict | None:
+    """Live DSH agent state for a project (None when no team is bound).
+
+    Best-effort and synchronous: reads the in-process session manager only,
+    never spawns. Spawn happens in `_run_team_design` or lazily via chat.
+    """
+    try:
+        from ecms.agent_os.runtime.dsh_sdk_manager import get_session_manager
+        from ecms.api.rest.hierarchy import get_team_for_project
+    except ImportError:
+        return None
+    try:
+        team = get_team_for_project(project_id)
+    except Exception:
+        return None
+    if team is None:
+        return None
+    manager = get_session_manager()
+    agents = []
+    for member in team.members:
+        session = manager.sessions.get(member.agent_id)
+        if session is None:
+            continue
+        agents.append({
+            "agent_id": member.agent_id,
+            "profile_id": member.profile_id,
+            "role": session.role,
+            "status": session.status,
+            "session_id": session.session_id,
+        })
+    if not agents:
+        return None
+    return {"team_id": team.team_id, "agents": agents}
+
+
+def _ba_handoff_brief(project_id: str, requirements: dict, conversation: list[dict]) -> str:
+    """Build the BA-to-HOE briefing: objective, requirements, risks, and transcript size."""
+    lines = [
+        f"[BA HANDOFF — project {project_id}]",
+        "The Business Analyst finalized this project with the user. "
+        "You are now the engineering team responsible for delivering it.",
+    ]
+    objective = requirements.get("objective")
+    if objective:
+        lines.append(f"\nObjective:\n{objective}")
+    for key, label in (
+        ("functionalReqs", "Functional requirements"),
+        ("techStack", "Tech stack"),
+        ("risks", "Risks"),
+        ("connectors", "Connectors"),
+    ):
+        values = requirements.get(key) or []
+        if values:
+            lines.append(f"\n{label}:")
+            lines.extend(f"- {v}" for v in values[:12])
+    turns = len(conversation or [])
+    if turns:
+        lines.append(
+            f"\nThe full BA discovery transcript ({turns} messages) is stored "
+            "in the project documents — refer to it when requirements need detail."
+        )
+    lines.append(
+        "\nReply briefly confirming you have the brief and stating your first "
+        "move as Head of Engineering."
+    )
+    return "\n".join(lines)
+
+
 async def _run_team_design(project_id: str, requirements: dict, conversation: list[dict]) -> None:
     """Background worker: generate required positions and assign reusable agents.
 
@@ -1524,6 +1592,20 @@ async def _run_team_design(project_id: str, requirements: dict, conversation: li
 
         await _set_team_status(project_id, "ready")
         logger.info("[discovery] team ready for project %s (%d positions)", project_id, len(rows))
+
+        # Bind a live DSH engineering team (HOE + Frontend/Backend) and hand
+        # it the BA brief. Best-effort: workspace positions above are the
+        # source of truth; DSH agents add live execution on top.
+        try:
+            from ecms.api.rest.hierarchy import spawn_team_for_project
+
+            handoff = _ba_handoff_brief(project_id, requirements, conversation)
+            await spawn_team_for_project(project_id, handoff=handoff)
+        except Exception as exc:
+            logger.warning(
+                "[discovery] DSH team spawn skipped for project %s: %s",
+                project_id, exc,
+            )
     except Exception as exc:
         logger.exception("[discovery] team design failed for project %s: %s", project_id, exc)
         try:
@@ -1660,4 +1742,5 @@ async def get_project_team(project_id: str, request: Request):
         "organization_members": organization_members,
         "positions": positions,
         "agents": agents,
+        "dsh_team": _live_dsh_team(project_id),
     }

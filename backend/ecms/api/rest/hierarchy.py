@@ -54,6 +54,7 @@ class CreateTeamRequest(BaseModel):
         default_factory=lambda: [TeamMemberSpec(profile_id=p, agent_id=a) for p, a in DEFAULT_TEAM]
     )
     extra_system_prompt: str | None = None
+    project_id: str | None = None
 
 
 class AgentInfo(BaseModel):
@@ -68,6 +69,7 @@ class AgentInfo(BaseModel):
 class TeamInfo(BaseModel):
     team_id: str
     created_at: float
+    project_id: str | None = None
     agents: list[AgentInfo]
 
 
@@ -116,6 +118,7 @@ class TeamRecord:
     team_id: str
     created_at: float
     members: list[TeamMemberSpec] = field(default_factory=list)
+    project_id: str | None = None
 
 
 _TEAMS: dict[str, TeamRecord] = {}
@@ -135,28 +138,149 @@ def _team_or_404(team_id: str) -> TeamRecord:
     return team
 
 
-async def _ensure_memory_bridge(request: Request) -> None:
+async def _ensure_memory_bridge(request: Request | None = None) -> None:
     """Attach the ECMS memory bridge to the session manager (idempotent).
 
-    Reads the app's shared cognitive system (knowledge + memory engines) so
-    agent prompts recall platform memory and responses are recorded back as
-    episodic UCOs. On first attach, persisted episodes are backfilled from
-    the database so recall survives backend restarts. Silent no-op outside
-    the full app (tests, scripts) where the manager simply runs on DSH
-    session memory.
+    With a request, reads the app's shared cognitive system. Without one
+    (background tasks like project team spawn), builds minimal engines over
+    an in-memory index — episodic recall still works via DB backfill.
+    Silent no-op when the manager already has a bridge.
     """
     manager = get_session_manager()
     if manager.memory_bridge is not None:
         return
-    cognitive = getattr(request.app.state, "cognitive", None)
-    if cognitive is None:
-        return
+    cognitive = getattr(request.app.state, "cognitive", None) if request is not None else None
     from ecms.agent_os.runtime.agent_memory import AgentMemoryBridge
-    bridge = AgentMemoryBridge(
-        memory=cognitive.memory, repository=cognitive.repository
+
+    if cognitive is not None:
+        manager.memory_bridge = AgentMemoryBridge(
+            memory=cognitive.memory, repository=cognitive.repository
+        )
+    else:
+        from ecms.infrastructure.reasoning.deterministic import DeterministicEmbeddingProvider
+        from ecms.knowledge.infrastructure.repository import InMemoryKnowledgeRepository
+        from ecms.memory.services.engine import DefaultMemoryEngine
+
+        embedder = DeterministicEmbeddingProvider()
+        repository = InMemoryKnowledgeRepository(embedder)
+        manager.memory_bridge = AgentMemoryBridge(
+            memory=DefaultMemoryEngine(repository, embedder=embedder),
+            repository=repository,
+        )
+    await manager.memory_bridge.backfill_from_db()
+
+
+def get_team_for_project(project_id: str) -> TeamRecord | None:
+    """Return the live team bound to a project, if any.
+
+    Teams whose members all died are stopped and deregistered so the next
+    call spawns fresh.
+    """
+    manager = get_session_manager()
+    for team in list(_TEAMS.values()):
+        if team.project_id != project_id:
+            continue
+        alive = [
+            m.agent_id for m in team.members
+            if (s := manager.sessions.get(m.agent_id)) is not None and s.status != "dead"
+        ]
+        if alive:
+            return team
+    return None
+
+
+async def prune_dead_project_team(project_id: str) -> None:
+    """Stop and deregister a project team with no live members (best-effort)."""
+    manager = get_session_manager()
+    for team in list(_TEAMS.values()):
+        if team.project_id != project_id:
+            continue
+        alive = any(
+            (s := manager.sessions.get(m.agent_id)) is not None and s.status != "dead"
+            for m in team.members
+        )
+        if not alive:
+            try:
+                await manager.stop_team([m.agent_id for m in team.members])
+            except Exception:
+                pass
+            _TEAMS.pop(team.team_id, None)
+
+
+async def spawn_team_for_project(
+    project_id: str, handoff: str | None = None
+) -> TeamInfo:
+    """Get-or-create the DSH engineering team for a project.
+
+    Spawning is concurrent (~2s); the BA handoff brief is queued to the HOE
+    without waiting, so callers never block on an LLM run.
+    """
+    import logging as _logging
+
+    _logger = _logging.getLogger("ecms.api.hierarchy")
+    await _ensure_memory_bridge(None)
+    manager = get_session_manager()
+    await manager.ensure_started()
+
+    await prune_dead_project_team(project_id)
+    existing = get_team_for_project(project_id)
+    if existing is not None:
+        return TeamInfo(
+            team_id=existing.team_id,
+            created_at=existing.created_at,
+            project_id=existing.project_id,
+            agents=[
+                _agent_info(manager, m.profile_id, m.agent_id)
+                for m in existing.members
+                if m.agent_id in manager.sessions
+            ],
+        )
+
+    short = project_id[:8]
+    members = [
+        TeamMemberSpec(profile_id=p, agent_id=f"proj-{short}-{a}")
+        for p, a in DEFAULT_TEAM
+    ]
+    team_id = f"team-proj-{short}-{uuid.uuid4().hex[:6]}"
+    specs = [(m.profile_id, m.agent_id) for m in members]
+    await manager.spawn_team_from_profiles(
+        specs,
+        api_key=_api_key(),
+        extra_system_prompt=(
+            f"You are working on project {project_id}. "
+            "Coordinate with your fellow team members through your team lead."
+        ),
     )
-    manager.memory_bridge = bridge
-    await bridge.backfill_from_db()
+    _TEAMS[team_id] = TeamRecord(
+        team_id=team_id, created_at=time.time(), members=members, project_id=project_id
+    )
+    _logger.info("Spawned DSH team %s for project %s", team_id, project_id)
+
+    if handoff:
+        hoe_id = next(
+            (m.agent_id for m in members if m.profile_id == "head-of-engineering"),
+            members[0].agent_id,
+        )
+        queued = await manager.ingest_message(
+            hoe_id,
+            AgentMessage(
+                source="system",
+                sender_id="ba-handoff",
+                sender_name="BA Handoff",
+                content=handoff,
+                channel_id=f"project-{project_id}",
+                metadata={"type": "ba_handoff", "project_id": project_id},
+            ),
+        )
+        if not queued:
+            _logger.warning("HOE %s not accepting handoff for project %s", hoe_id, project_id)
+
+    return TeamInfo(
+        team_id=team_id,
+        created_at=_TEAMS[team_id].created_at,
+        project_id=project_id,
+        agents=[_agent_info(manager, m.profile_id, m.agent_id) for m in members],
+    )
 
 
 def _agent_info(manager, profile_id: str, agent_id: str) -> AgentInfo:
@@ -221,10 +345,16 @@ async def create_team(request: Request, body: CreateTeamRequest) -> TeamInfo:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Team spawn failed: {e}")
 
-    _TEAMS[team_id] = TeamRecord(team_id=team_id, created_at=time.time(), members=members)
+    _TEAMS[team_id] = TeamRecord(
+        team_id=team_id,
+        created_at=time.time(),
+        members=members,
+        project_id=body.project_id,
+    )
     return TeamInfo(
         team_id=team_id,
         created_at=_TEAMS[team_id].created_at,
+        project_id=body.project_id,
         agents=[_agent_info(manager, m.profile_id, m.agent_id) for m in members],
     )
 
@@ -240,8 +370,43 @@ async def list_teams() -> list[TeamInfo]:
             session = manager.sessions.get(m.agent_id)
             if session:
                 agents.append(_agent_info(manager, m.profile_id, m.agent_id))
-        result.append(TeamInfo(team_id=team.team_id, created_at=team.created_at, agents=agents))
+        result.append(TeamInfo(team_id=team.team_id, created_at=team.created_at, project_id=team.project_id, agents=agents))
     return result
+
+
+class SpawnForProjectRequest(BaseModel):
+    project_id: str
+    handoff: str | None = None
+
+
+@router.post("/teams/spawn-for-project", response_model=TeamInfo)
+async def spawn_for_project(body: SpawnForProjectRequest) -> TeamInfo:
+    """Get-or-create the DSH team for a project, with an optional HOE brief."""
+    try:
+        return await spawn_team_for_project(body.project_id, handoff=body.handoff)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Project team spawn failed: {e}")
+
+
+@router.get("/teams/by-project/{project_id}", response_model=TeamInfo)
+async def get_team_by_project(project_id: str) -> TeamInfo:
+    """Get the live DSH team bound to a project (404 when none)."""
+    manager = get_session_manager()
+    team = get_team_for_project(project_id)
+    if team is None:
+        raise HTTPException(status_code=404, detail=f"No live team for project {project_id}")
+    return TeamInfo(
+        team_id=team.team_id,
+        created_at=team.created_at,
+        project_id=team.project_id,
+        agents=[
+            _agent_info(manager, m.profile_id, m.agent_id)
+            for m in team.members
+            if m.agent_id in manager.sessions
+        ],
+    )
 
 
 @router.get("/teams/{team_id}", response_model=TeamInfo)
@@ -252,6 +417,7 @@ async def get_team(team_id: str) -> TeamInfo:
     return TeamInfo(
         team_id=team.team_id,
         created_at=team.created_at,
+        project_id=team.project_id,
         agents=[_agent_info(manager, m.profile_id, m.agent_id) for m in team.members],
     )
 
@@ -270,33 +436,18 @@ async def delete_team(team_id: str) -> dict:
 async def send_message(team_id: str, body: SendMessageRequest, request: Request) -> MessageResponse:
     """Send a message to one team member and wait for its AI response."""
     await _ensure_memory_bridge(request)
-    manager = get_session_manager()
-    team = _team_or_404(team_id)
-    if body.agent_id not in {m.agent_id for m in team.members}:
-        raise HTTPException(status_code=404, detail=f"Agent {body.agent_id} is not in team {team_id}")
-
-    message = AgentMessage(
-        source="aegisos",
-        sender_id="aegisos-ui",
+    response, duration = await send_message_to_agent(
+        team_id,
+        body.agent_id,
+        body.content,
         sender_name=body.sender_name,
-        content=body.content,
-        channel_id=f"team-{team_id}",
+        timeout=body.timeout,
     )
-    waiter = asyncio.create_task(_wait_for_reply(manager, body.agent_id, body.timeout))
-    queued = await manager.ingest_message(body.agent_id, message)
-    if not queued:
-        waiter.cancel()
-        raise HTTPException(status_code=410, detail=f"Agent {body.agent_id} is no longer running")
-    started = time.time()
-    try:
-        response = await waiter
-    except HTTPException:
-        raise
     return MessageResponse(
         team_id=team_id,
         agent_id=body.agent_id,
         response=response,
-        duration_ms=int((time.time() - started) * 1000),
+        duration_ms=int(duration * 1000),
     )
 
 
@@ -423,7 +574,7 @@ async def publish_pattern(body: PublishPatternRequest, request: Request) -> dict
 @router.get("/patterns")
 async def search_patterns(query: str, request: Request, limit: int = 3) -> list[dict]:
     """Find org patterns matching a query."""
-    _ensure_memory_bridge(request)
+    await _ensure_memory_bridge(request)
     return await _bridge_or_400(request).search_patterns(query, limit=limit)
 
 
@@ -436,3 +587,41 @@ async def search_memory(
     bridge = _bridge_or_400(request)
     results = await bridge.search_episodes(query, limit=limit)
     return {"results": [f"{r['display_name']}: {r['description']}" for r in results]}
+
+
+async def send_message_to_agent(
+    team_id: str,
+    agent_id: str,
+    content: str,
+    *,
+    sender_name: str = "AegisOS",
+    timeout: float = 180.0,
+) -> tuple[str, float]:
+    """Send a message to a team member and wait for its AI response.
+
+    Shared by the HTTP endpoint and server-side callers (workspace chat).
+    Returns (response_text, duration_seconds). Raises HTTPException when the
+    agent is missing, gone, or silent past the timeout.
+    """
+    manager = get_session_manager()
+    team = _team_or_404(team_id)
+    if agent_id not in {m.agent_id for m in team.members}:
+        raise HTTPException(status_code=404, detail=f"Agent {agent_id} is not in team {team_id}")
+    message = AgentMessage(
+        source="aegisos",
+        sender_id="aegisos",
+        sender_name=sender_name,
+        content=content,
+        channel_id=f"team-{team_id}",
+    )
+    waiter = asyncio.create_task(_wait_for_reply(manager, agent_id, timeout))
+    queued = await manager.ingest_message(agent_id, message)
+    if not queued:
+        waiter.cancel()
+        raise HTTPException(status_code=410, detail=f"Agent {agent_id} is no longer running")
+    started = time.time()
+    try:
+        response = await waiter
+    except HTTPException:
+        raise
+    return response, time.time() - started
