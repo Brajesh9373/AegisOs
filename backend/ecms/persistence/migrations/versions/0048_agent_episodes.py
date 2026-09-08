@@ -23,7 +23,7 @@ def upgrade() -> None:
     op.create_table(
         "agent_episodes",
         sa.Column("uco_id", sa.String(128), primary_key=True),
-        sa.Column("agent_id", sa.String(128), nullable=False, index=True),
+        sa.Column("agent_id", sa.String(128), nullable=False),
         sa.Column("display_name", sa.String(255), nullable=False),
         sa.Column("description", sa.Text, nullable=False, server_default=""),
         sa.Column("summary", sa.String(512), nullable=False, server_default=""),

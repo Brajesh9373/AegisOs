@@ -96,6 +96,47 @@ def _error(code: str, message: str, status: int = 400):
     raise HTTPException(status_code=status, detail={"error": code, "message": message})
 
 
+async def _get_current_user(request: Request) -> dict:
+    """Resolve the caller from a Bearer token via auth_sessions.
+
+    Several project/team endpoints predate the discovery identity seam and
+    call this platform-style helper; it mirrors platform.py so those routes
+    work instead of raising NameError.
+    """
+    from datetime import datetime
+
+    auth = request.headers.get("Authorization", "")
+    token = auth.removeprefix("Bearer ").strip()
+    if not token:
+        _error("AUTH-4011", "Missing token", 401)
+    async with db_session() as session:
+        row = (
+            await session.execute(
+                text("SELECT * FROM auth_sessions WHERE token = :token"),
+                {"token": token},
+            )
+        ).first()
+        if not row:
+            _error("AUTH-4012", "Invalid session", 401)
+        sess = {k.lower(): v for k, v in row._mapping.items()}
+        if int(sess.get("expiresat", "0")) < int(datetime.now().timestamp() * 1000):
+            await session.execute(
+                text("DELETE FROM auth_sessions WHERE token = :token"),
+                {"token": token},
+            )
+            _error("AUTH-4013", "Session expired", 401)
+        user_id = sess.get("userid")
+        user_row = (
+            await session.execute(
+                text("SELECT * FROM users WHERE id = :id"), {"id": user_id}
+            )
+        ).first()
+        if not user_row:
+            _error("AUTH-4012", "Invalid session", 401)
+        user = {k.lower(): v for k, v in user_row._mapping.items()}
+        return {"id": user.get("id"), "email": user.get("email"), "name": user.get("name", "")}
+
+
 async def _load_session(session_id: str, identity: DiscoveryIdentity) -> dict:
     """Load a discovery session only within the caller's owner/tenant scope."""
     async with db_session() as session:

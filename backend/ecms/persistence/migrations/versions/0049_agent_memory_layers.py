@@ -23,7 +23,7 @@ def upgrade() -> None:
     op.create_table(
         "agent_procedures",
         sa.Column("id", sa.String(128), primary_key=True),
-        sa.Column("name", sa.String(255), nullable=False, index=True),
+        sa.Column("name", sa.String(255), nullable=False),
         sa.Column("description", sa.Text, nullable=False, server_default=""),
         sa.Column("steps", sa.JSON, nullable=False, server_default="[]"),
         sa.Column("learned_by", sa.String(128), nullable=False, server_default=""),
@@ -59,7 +59,7 @@ def upgrade() -> None:
     op.create_table(
         "org_patterns",
         sa.Column("id", sa.String(128), primary_key=True),
-        sa.Column("pattern_type", sa.String(32), nullable=False, index=True),
+        sa.Column("pattern_type", sa.String(32), nullable=False),
         sa.Column("description", sa.Text, nullable=False),
         sa.Column("published_by", sa.String(128), nullable=False, server_default=""),
         sa.Column(
@@ -69,11 +69,13 @@ def upgrade() -> None:
             server_default=sa.func.now(),
         ),
     )
+    op.create_index("ix_agent_procedures_name", "agent_procedures", ["name"])
     op.create_index("ix_org_patterns_type", "org_patterns", ["pattern_type"])
 
 
 def downgrade() -> None:
     op.drop_index("ix_org_patterns_type", "org_patterns")
+    op.drop_index("ix_agent_procedures_name", "agent_procedures")
     op.drop_table("org_patterns")
     op.drop_table("agent_preferences")
     op.drop_table("agent_procedures")

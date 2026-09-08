@@ -2191,21 +2191,29 @@ async def _route_to_project_hoe(
     except ImportError:
         return None
     try:
-        team = get_team_for_project(project_id)
-        if team is None:
-            team = await spawn_team_for_project(project_id)
+        record = get_team_for_project(project_id)
+        if record is None:
+            await spawn_team_for_project(project_id)
+            record = get_team_for_project(project_id)
+        if record is None:
+            return None
         hoe_id = next(
-            (m.agent_id for m in team.members if m.profile_id == "head-of-engineering"),
+            (m.agent_id for m in record.members if m.profile_id == "head-of-engineering"),
             None,
         )
         if hoe_id is None:
             return None
         response, _duration = await send_message_to_agent(
-            team.team_id, hoe_id, content,
+            record.team_id, hoe_id, content,
             sender_name=sender_name, timeout=180.0,
         )
         return response
-    except Exception:
+    except Exception as exc:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "Workspace chat HOE route failed for project %s: %s", project_id, exc
+        )
         return None
 
 
