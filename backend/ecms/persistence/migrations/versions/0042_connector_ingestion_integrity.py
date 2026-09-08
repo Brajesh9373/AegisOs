@@ -18,6 +18,10 @@ depends_on: Sequence[str] | None = None
 
 def upgrade() -> None:
     """Enforce provenance, repeatable revisions, legal states, and counters."""
+    if op.get_bind().dialect.name == "sqlite":
+        # SQLite cannot ALTER constraints onto existing tables, and fresh
+        # sqlite tables carry no legacy constraints to repair — skip.
+        return
     op.create_unique_constraint(
         "uq_connector_ingestion_job_provenance",
         "connector_ingestion_jobs",

@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from alembic import op
+from ecms.persistence.migrations.compat import add_column_if_missing
 from sqlalchemy import text
 
 revision: str = "0026_platform_schema_compat"
@@ -18,22 +19,21 @@ depends_on: str | Sequence[str] | None = None
 
 
 def _column_exists(table: str, column: str) -> bool:
-    """Check whether a column exists on a table."""
-    conn = op.get_bind()
-    res = conn.execute(
-        text(
-            "SELECT 1 FROM information_schema.columns "
-            "WHERE table_name = :tbl AND column_name = :col"
-        ),
-        {"tbl": table, "col": column},
-    )
-    return res.fetchone() is not None
+    """Check whether a column exists on a table (any dialect)."""
+    import sqlalchemy as sa
+
+    inspector = sa.inspect(op.get_bind())
+    try:
+        columns = inspector.get_columns(table)
+    except Exception:
+        return False
+    return any(c["name"] == column for c in columns)
 
 
 def upgrade() -> None:
     # audit_logs – add new columns, then back-fill from legacy names if they exist
-    op.execute("ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS details TEXT")
-    op.execute("ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS timestamp TEXT")
+    add_column_if_missing("audit_logs", "details TEXT")
+    add_column_if_missing("audit_logs", "timestamp TEXT")
 
     # Only back-fill when the legacy source columns are present.
     # On fresh databases the tables are created with the new names directly,
@@ -54,8 +54,8 @@ def upgrade() -> None:
         )
 
     # artifacts – add new columns, then back-fill from legacy name if it exists
-    op.execute("ALTER TABLE artifacts ADD COLUMN IF NOT EXISTS storagepath TEXT")
-    op.execute("ALTER TABLE artifacts ADD COLUMN IF NOT EXISTS versionhistory TEXT")
+    add_column_if_missing("artifacts", "storagepath TEXT")
+    add_column_if_missing("artifacts", "versionhistory TEXT")
 
     if _column_exists("artifacts", "uri"):
         op.execute(

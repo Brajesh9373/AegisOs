@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from alembic import op
+from ecms.persistence.migrations.compat import add_column_if_missing
 
 revision: str = "0020_requirements_tables"
 down_revision: str | None = "0019_agent_task_progress"
@@ -17,7 +18,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.execute("ALTER TABLE business_projects ADD COLUMN IF NOT EXISTS requirements JSONB")
+    add_column_if_missing("business_projects", "requirements JSONB")
 
     op.execute("""
         CREATE TABLE IF NOT EXISTS project_requirements (

@@ -23,6 +23,16 @@ def upgrade() -> None:
         op.add_column("agents", sa.Column("role_description", sa.Text(), nullable=True))
     if not _has_column("agents", "skills"):
         op.add_column("agents", sa.Column("skills", sa.JSON(), nullable=True))
+    if op.get_bind().dialect.name == "sqlite":
+        # SQLite cannot ALTER COLUMN defaults; batch mode recreates the table.
+        with op.batch_alter_table("agents") as batch_op:
+            batch_op.alter_column(
+                "designation",
+                existing_type=sa.String(255),
+                nullable=True,
+                server_default="",
+            )
+        return
     op.alter_column(
         "agents", "designation", existing_type=sa.String(255), nullable=True, server_default=""
     )

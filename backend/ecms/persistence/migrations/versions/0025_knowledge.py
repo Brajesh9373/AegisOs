@@ -22,6 +22,9 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    if op.get_bind().dialect.name == "sqlite":
+        _upgrade_sqlite()
+        return
     op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
 
     op.create_table(
@@ -50,6 +53,30 @@ def upgrade() -> None:
         "CREATE INDEX idx_knowledge_content_fts ON knowledge_entries "
         "USING GIN(to_tsvector('english', content))"
     )
+
+
+def _upgrade_sqlite() -> None:
+    """Equivalent table without postgres-only constructs (extensions, ARRAY, GIN/FTS)."""
+    op.create_table(
+        "knowledge_entries",
+        sa.Column("id", sa.Text(), primary_key=True),
+        sa.Column("category", sa.Text(), nullable=False, server_default=""),
+        sa.Column("domain", sa.Text(), nullable=False, server_default=""),
+        sa.Column("tags", sa.JSON(), nullable=True),
+        sa.Column("content", sa.Text(), nullable=False),
+        sa.Column("embedding", sa.JSON(), nullable=True),
+        sa.Column("source", sa.Text(), nullable=False, server_default="telegram"),
+        sa.Column("contributor", sa.Text(), nullable=False, server_default=""),
+        sa.Column("project_id", sa.Text(), nullable=True),
+        sa.Column("chunk_index", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("parent_id", sa.Text(), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+    )
+    op.create_index("idx_knowledge_category", "knowledge_entries", ["category"])
+    op.create_index("idx_knowledge_domain", "knowledge_entries", ["domain"])
+    op.create_index("idx_knowledge_source", "knowledge_entries", ["source"])
+    op.create_index("idx_knowledge_project", "knowledge_entries", ["project_id"])
 
 
 def downgrade() -> None:

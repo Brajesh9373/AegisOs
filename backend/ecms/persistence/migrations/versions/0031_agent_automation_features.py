@@ -17,11 +17,16 @@ def upgrade() -> None:
     op.add_column("agents", sa.Column("automation", sa.JSON(), nullable=True))
     op.add_column("agents", sa.Column("features", sa.JSON(), nullable=True))
 
+    # SQLite has no ::json / ::text casts; the same statements work uncast
+    # (JSON is stored as TEXT there).
+    cast = "" if op.get_bind().dialect.name == "sqlite" else "::json"
+    text_cast = "" if op.get_bind().dialect.name == "sqlite" else "::text"
+
     # Seed default automation + features for existing agents
-    op.execute("""
+    op.execute(f"""
         UPDATE agents SET
-            automation = '{"autoRetry": true, "maxRetries": 3, "retryDelaySeconds": 30, "escalateOnFailure": true, "heartbeatIntervalSeconds": 60}'::json,
-            features = '{"memoryRetentionDays": 30, "dataQueryAccess": "read", "maxConcurrentTasks": 5, "rateLimitPerMinute": 60, "streamingEnabled": true, "auditLogging": true, "piiMasking": false}'::json
+            automation = '{{"autoRetry": true, "maxRetries": 3, "retryDelaySeconds": 30, "escalateOnFailure": true, "heartbeatIntervalSeconds": 60}}'{cast},
+            features = '{{"memoryRetentionDays": 30, "dataQueryAccess": "read", "maxConcurrentTasks": 5, "rateLimitPerMinute": 60, "streamingEnabled": true, "auditLogging": true, "piiMasking": false}}'{cast}
         WHERE automation IS NULL
     """)
 
@@ -43,8 +48,8 @@ def upgrade() -> None:
     }
     for role, skills in skill_map.items():
         op.execute(f"""
-            UPDATE agents SET skills = '{skills}'::json
-            WHERE role = '{role}' AND skills::text = '[]'
+            UPDATE agents SET skills = '{skills}'{cast}
+            WHERE role = '{role}' AND skills{text_cast} = '[]'
         """)
 
 

@@ -1740,40 +1740,54 @@ async def get_project_team(project_id: str, request: Request):
 
     from ecms.persistence.repositories.project_agent_position import ProjectAgentPositionRepository
 
-    async with db_session() as session:
-        repo = ProjectAgentPositionRepository(session)
-        await repo.ensure_workspace_owner(
-            project_id, assigned_by_user_id="system", source="read_repair"
+    # Positions/org reads are best-effort: on a database missing those tables
+    # (or any read failure) the endpoint still returns the project status plus
+    # the live DSH team instead of 500ing the whole workspace.
+    positions: list = []
+    human_assignments: list = []
+    organization_members: list = []
+    human_owner = None
+    agents: list = []
+    try:
+        async with db_session() as session:
+            repo = ProjectAgentPositionRepository(session)
+            await repo.ensure_workspace_owner(
+                project_id, assigned_by_user_id="system", source="read_repair"
+            )
+            await repo.ensure_position_owners(
+                project_id, assigned_by_user_id="system", source="read_repair"
+            )
+            positions = await repo.serialize_project(project_id)
+            human_assignments = await repo.serialize_human_assignments(project_id)
+            agents = [
+                {
+                    **position["assigned_agent"],
+                    "position_id": position["id"],
+                    "position_reports_to": position["reports_to"],
+                }
+                for position in positions
+                if position.get("assigned_agent")
+            ]
+        organization_members = await _load_active_organization_members()
+        workspace_owner = next(
+            (
+                assignment
+                for assignment in human_assignments
+                if assignment.get("scope") == "workspace_owner"
+                and assignment.get("organization_member")
+            ),
+            None,
         )
-        await repo.ensure_position_owners(
-            project_id, assigned_by_user_id="system", source="read_repair"
+        human_owner = (
+            workspace_owner["organization_member"]
+            if workspace_owner
+            else _select_human_owner(organization_members)
         )
-        positions = await repo.serialize_project(project_id)
-        human_assignments = await repo.serialize_human_assignments(project_id)
-        agents = [
-            {
-                **position["assigned_agent"],
-                "position_id": position["id"],
-                "position_reports_to": position["reports_to"],
-            }
-            for position in positions
-            if position.get("assigned_agent")
-        ]
-    organization_members = await _load_active_organization_members()
-    workspace_owner = next(
-        (
-            assignment
-            for assignment in human_assignments
-            if assignment.get("scope") == "workspace_owner"
-            and assignment.get("organization_member")
-        ),
-        None,
-    )
-    human_owner = (
-        workspace_owner["organization_member"]
-        if workspace_owner
-        else _select_human_owner(organization_members)
-    )
+    except Exception as exc:
+        logger.warning(
+            "Partial team payload for project %s (positions unavailable): %s",
+            project_id, exc,
+        )
 
     return {
         "project_id": project_id,

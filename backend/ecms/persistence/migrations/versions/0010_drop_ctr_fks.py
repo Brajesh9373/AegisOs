@@ -11,6 +11,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
+from ecms.persistence.migrations.compat import drop_constraint_if_exists
+
 revision: str = "0010_drop_ctr_fks"
 down_revision: str | None = "0009_access_policies"
 branch_labels: str | Sequence[str] | None = None
@@ -18,11 +20,11 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.execute(
-        "ALTER TABLE policy_recommendations DROP CONSTRAINT IF EXISTS policy_recommendations_project_id_fkey"
+    drop_constraint_if_exists(
+        "policy_recommendations", "policy_recommendations_project_id_fkey"
     )
-    op.execute(
-        "ALTER TABLE policy_recommendations DROP CONSTRAINT IF EXISTS policy_recommendations_reviewed_by_fkey"
+    drop_constraint_if_exists(
+        "policy_recommendations", "policy_recommendations_reviewed_by_fkey"
     )
 
 

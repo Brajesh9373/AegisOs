@@ -91,6 +91,14 @@ def upgrade() -> None:
             WHEN {profile} ~ '(delivery|project manager|program manager|lead|manager)' THEN '{delivery}'::json
         """
 
+    if op.get_bind().dialect.name == "sqlite":
+        _upgrade_sqlite(
+            identity, context, generated_names,
+            security, quality, devops, analysis, architecture, data,
+            engineering, delivery, fallback,
+        )
+        return
+
     op.execute(
         f"""
         UPDATE agents
@@ -102,6 +110,66 @@ def upgrade() -> None:
         WHERE json_array_length(certificates) = 1
           AND certificates->0->>'name' IN ({generated_names})
         """
+    )
+
+
+def _upgrade_sqlite(
+    identity: str,
+    context: str,
+    generated_names: str,
+    security: str,
+    quality: str,
+    devops: str,
+    analysis: str,
+    architecture: str,
+    data: str,
+    engineering: str,
+    delivery: str,
+    fallback: str,
+) -> None:
+    """Same expansion with LIKE chains and json_extract (no ~, CONCAT_WS, casts)."""
+    identity = (
+        "LOWER(COALESCE(name,'') || ' ' || COALESCE(role,'') || ' ' || "
+        "COALESCE(designation,'') || ' ' || COALESCE(department,''))"
+    )
+    context = (
+        "LOWER(COALESCE(name,'') || ' ' || COALESCE(role,'') || ' ' || "
+        "COALESCE(designation,'') || ' ' || COALESCE(department,'') || ' ' || "
+        "COALESCE(role_description,'') || ' ' || COALESCE(CAST(skills AS TEXT),''))"
+    )
+    portfolios = [security, quality, devops, analysis, architecture, data, engineering, delivery]
+    alternations = [
+        "security|compliance|privacy|risk",
+        "qa|quality|test|uat|acceptance",
+        "devops|sre|reliability|infrastructure|kubernetes|platform",
+        "business analyst|business_analysis|requirements|discovery",
+        "architect|architecture|solution design|integration",
+        "data|migration|etl|database|mysql",
+        "frappe|erpnext|configuration|python|engineer|developer",
+        "delivery|project manager|program manager|lead|manager",
+    ]
+
+    def cases(subject: str) -> str:
+        blocks = []
+        for alternation, portfolio in zip(alternations, portfolios):
+            likes = " OR ".join(f"{subject} LIKE '%{alt}%'" for alt in alternation.split("|"))
+            blocks.append(f"WHEN {likes} THEN '{portfolio}'")
+        return "\n".join(blocks)
+
+    op.execute(
+        "UPDATE agents SET certificates = CASE "
+        f"{cases(identity)} {cases(context)} ELSE '{fallback}' END "
+        "WHERE json_array_length(certificates) = 1 "
+        "AND json_extract(certificates, '$[0].name') IN ("
+        "'ISC2 Certified in Cybersecurity (CC)',"
+        "'ISTQB Certified Tester Foundation Level (CTFL)',"
+        "'Certified Kubernetes Administrator (CKA)',"
+        "'Entry Certificate in Business Analysis (ECBA)',"
+        "'TOGAF Enterprise Architecture Foundation',"
+        "'Databricks Certified Data Engineer Associate',"
+        "'PCEP – Certified Entry-Level Python Programmer',"
+        "'Project Management Professional (PMP)',"
+        "'GitHub Foundations')"
     )
 
 
