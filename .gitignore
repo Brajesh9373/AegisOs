@@ -1,67 +1,28 @@
-# ---- Python ----
-__pycache__/
-*.py[cod]
-*.egg-info/
-.eggs/
-build/
-dist/
-.venv/
-venv/
-.uv-cache/
-.mypy_cache/
-.ruff_cache/
-.pytest_cache/
-.hypothesis/
-.coverage
-.coverage.*
-htmlcov/
-coverage.xml
-
-# ---- Node / frontend ----
+# Build artifacts
+dsh-full.tgz
+dsh-prebuilt.tgz
+*.tgz
+dsh-node_modules/
 node_modules/
-.next/
-out/
-.turbo/
-*.tsbuildinfo
-npm-debug.log*
+__pycache__/
+*.pyc
 
-# ---- Environment & secrets ----
+# Database
+*.db
+*.sqlite
+
+# Environment
 .env
-.env.*
-!.env.example
-!.env.*.example
-legacy/.env
-legacy/.git-broken/
-legacy/data/
-legacy/.venv/
-legacy/**/__pycache__/
+.env.local
 
-# ---- Terraform ----
-.terraform/
-*.tfstate
-*.tfstate.*
-crash.log
-override.tf
-override.tf.json
-
-# ---- Docker ----
-*.pid
-
-# ---- IDE / OS ----
+# IDE
 .idea/
 .vscode/
 *.swp
+
+# OS
 .DS_Store
 Thumbs.db
 
-# ---- Local tooling ----
-.tools/
-.planning/
-.commandcode/
-.design/
-.codegraph/
-commandcode/
-
-# ---- Docs site ----
-site/
-.claude/worktrees/
+# Docker build artifacts
+docker/*.tgz

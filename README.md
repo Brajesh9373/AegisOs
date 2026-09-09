@@ -32,13 +32,15 @@ AegisOS is the execution layer for AI-native organizations. Connect enterprise s
 ## ⚡ Quickstart
 
 ```bash
-# Clone the repository (--recurse-submodules pulls in DSH,
-# the DeepSeek Harness checkout the agent hierarchy launches from)
-git clone --recurse-submodules https://github.com/varunmishra2801/AegisOs
+# Clone the repository
+git clone https://github.com/Brajesh9373/AegisOs
 cd AegisOs
 
-# Start the full stack with Docker
-docker compose -f docker/docker-compose.yml up -d
+# Start the full stack (handles DSH build + Docker automatically)
+./scripts/start-aegisos.sh
+
+# Or force rebuild everything
+./scripts/start-aegisos.sh --build
 
 # Access the application
 # Frontend: http://localhost:3000
@@ -46,7 +48,17 @@ docker compose -f docker/docker-compose.yml up -d
 # API Docs: http://localhost:8000/docs
 ```
 
-**Requirements:** Docker 24+, 8GB RAM, 20GB disk space
+**Requirements:**
+- Docker 24+, 8GB RAM, 20GB disk space
+- Node.js 22+ (for DSH bundle building)
+- pnpm 11+ (for DSH dependency management)
+
+**Environment Variables:**
+
+| Variable | Description | Default |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Anthropic API key (or compatible proxy) | Required |
+| `ANTHROPIC_BASE_URL` | Anthropic API base URL | `https://api.anthropic.com` |
 
 ### Start Building AI Agents
 
@@ -166,40 +178,76 @@ agents: a Head of Engineering (HOE) leading senior Frontend/Backend engineers,
 each with its own durable session, platform memory (episodic, procedural,
 preferences, org patterns), and agent-initiated memory tools.
 
-**Which DSH checkout.** `DSH/` is a git submodule pinned to our fork
-[`Brajesh9373/deepseek-harness`](https://github.com/Brajesh9373/deepseek-harness),
-branch `aegisos-sdk` — stock upstream plus the `dsh-tool-agent-memory`
-package, which upstream does not ship. `--recurse-submodules` on clone is
-required; `--branch aegisos-sdk` matters if you clone DSH separately.
-
-**Build requirement.** DSH resolves plugins from `lib/` build output, which
-is gitignored, so every fresh checkout must build once before spawning agents:
+### Quick Start
 
 ```bash
-cd DSH
-pnpm install
-npm run build:lib:host
+# Start everything (builds DSH bundle + Docker images automatically)
+./scripts/start-aegisos.sh
+
+# Force rebuild DSH + images
+./scripts/start-aegisos.sh --build
+
+# Stop all services
+./scripts/start-aegisos.sh --down
+
+# View logs
+./scripts/start-aegisos.sh --logs
 ```
 
-**Runtime environment** (backend process spawning the agents):
+### DSH Bundle Build Process
+
+The `scripts/start-aegisos.sh` script handles the DSH bundle preparation:
+
+1. **Dependency installation** — `pnpm install` in `DSH/`
+2. **TypeScript compilation** — `tsc -b tsconfig.host.json` (requires ~4GB RAM)
+3. **Bundle creation** — `tsdown --env.DSH_BUILD_FACE host`
+4. **Tarball packaging** — `dsh-full.tgz` (excludes `.git/` and `node_modules/.cache/`)
+
+The bundle is then copied into the Docker image via `COPY dsh-full.tgz /tmp/`,
+avoiding OOM issues during `docker build` (the build container has limited RAM).
+
+### Anthropic Adapter
+
+The `packages/llm/llm-anthropic/` package registers an `anthropic` provider
+route for DSH's LLM seam. It supports:
+- Anthropic Messages API (native)
+- OpenAI-compatible gateways (LiteLLM, proxies)
+- Custom models like `meituan/LongCat-2.0:free`
+
+### Agent Profiles
+
+Seeded profiles in PostgreSQL:
+
+| Profile ID | Role | Provider |
+|---|---|---|
+| `head-of-engineering` | HOE (delegation depth 3) | anthropic |
+| `senior-frontend-engineer` | Frontend specialist (depth 2) | anthropic |
+| `senior-backend-engineer` | Backend specialist (depth 2) | anthropic |
+
+### Runtime Environment
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `DSH_REPO` | DSH checkout the launcher runs from | repo-local `DSH/` |
-| `ANTHROPIC_API_KEY` / `ANTHROPIC_BASE_URL` | LLM route for agent sessions | unset (spawn fails loud without a key) |
+| `DSH_REPO` | DSH checkout the launcher runs from | `/app/DSH` |
+| `ANTHROPIC_API_KEY` | LLM API key for agent sessions | Required |
+| `ANTHROPIC_BASE_URL` | LLM API base URL | `https://api.anthropic.com` |
 | `AEGISOS_API_URL` | Backend URL the memory tools call back to | `http://127.0.0.1:8000` |
-| `ECMS_SERVICE_TOKEN` | Trust token letting the BFF call ECMS service-to-service | unset (BFF proxying disabled) |
+| `ECMS_SERVICE_TOKEN` | Trust token for BFF→ECMS service calls | unset (BFF proxying disabled) |
 
-**Request flow.** Browser → Express BFF (`:3001`, owns browser auth) → explicit
+### Request Flow
+
+Browser → Express BFF (`:3001`, owns browser auth) → explicit
 `/api/discovery/*`, `/api/hierarchy/*`, `/api/projects/:id/workspace*` routes
-→ ECMS Python backend (`:8000`) → per-agent `dsh --profile sdk` subprocesses
-from the fork above. The BFF serves everything else itself; ECMS never trusts
-browser tokens, only the service token.
+→ ECMS Python backend (`:8000`) → per-agent `dsh --profile sdk` subprocesses.
+The BFF serves everything else itself; ECMS never trusts browser tokens,
+only the service token.
 
-**Key surfaces.** `POST /api/hierarchy/teams/spawn-for-project`
-(spawn + BA handoff), `POST .../by-project/{id}/kickoff` (breakdown →
-delegate → review), `POST /api/projects/{id}/workspace/chat` (HOE reply),
-`Engineering Team` page in the UI (live spawn/chat/delegate console).
+### Key API Surfaces
+
+- `POST /api/hierarchy/teams/spawn-for-project` — spawn + BA handoff
+- `POST .../by-project/{id}/kickoff` — breakdown → delegate → review
+- `POST /api/projects/{id}/workspace/chat` — HOE reply
+- `Engineering Team` page in the UI (live spawn/chat/delegate console)
 
 ## Tech Stack
 

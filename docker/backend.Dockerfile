@@ -36,13 +36,10 @@ COPY backend/alembic.ini ./alembic.ini
 
 # DeepSeek Harness (AegisOS fork): the DSH agent hierarchy spawns
 # `node --import tsx/esm apps/cli/src/bin.ts --profile sdk` from this checkout.
-# Full install (devDeps included: tsx runs the TS sources directly) followed
-# by the host library build; lib/ outputs are build artifacts, not git content.
-ARG DSH_REF=aegisos-sdk
-RUN git clone --branch ${DSH_REF} --depth 50 https://github.com/Brajesh9373/deepseek-harness.git /app/DSH && \
-    cd /app/DSH && pnpm install --ignore-scripts && \
-    npm run build:lib:host && \
-    chown -R ecms:ecms /app/DSH
+# Prebuilt artifacts (lib/) are baked in to avoid OOM in low-RAM build containers.
+COPY dsh-full.tgz /tmp/
+RUN mkdir -p /app/DSH && tar -xzf /tmp/dsh-full.tgz -C /app/DSH && rm /tmp/dsh-full.tgz
+RUN chown -R ecms:ecms /app/DSH
 
 # Legacy providers — Git, MySQL, Jira connectors + pipeline + memory
 # --no-deps: all legacy runtime deps already covered by main backend (pymysql,
