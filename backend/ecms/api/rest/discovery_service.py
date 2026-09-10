@@ -36,9 +36,11 @@ def _row_to_dict(row) -> dict:
 
 
 async def _load_session_for_update(session_id: str, db) -> dict:
+    # FOR UPDATE is postgres-only; sqlite serializes writers anyway.
+    lock = "" if db.bind.dialect.name == "sqlite" else " FOR UPDATE"
     row = (
         await db.execute(
-            text("SELECT * FROM discovery_sessions WHERE id=:id FOR UPDATE"), {"id": session_id}
+            text(f"SELECT * FROM discovery_sessions WHERE id=:id{lock}"), {"id": session_id}
         )
     ).first()
     if not row:
@@ -65,9 +67,10 @@ class DiscoveryService:
         """Atomic analyze using BA profile: succeed → CLARIFYING, fail → stay INGESTED, retry → idempotent."""
         # Load session data first - keep it in scope for the whole method
         async with db_session() as db:
+            lock = "" if db.bind.dialect.name == "sqlite" else " FOR UPDATE"
             row = (
                 await db.execute(
-                    text("SELECT * FROM discovery_sessions WHERE id=:id FOR UPDATE"),
+                    text(f"SELECT * FROM discovery_sessions WHERE id=:id{lock}"),
                     {"id": session_id},
                 )
             ).first()
@@ -175,9 +178,10 @@ class DiscoveryService:
 
         # Persist results
         async with db_session() as db:
+            lock = "" if db.bind.dialect.name == "sqlite" else " FOR UPDATE"
             row = (
                 await db.execute(
-                    text("SELECT messages, stage FROM discovery_sessions WHERE id=:id FOR UPDATE"),
+                    text(f"SELECT messages, stage FROM discovery_sessions WHERE id=:id{lock}"),
                     {"id": session_id},
                 )
             ).first()

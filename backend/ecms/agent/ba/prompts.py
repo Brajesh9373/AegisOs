@@ -154,9 +154,9 @@ CLARIFY_DIMENSIONS = [
 ]
 
 
-def build_understand_prompt(source_text: str) -> str:
+def build_understand_prompt(source_text: str, knowledge_context: str = "") -> str:
     """Stage 1 — recap what was understood, then ask to confirm."""
-    return (
+    base = (
         "The client provided the following requirement input:\n\n"
         f'"""\n{source_text.strip()}\n"""\n\n'
         "Write your FIRST message to the client. It must:\n"
@@ -170,6 +170,9 @@ def build_understand_prompt(source_text: str) -> str:
         'I have some questions."\n\n'
         "Output ONLY the message text in Markdown. No preamble, no JSON."
     )
+    if knowledge_context.strip():
+        base += f"\n\nRelevant known context (prefer it over guessing):\n{knowledge_context.strip()}"
+    return base
 
 
 def _full_transcript(source_text: str, conversation: list[dict]) -> str:
@@ -371,10 +374,11 @@ ASSESS_TOOL = {
 }
 
 
-def build_clarify_prompt(source_text: str) -> str:
+def build_clarify_prompt(source_text: str, conversation: list | None = None, knowledge_context: str = "") -> str:
     """Stage 2 — select one category and ask its relevant questions."""
+    _ = conversation  # reserved for future transcript-aware selection
     categories = "\n".join(f"- {key}: {label}" for key, label in CLARIFICATION_CATEGORIES.items())
-    return (
+    base = (
         "The client confirmed your understanding of this input:\n\n"
         f'"""\n{source_text.strip()}\n"""\n\n'
         "Choose the single most useful category to begin the interview:\n"
@@ -387,10 +391,17 @@ def build_clarify_prompt(source_text: str) -> str:
         "category heading in the Markdown because the frontend displays it. "
         "Call emit_clarification with the selected category and complete Markdown."
     )
+    if knowledge_context.strip():
+        base += f"\n\nRelevant known context (prefer it over guessing):\n{knowledge_context.strip()}"
+    return base
 
 
-def build_finalize_prompt(source_text: str, conversation: list[dict]) -> str:
+def build_finalize_prompt(source_text: str, conversation: list[dict], knowledge_context: str = "") -> str:
     """Stage 3 — the finalized requirements object (structured output)."""
+    if knowledge_context.strip():
+        source_text = (
+            f"{source_text.strip()}\n\nKnown context (prefer over guessing):\n{knowledge_context.strip()}"
+        )
     convo = "\n\n".join(
         f"{m.get('role', '?').upper()}: {m.get('content', '')}" for m in conversation
     )

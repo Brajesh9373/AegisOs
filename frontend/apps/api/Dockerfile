@@ -9,7 +9,7 @@ RUN turbo prune @aegisos/api --docker
 
 FROM alpine AS installer
 WORKDIR /app
-RUN npm install -g pnpm
+RUN npm install -g pnpm@9.0.0
 COPY --from=pruner /app/out/json/ .
 COPY --from=pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
 RUN pnpm install --frozen-lockfile

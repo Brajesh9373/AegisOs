@@ -1092,6 +1092,11 @@ If you need to spawn your own subagents, you may do so (max depth: {child_depth 
             {"id": "system-prompt", "config": {"persona": persona}},
             {"id": "approval", "name": "@deepseek-ai/dsh-user-approval", "config": {"policy": "never"}},
             {"id": "sandbox-policy", "name": "@deepseek-ai/dsh-sandbox-policy", "config": {"mode": "danger-full-access"}},
+            # The native Anthropic adapter declares the same `anthropic`
+            # provider route our llm-pi-ai settings route needs; two
+            # declarants race at boot and one always loses. The pi-ai route
+            # carries our custom model + base URL, so the native one stays off.
+            {"id": "llm-anthropic", "disabled": True},
         ]
 
         # Enable subagents for parent roles
@@ -1221,6 +1226,15 @@ If you need to spawn your own subagents, you may do so (max depth: {child_depth 
             logger.info(
                 "Agent %s initialized: %s", session.agent_id, result,
             )
+        except asyncio.TimeoutError:
+            tail = "\n".join(session._stderr_tail[-10:])
+            logger.error(
+                "Initialize timed out for agent %s (process alive: %s). Stderr tail:\n%s",
+                session.agent_id,
+                process.returncode is None,
+                tail,
+            )
+            raise
         finally:
             session.pending_requests.pop(request_id, None)
 
@@ -1263,6 +1277,11 @@ If you need to spawn your own subagents, you may do so (max depth: {child_depth 
                 "name": "@deepseek-ai/dsh-sandbox-policy",
                 "config": {"mode": "danger-full-access"},
             },
+            # The native Anthropic adapter declares the same `anthropic`
+            # provider route our llm-pi-ai settings route needs; two
+            # declarants race at boot and one always loses. The pi-ai route
+            # carries our custom model + base URL, so the native one stays off.
+            {"id": "llm-anthropic", "disabled": True},
         ]
 
         # Only enable subagents for parent roles (HOE, Senior Engineer)

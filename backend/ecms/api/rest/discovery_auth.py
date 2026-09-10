@@ -240,6 +240,21 @@ async def resolve_discovery_identity(request: Request) -> DiscoveryIdentity:
     session must map to an active organization member in the claimed tenant.
     Development/testing supports legacy UI sessions with the fallback checks.
     """
+    # Trusted edge (BFF service account) first: same trust as the platform
+    # service-token bypass. Admin role keeps cross-tenant reads working the
+    # way operator flows expect; per-user audit stays in message metadata.
+    from ecms.api.service_auth import service_user
+
+    if service_user(request.headers) is not None:
+        import os
+
+        return DiscoveryIdentity(
+            user_id="bff-service",
+            organization_id=os.environ.get("ECMS_SERVICE_ORGANIZATION_ID", "default"),
+            roles=("admin",),
+            authentication_method="service",
+        )
+
     token = _bearer_token(request)
 
     # Try JWT first (primary path in all environments)

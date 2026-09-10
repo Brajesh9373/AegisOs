@@ -1,261 +1,163 @@
 #!/bin/bash
-# AegisOS Platform Startup Script
-# =================================
-# Handles DSH bundle preparation, Docker image building, and service startup.
+# Start the whole AegisOS system (backend + BFF + web + infra).
 #
-# Usage:
-#   ./scripts/start-aegisos.sh              # Start all services
-#   ./scripts/start-aegisos.sh --build      # Force rebuild DSH bundle + images
-#   ./scripts/start-aegisos.sh --dsh-only   # Only rebuild DSH bundle
-#   ./scripts/start-aegisos.sh --down       # Stop all services
-#   ./scripts/start-aegisos.sh --logs       # Show logs
+#   ./scripts/start-aegisos.sh          Start all services (builds DSH bundle first if missing)
+#   ./scripts/start-aegisos.sh --build  Force rebuild of the DSH bundle + all images
+#   ./scripts/start-aegisos.sh --down   Stop all services
+#   ./scripts/start-aegisos.sh --logs   Follow logs of all services
+#
+# The DSH agent hierarchy needs the harness prebuilt (tsc needs ~4GB heap,
+# more than low-RAM docker builders have), so compilation happens on the
+# host and the backend image just extracts the tarball. No secrets are
+# committed: agent LLM keys come from the environment (see below).
+set -euo pipefail
 
-set -e
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TARBALL="$ROOT/docker/dsh-full.tgz"
+BACKEND_COMPOSE="$ROOT/docker/docker-compose.yml"
+FRONTEND_COMPOSE="$ROOT/frontend/docker-compose.yml"
+ENV_FILE="$ROOT/.env"
+# Pin the Docker context: a stray/broken `default` context (no daemon socket)
+# produces "client for node default not found" on build. Override per-machine
+# with DOCKER_CONTEXT=... in the environment.
+DOCKER="docker --context ${DOCKER_CONTEXT:-desktop-linux}"
 
-# Configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-DSH_DIR="$PROJECT_ROOT/DSH"
-DOCKER_DIR="$PROJECT_ROOT/docker"
-DSH_BUNDLE="$PROJECT_ROOT/dsh-full.tgz"
-COMPOSE_FILE="$DOCKER_DIR/docker-compose.yml"
+# Secrets for the agent hierarchy (export before running, or place in .env):
+#   ANTHROPIC_API_KEY / ANTHROPIC_BASE_URL — LLM route for DSH agent sessions
+#   ECMS_SERVICE_TOKEN — must match on backend and BFF (BFF→ECMS trust)
+#   AEGISOS_API_URL — backend URL the DSH memory tools call (defaults to localhost:8000)
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
-log() { echo -e "${GREEN}[AegisOS]${NC} $1"; }
-warn() { echo -e "${YELLOW}[AegisOS]${NC} $1"; }
-error() { echo -e "${RED}[AegisOS]${NC} $1"; }
-info() { echo -e "${BLUE}[AegisOS]${NC} $1"; }
-
-# Check prerequisites
-check_prerequisites() {
-    log "Checking prerequisites..."
-
-    local missing=()
-
-    if ! command -v docker &> /dev/null; then
-        missing+=("docker")
-    fi
-
-    if ! command -v node &> /dev/null; then
-        missing+=("node")
-    fi
-
-    if ! command -v pnpm &> /dev/null; then
-        missing+=("pnpm")
-    fi
-
-    if [ ${#missing[@]} -ne 0 ]; then
-        error "Missing prerequisites: ${missing[*]}"
-        echo "Please install them before running this script."
-        exit 1
-    fi
-
-    # Check Node version (requires 22+)
-    local node_version=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
-    if [ "$node_version" -lt 22 ]; then
-        error "Node.js 22+ required. Found: $(node --version)"
-        exit 1
-    fi
-
-    # Check available memory (DSH build needs ~4GB)
-    local available_mem_kb=$(grep MemAvailable /proc/meminfo | awk '{print $2}')
-    local available_mem_gb=$((available_mem_kb / 1024 / 1024))
-    if [ "$available_mem_gb" -lt 3 ]; then
-        warn "Less than 3GB RAM available. DSH build may fail."
-        warn "Consider adding swap space or building on a machine with more RAM."
-    fi
-
-    log "Prerequisites OK"
+usage() {
+  sed -n '2,10p' "$0"
+  exit 0
 }
 
-# Build DSH bundle
+check_prereqs() {
+  local missing=0
+  command -v docker >/dev/null || { echo "missing: docker"; missing=1; }
+  if command -v node >/dev/null; then
+    local major
+    major="$(node -p 'process.versions.node.split(".")[0]')"
+    [ "$major" -ge 22 ] || { echo "node >= 22 required (found $major)"; missing=1; }
+  else
+    echo "missing: node >= 22 (DSH host build)"
+    missing=1
+  fi
+  command -v pnpm >/dev/null || { echo "missing: pnpm (DSH host build)"; missing=1; }
+  local mem_gb
+  mem_gb="$(free -g | awk '/^Mem:/ {print $2}')"
+  if [ "$mem_gb" -lt 6 ]; then
+    echo "warning: only ${mem_gb}GB RAM — DSH host build wants 6GB+ (set NODE_OPTIONS to constrain heap)"
+  fi
+  [ "$missing" -eq 0 ] || exit 1
+}
+
 build_dsh_bundle() {
-    log "Building DSH bundle..."
-
-    if [ ! -d "$DSH_DIR" ]; then
-        error "DSH directory not found at $DSH_DIR"
-        exit 1
-    fi
-
-    cd "$DSH_DIR"
-
-    # Install dependencies if needed
-    if [ ! -d "node_modules" ]; then
-        log "Installing DSH dependencies..."
-        pnpm install
-    fi
-
-    # Generate tsconfig paths
-    log "Generating tsconfig paths..."
-    NODE_OPTIONS=--max-old-space-size=4000 ./node_modules/.bin/tsx scripts/gen-tsconfig-paths.ts
-
-    # Build TypeScript
-    log "Compiling DSH TypeScript..."
-    NODE_OPTIONS=--max-old-space-size=4000 ./node_modules/.bin/tsc -b tsconfig.host.json
-
-    # Build host bundles
-    log "Building DSH host bundles..."
+  echo "=== Building DSH bundle on host ==="
+  (
+    cd "$ROOT/DSH"
+    pnpm install
+    NODE_OPTIONS=--max-old-space-size=4000 ./node_modules/typescript/bin/tsc -b tsconfig.host.json
     ./node_modules/.bin/tsdown --env.DSH_BUILD_FACE host
-
-    # Create bundle tarball
-    log "Creating DSH bundle tarball..."
-    cd "$PROJECT_ROOT"
-    tar -czf "$DSH_BUNDLE" --exclude=.git --exclude='node_modules/.cache' -C DSH .
-
-    local bundle_size=$(du -h "$DSH_BUNDLE" | cut -f1)
-    log "DSH bundle created: $DSH_BUNDLE ($bundle_size)"
+  )
+  echo "=== Packing $TARBALL ==="
+  tar -czf "$TARBALL" --exclude=.git --exclude='node_modules/.cache' -C "$ROOT/DSH" .
+  ls -lh "$TARBALL"
 }
 
-# Build Docker images
-build_images() {
-    log "Building Docker images..."
+build_backend() {
+  echo "=== Building backend image (embeds $TARBALL) ==="
+  $DOCKER compose --env-file "$ENV_FILE" -f "$BACKEND_COMPOSE" build backend
+}
 
-    cd "$PROJECT_ROOT"
+build_frontend() {
+  echo "=== Building frontend images ==="
+  $DOCKER compose --env-file "$ENV_FILE" -f "$FRONTEND_COMPOSE" build api web
+}
 
-    # Ensure DSH bundle exists
-    if [ ! -f "$DSH_BUNDLE" ]; then
-        warn "DSH bundle not found. Building..."
-        build_dsh_bundle
+start_all() {
+  echo "=== Starting backend stack ==="
+  $DOCKER compose --env-file "$ENV_FILE" -f "$BACKEND_COMPOSE" up -d
+  echo "=== Starting frontend stack ==="
+  $DOCKER compose --env-file "$ENV_FILE" -f "$FRONTEND_COMPOSE" up -d
+}
+
+# Secrets live in .env (gitignored), shared by both stacks so the two
+# ECMS_SERVICE_TOKEN values always match. Creates it from .env.example on
+# first run, generating a service token when absent.
+ensure_env() {
+  if [ ! -f "$ENV_FILE" ]; then
+    echo "Creating $ENV_FILE from .env.example — fill in ANTHROPIC_API_KEY."
+    cp "$ROOT/.env.example" "$ENV_FILE"
+  fi
+  if ! grep -qE '^ECMS_SERVICE_TOKEN=.{8,}' "$ENV_FILE"; then
+    local token
+    token="$(openssl rand -hex 32 2>/dev/null || python3 -c 'import secrets;print(secrets.token_hex(32))')"
+    if grep -q '^ECMS_SERVICE_TOKEN=' "$ENV_FILE"; then
+      sed -i "s|^ECMS_SERVICE_TOKEN=.*|ECMS_SERVICE_TOKEN=$token|" "$ENV_FILE"
+    else
+      echo "ECMS_SERVICE_TOKEN=$token" >> "$ENV_FILE"
     fi
-
-    # Build backend image
-    log "Building backend image..."
-    docker build -f "$DOCKER_DIR/backend.Dockerfile" -t ecms-backend:latest "$PROJECT_ROOT"
-
-    log "Docker images built successfully"
+    echo "Generated ECMS_SERVICE_TOKEN in .env (shared by both stacks)."
+  fi
+  # shellcheck disable=SC1090
+  set -a; . "$ENV_FILE"; set +a
+  if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+    echo "NOTE: ANTHROPIC_API_KEY is unset — the platform runs, but DSH agent spawning will fail loud."
+  fi
 }
 
-# Start services
-start_services() {
-    log "Starting AegisOS services..."
-
-    cd "$PROJECT_ROOT"
-
-    # Export environment variables
-    export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-user_59UthjyP4Vt2CxcqErU3gGvGxgiQiao2m8xVCDYYfomxaevK46w45khorDQjT29tHwpz9MCet3Qzx5cL34XhF74R}"
-    export ANTHROPIC_BASE_URL="${ANTHROPIC_BASE_URL:-http://127.0.0.1:3457/v1}"
-
-    # Start core infrastructure first
-    log "Starting infrastructure (postgres, redis, minio)..."
-    docker compose -f "$COMPOSE_FILE" up -d postgres redis minio
-
-    # Wait for postgres
-    log "Waiting for postgres..."
-    until docker exec ecms-postgres-1 pg_isready -U ecms &> /dev/null; do
-        sleep 2
+wait_healthy() {  echo "=== Waiting for health ==="
+  for url in "http://localhost:8000/health:backend" "http://localhost:3001/api/health:BFF" "http://localhost:5173:web"; do
+    name="${url##*:}"
+    url="${url%:*}"
+    for _ in $(seq 1 30); do
+      if curl -sf -m 5 "$url" >/dev/null 2>&1; then
+        echo "$name: healthy ($url)"
+        break
+      fi
+      sleep 5
     done
-
-    # Start backend
-    log "Starting backend..."
-    docker compose -f "$COMPOSE_FILE" up -d backend
-
-    # Wait for backend health
-    log "Waiting for backend to be healthy..."
-    until curl -s http://localhost:8000/health &> /dev/null; do
-        sleep 3
-    done
-
-    # Start frontend
-    log "Starting frontend..."
-    docker compose -f "$COMPOSE_FILE" up -d frontend
-
-    log ""
-    log "=================================="
-    log "  AegisOS is ready!"
-    log "=================================="
-    info "  Backend:  http://localhost:8000"
-    info "  Frontend: http://localhost:3000"
-    info "  Health:   http://localhost:8000/health"
-    log ""
-    info "  Agent profiles seeded:"
-    info "    - head-of-engineering"
-    info "    - senior-frontend-engineer"
-    info "    - senior-backend-engineer"
-    log ""
-    info "  LLM Provider: anthropic"
-    info "  LLM Model: meituan/LongCat-2.0:free"
-    log "=================================="
+  done
+  echo
+  echo "Backend:  http://localhost:8000  (docs: http://localhost:8000/docs)"
+  echo "Frontend: http://localhost:5173"
+  if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+    echo "NOTE: ANTHROPIC_API_KEY is unset — DSH agent spawning will fail loud until it is exported."
+  fi
 }
 
-# Stop services
-stop_services() {
-    log "Stopping AegisOS services..."
-    cd "$PROJECT_ROOT"
-    docker compose -f "$COMPOSE_FILE" down
-    log "Services stopped"
-}
-
-# Show logs
-show_logs() {
-    cd "$PROJECT_ROOT"
-    docker compose -f "$COMPOSE_FILE" logs -f --tail=100
-}
-
-# Main
-main() {
-    echo ""
-    log "AegisOS Platform Startup"
-    echo ""
-
-    case "${1:-}" in
-        --build)
-            check_prerequisites
-            build_dsh_bundle
-            build_images
-            start_services
-            ;;
-        --dsh-only)
-            check_prerequisites
-            build_dsh_bundle
-            ;;
-        --images-only)
-            check_prerequisites
-            build_images
-            ;;
-        --down)
-            stop_services
-            ;;
-        --logs)
-            show_logs
-            ;;
-        --help|-h)
-            echo "Usage: $0 [OPTION]"
-            echo ""
-            echo "Options:"
-            echo "  (none)        Start all services (skip build if images exist)"
-            echo "  --build       Force rebuild DSH bundle + Docker images, then start"
-            echo "  --dsh-only    Only rebuild the DSH bundle tarball"
-            echo "  --images-only Only rebuild Docker images (uses existing bundle)"
-            echo "  --down        Stop all services"
-            echo "  --logs        Show service logs"
-            echo "  --help        Show this help message"
-            echo ""
-            echo "Environment Variables:"
-            echo "  ANTHROPIC_API_KEY     Anthropic API key (or compatible proxy)"
-            echo "  ANTHROPIC_BASE_URL    Anthropic API base URL"
-            echo ""
-            echo "Examples:"
-            echo "  $0                    # Quick start (uses cached images)"
-            echo "  $0 --build            # Full rebuild and start"
-            echo "  ANTHROPIC_API_KEY=xxx ANTHROPIC_BASE_URL=http://proxy:80 $0"
-            ;;
-        *)
-            check_prerequisites
-            # Check if images exist
-            if ! docker image inspect ecms-backend:latest &> /dev/null; then
-                log "Backend image not found. Building..."
-                build_dsh_bundle
-                build_images
-            fi
-            start_services
-            ;;
-    esac
-}
-
-main "$@"
+case "${1:-}" in
+  --help|-h) usage ;;
+  --down)
+    $DOCKER compose --env-file "$ENV_FILE" -f "$FRONTEND_COMPOSE" down
+    $DOCKER compose --env-file "$ENV_FILE" -f "$BACKEND_COMPOSE" down
+    ;;
+  --logs)
+    $DOCKER compose --env-file "$ENV_FILE" -f "$BACKEND_COMPOSE" logs -f --tail=100
+    ;;
+  --build)
+    check_prereqs
+    ensure_env
+    build_dsh_bundle
+    build_backend
+    build_frontend
+    start_all
+    wait_healthy
+    ;;
+  "")
+    check_prereqs
+    ensure_env
+    if [ ! -f "$TARBALL" ]; then
+      build_dsh_bundle
+    else
+      echo "Reusing $TARBALL (use --build to force a rebuild)"
+    fi
+    # Backend image embeds the tarball; (re)build it whenever we get here.
+    build_backend
+    build_frontend
+    start_all
+    wait_healthy
+    ;;
+  *) echo "unknown flag: $1"; usage ;;
+esac

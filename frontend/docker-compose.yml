@@ -11,13 +11,13 @@ services:
       HOST: 0.0.0.0
       PORT: 3001
       DATABASE_URL: postgresql://ecms:ecms@postgres:5432/ecms
-      # ECMS Python backend (discovery, hierarchy, workspace). localhost only
-      # fits a host-run BFF; in compose set ECMS_BACKEND_URL to a reachable
-      # address (ECMS service DNS or host gateway) in the .env file.
-      ECMS_BACKEND_URL: ${ECMS_BACKEND_URL:-http://localhost:8000}
+      # ECMS Python backend (discovery, hierarchy, workspace). Resolved over
+      # the shared ecms network (see networks below); override per deployment.
+      ECMS_BACKEND_URL: ${ECMS_BACKEND_URL:-http://backend:8000}
       ECMS_SERVICE_TOKEN: ${ECMS_SERVICE_TOKEN:-}
-    extra_hosts:
-      - 'postgres:host-gateway'
+    networks:
+      - default
+      - ecms-network
     volumes:
       - ./data:/app/data
     healthcheck:
@@ -48,3 +48,11 @@ services:
       retries: 5
       start_period: 10s
     restart: unless-stopped
+
+networks:
+  # Shared with the root ECMS stack (docker/docker-compose.yml, project name
+  # "ecms") so the BFF reaches postgres and the Python backend over service
+  # DNS instead of host-gateway hacks. Must exist: start the backend stack first.
+  ecms-network:
+    name: ecms_ecms-network
+    external: true

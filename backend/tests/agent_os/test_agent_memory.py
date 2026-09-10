@@ -30,6 +30,11 @@ class FakeUCO:
     display_name: str = "Episode"
     description: str = "Q: hi\nA: hello"
     uco_id: str = "uco-test-1"
+    custom_attributes: dict = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.custom_attributes is None:
+            self.custom_attributes = {}
 
 
 class FakeMemory:
@@ -114,6 +119,21 @@ async def test_recall_aggregates_layers() -> None:
     assert "Deploy app" in context
     assert "style: ruff" in context
     assert "run deploy checks" in context
+
+
+async def test_recall_attributes_foreign_episodes() -> None:
+    mine = FakeUCO(
+        display_name="Episode (a-1)", description="Q: hi\nA: I am backend",
+        uco_id="uco-mine", custom_attributes={"agent_id": "a-1"},
+    )
+    theirs = FakeUCO(
+        display_name="Episode (b-2)", description="Q: hi\nA: I am frontend",
+        uco_id="uco-theirs", custom_attributes={"agent_id": "b-2"},
+    )
+    bridge = _bridge([theirs, mine])
+    context = await bridge.recall("hi", {"read": True}, agent_id="a-1")
+    assert "(Another agent 'b-2' previously said)" in context
+    assert "Another agent 'a-1'" not in context
 
 
 # ── recency ordering ────────────────────────────────────────────────────

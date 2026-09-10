@@ -36,8 +36,12 @@ COPY backend/alembic.ini ./alembic.ini
 
 # DeepSeek Harness (AegisOS fork): the DSH agent hierarchy spawns
 # `node --import tsx/esm apps/cli/src/bin.ts --profile sdk` from this checkout.
-# Prebuilt artifacts (lib/) are baked in to avoid OOM in low-RAM build containers.
-COPY dsh-full.tgz /tmp/
+# Prebuilt bundle (node_modules + lib/) baked in to avoid OOM in low-RAM build
+# containers (tsc needs ~4GB heap). Regenerate on the host with:
+#   cd DSH && pnpm install && npm run build:lib:host
+#   tar -czf docker/dsh-full.tgz --exclude=.git --exclude='node_modules/.cache' -C DSH .
+# or: ./scripts/start-aegisos.sh --build
+COPY docker/dsh-full.tgz /tmp/
 RUN mkdir -p /app/DSH && tar -xzf /tmp/dsh-full.tgz -C /app/DSH && rm /tmp/dsh-full.tgz
 RUN chown -R ecms:ecms /app/DSH
 

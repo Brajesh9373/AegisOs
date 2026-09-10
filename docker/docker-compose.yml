@@ -67,7 +67,8 @@ services:
     command: ["--timeout", "120000", "--max-queued-queries", "500", "--resultset-size", "100000"]
     ports:
       - "6380:6379"
-      - "3001:3000"
+      # Browser UI on 3002: host 3001 belongs to the BFF API (frontend stack).
+      - "3002:3000"
     volumes:
       - falkordb_data:/data
     cpus: ${ECMS_FALKORDB_CPU_LIMIT:-1.0}

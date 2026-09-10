@@ -139,8 +139,16 @@ class AgentMemoryBridge:
         blocks = []
         for uco in trimmed:
             text = f"{uco.display_name}: {uco.description}"
-            if text.strip():
-                blocks.append(text)
+            if not text.strip():
+                continue
+            # Attribute foreign episodes explicitly: without this the model
+            # adopts other agents' designations as its own (observed: HOE
+            # answering "I am the Frontend Engineer").
+            custom = getattr(uco, "custom_attributes", None)
+            owner = custom.get("agent_id") if isinstance(custom, dict) else ""
+            if owner and owner != agent_id:
+                text = f"(Another agent '{owner}' previously said) {text}"
+            blocks.append(text)
         if blocks:
             sections.append("Past episodes:\n" + "\n".join(blocks))
         try:

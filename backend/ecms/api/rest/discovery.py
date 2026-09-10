@@ -647,7 +647,7 @@ async def finalize(session_id: str, body: FinalizeBody, request: Request):
                     meeting_frequency=body.meeting_frequency or "weekly",
                 )
     summary = f"**Project: {req_dict.get('projectName', '')}**\n\n{req_dict.get('objective', '')}"
-    await _append_message(session_id, "assistant", summary)
+    await _append_message(session_id, identity, "assistant", summary)
 
     return {
         "session_id": session_id,
@@ -663,8 +663,8 @@ async def finalize(session_id: str, body: FinalizeBody, request: Request):
 
 @router.get("/{session_id}")
 async def get_session(session_id: str, request: Request):
-    await _get_current_user(request)
-    sess = await _load_session(session_id)
+    identity = await resolve_discovery_identity(request)
+    sess = await _load_session(session_id, identity)
     return sess
 
 
@@ -818,10 +818,10 @@ async def _ensure_requirement_documents(session, project_id: str) -> None:
 
 @router.post("/{session_id}/link-project")
 async def link_project(session_id: str, body: dict, request: Request):
-    user = await _get_current_user(request)
-    bind_context(session_id=session_id, user_id=user.get("id"))
+    identity = await resolve_discovery_identity(request)
+    bind_context(session_id=session_id, user_id=identity.user_id)
     with traced_span("discovery.link_project"):
-        sess = await _load_session(session_id)
+        sess = await _load_session(session_id, identity)
         if sess.get("stage") != "FINALIZED":
             raise HTTPException(
                 status_code=400,
@@ -1676,8 +1676,8 @@ async def design_team_endpoint(session_id: str, request: Request):
     Requires the session to be FINALIZED and linked to a project. The workspace
     polls the team endpoint for completion.
     """
-    await _get_current_user(request)
-    sess = await _load_session(session_id)
+    identity = await resolve_discovery_identity(request)
+    sess = await _load_session(session_id, identity)
     if sess["stage"] != "FINALIZED":
         _error("WRONG-STAGE", f"Cannot design team from {sess['stage']}", 400)
 
@@ -1705,7 +1705,7 @@ async def regenerate_project_team(project_id: str, request: Request):
     Looks up the linked discovery session by project_id so the workspace does not
     need to know the session id. Returns 202 and runs generation in the background.
     """
-    await _get_current_user(request)
+    await resolve_discovery_identity(request)
     async with db_session() as session:
         from sqlalchemy import text
 
@@ -1738,7 +1738,7 @@ async def regenerate_project_team(project_id: str, request: Request):
 @router.get("/projects/{project_id}/team")
 async def get_project_team(project_id: str, request: Request):
     """Return the project's team status and required/assigned agent positions."""
-    await _get_current_user(request)
+    await resolve_discovery_identity(request)
     async with db_session() as session:
         from sqlalchemy import text
 
