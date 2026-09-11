@@ -1,0 +1,45 @@
+Title: Getting Started with AegisOS – Enterprise AI Workforce OS
+
+[Intro – 0:00-0:15]
+“Hey everyone, today we’re going to spin up AegisOS – an open‑source Enterprise AI Workforce Operating System that lets you connect your enterprise tools, spin up governed AI agents, and visualize everything in a knowledge graph. Let’s dive in!”
+
+[Prerequisites – 0:15-0:30]
+“You’ll need Docker 24+ with at least 8 GB RAM, Node 22+, and pnpm 11+. Also, you’ll need an Anthropic‑compatible API key – we’ll use the free FreeLLM API for this demo.”
+
+[Clone & Setup – 0:30-0:45]
+“Open a terminal and run:
+git clone https://github.com/Brajesh9373/AegisOS
+cd AegisOS”
+
+[Environment – 0:45-1:00]
+“Create a .env file from the example:
+cp .env.example .env
+Then edit .env and add your FreeLLM key:
+ANTHROPIC_API_KEY=freellmapi-7e13a597ba6b66fc039d7f5544c86d1488f40b71671e0564
+ANTHROPIC_BASE_URL=http://localhost:3002/v1”
+
+[Start the Stack – 1:00-1:30]
+“Now launch everything:
+./scripts/start-aegisos.sh
+This will build the DSH bundle, start all Docker containers (frontend, backend, Prometheus, Grafana, etc.) and print the URLs when ready.”
+
+[Explore the UI – 1:30-2:00]
+“Once it’s up, open http://localhost:3000. You’ll see the Mission Control UI. Notice the clean navbar, the live demo link, and the quick‑start cards.”
+
+[Create a Project – 2:00-2:45]
+“Click ‘Create Project’, give it a name like ‘Demo‑Co’, and hit Create. You’ll be taken to the project workspace where you can spawn teams, add connectors, and chat with the Head of Engineering AI agent.”
+
+[Add a Connector – 2:45-3:20]
+“Go to the Connectors tab, add a GitHub connector, point it at a public repo, and run an ingestion. You’ll see the progress bar and, when done, the knowledge graph update.”
+
+[Visualize the Knowledge Graph – 3:20-3:50]
+“Switch to the Knowledge Graph tab. You’ll see nodes for files, classes, functions, and their relationships – powered by FalkorDB and visualized with Cosmos.gl + D3.js.”
+
+[Observability – 3:50-4:10]
+“Open Grafana at http://localhost:3300 (admin/admin) to see pre‑built dashboards for Prometheus metrics, Loki logs, and Tempo traces.”
+
+[Wrap Up – 4:10-4:20]
+“That’s it! You now have a running AI workforce OS that you can extend with your own agents, connectors, and policies. If you liked this video, please star the repo, share it with your team, and leave a comment below. Thanks for watching!”
+
+[Outro – 4:20-4:30]
+“Subscribe for more AI‑ops tutorials. Bye!”
