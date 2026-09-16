@@ -91,8 +91,6 @@ export function SiteHeaderV3() {
             </AnimatePresence>
           </div>
           <Link href="/platform">Platform</Link>
-          <Link href="/enterprise">Enterprise</Link>
-          <a href="#architecture">How it works</a>
         </nav>
 
         <div className="v3-nav-actions">
@@ -110,7 +108,6 @@ export function SiteHeaderV3() {
           <motion.div className="v3-mobile-menu" initial={{ opacity: 0, y: -10, scale: .99 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8, scale: .99 }} transition={{ type: "spring", stiffness: 320, damping: 30 }}>
             <Link href="/platform" onClick={() => setMobile(false)}>Platform</Link>
             {productColumns.flatMap(c => c.items).map(([label, href]) => <Link href={href} key={href} onClick={() => setMobile(false)}>{label}</Link>)}
-            <Link href="/enterprise" onClick={() => setMobile(false)}>Enterprise</Link>
             <a href="/login" className="v3-solid-button" onClick={() => setMobile(false)}>Get started</a>
           </motion.div>
         )}
