@@ -931,6 +931,486 @@
 }
 
 /* ============================================================
+   FOOTER — rebalance for a single link column
+   ============================================================ */
+.v9-footer-cols {
+  display: grid;
+  grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+  gap: clamp(32px, 5vw, 88px);
+  align-items: start;
+}
+/* one column now, so don't reserve three tracks */
+.v9-footer .v3-footer-links { grid-template-columns: 1fr; }
+.v9-footer .v3-footer-links > div { gap: 11px; }
+
+.v9-footer-note > span {
+  display: block;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: .15em;
+  color: #6f829e;
+  margin-bottom: 14px;
+}
+.v9-footer-note p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.72;
+  color: #99abc4;
+  max-width: 480px;
+}
+.v9-footer-note a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 20px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #dbe6f7;
+  border-bottom: 1px solid rgba(219, 230, 247, .32);
+  padding-bottom: 3px;
+  transition: border-color .28s ease, color .28s ease;
+}
+.v9-footer-note a:hover { color: #fff; border-color: #fff; }
+
+@media (max-width: 980px) {
+  .v9-footer-cols { grid-template-columns: 1fr; gap: 34px; }
+  .v9-footer-note p { max-width: none; }
+}
+
+/* ============================================================
+   PLATFORM PAGE — SYSTEM EXPLAINER
+   ============================================================ */
+.pf-gap,
+.pf-how {
+  position: relative;
+  padding: 92px clamp(24px, 5vw, 76px) 88px;
+}
+.pf-gap { padding-bottom: 0; }
+.pf-how:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 88% 8%, rgba(19, 145, 132, .05), transparent 34%);
+}
+
+/* ---- one build ---- */
+.pf-gap-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: clamp(32px, 4vw, 48px);
+  border-top: 1px solid #dbe5f0;
+  border-bottom: 1px solid #dbe5f0;
+}
+.pf-gap-grid article {
+  padding: 32px 34px 36px 0;
+  border-left: 1px solid #dbe5f0;
+  padding-left: 34px;
+}
+.pf-gap-grid article:first-child { border-left: 0; padding-left: 0; }
+.pf-gap-grid article > span {
+  font-size: 8.5px;
+  font-weight: 750;
+  letter-spacing: .15em;
+  color: #8694a7;
+}
+.pf-gap-grid b {
+  display: block;
+  margin-top: 18px;
+  font-size: clamp(20px, 1.9vw, 26px);
+  letter-spacing: -.04em;
+  color: #7b8ba0;
+  font-weight: 500;
+}
+.pf-gap-grid p {
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: #6c7b91;
+  max-width: 330px;
+}
+.pf-gap-grid .is-ours > span { color: #3157d5; }
+.pf-gap-grid .is-ours b { color: #0e1b36; }
+.pf-gap-grid .is-ours p { color: #4e5f78; }
+
+.pf-system-head {
+  position: relative;
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 24px;
+  align-items: end;
+  padding-top: 22px;
+  border-top: 1px solid #cbd9e9;
+}
+.pf-system-head > span {
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .16em;
+  color: #536782;
+}
+.pf-system-head h2 {
+  margin: 0;
+  font-size: clamp(32px, 3.4vw, 50px);
+  line-height: .98;
+  letter-spacing: -.052em;
+  color: #0e1b36;
+}
+.pf-system-head p {
+  margin: 16px 0 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #6f7f95;
+  max-width: 660px;
+}
+
+/* ---- pipeline: sticky artifact + scrolling stage ---- */
+.pf-stages {
+  list-style: none;
+  margin: clamp(40px, 5vw, 68px) 0 0;
+  padding: 0;
+}
+.pf-stage {
+  display: grid;
+  grid-template-columns: 400px minmax(0, 1fr);
+  gap: clamp(40px, 5vw, 92px);
+  padding-bottom: 138px;
+}
+.pf-stage:last-child { padding-bottom: 0; }
+.pf-stage-visual { position: relative; }
+
+/* the one persistent viewport — its contents swap as you scroll */
+.pf-stage-pin {
+  position: sticky;
+  top: 118px;
+  border: 1px solid #dbe4ee;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, .97);
+  padding: 24px;
+  box-shadow: 0 20px 48px rgba(31, 54, 90, .07);
+}
+.pf-pin-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 16px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid #eef3f9;
+}
+.pf-pin-n {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  color: #fff;
+  background: linear-gradient(135deg, #3157d5, #4d46e5);
+  border-radius: 6px;
+  padding: 4px 7px;
+  line-height: 1;
+}
+.pf-pin-head b {
+  font-size: 15px;
+  letter-spacing: -.028em;
+  color: #0e1b36;
+}
+
+.pf-stage-main { padding-top: 6px; }
+.pf-stage-main > header {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding-bottom: 18px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #e8eef6;
+}
+.pf-stage-n {
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: .1em;
+  color: #3157d5;
+  font-variant-numeric: tabular-nums;
+}
+.pf-stage-main h3 {
+  margin: 0;
+  font-size: clamp(22px, 2.2vw, 30px);
+  letter-spacing: -.042em;
+  color: #0e1b36;
+}
+.pf-stage-main header svg { color: #b3bfd1; align-self: center; }
+.pf-stage-main header em {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 8.5px;
+  font-weight: 750;
+  letter-spacing: .15em;
+  color: #9aa7b8;
+}
+
+.pf-stage-main dl {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+}
+/* dt/dd sit inside a wrapper, so the grid belongs on the wrapper */
+.pf-stage-main dl > div {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.pf-stage-main dt {
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: .13em;
+  color: #9aa7b8;
+  padding-top: 4px;
+}
+.pf-stage-main dd {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #4e5f78;
+  max-width: 620px;
+}
+.pf-stage-main .is-out dd {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  justify-self: start;
+  font-weight: 650;
+  color: #137f73;
+  font-size: 13.5px;
+}
+.pf-stage-main .is-out dd svg { color: #139184; flex: none; }
+.pf-stage-main .is-you {
+  margin-top: 6px;
+  padding-top: 16px;
+  border-top: 1px dashed #e2e9f2;
+}
+.pf-stage-main .is-you dt { color: #6175c8; }
+.pf-stage-main .is-you dd { color: #5b6d88; }
+
+/* ---- artifact visuals (frameless) ---- */
+.pf-viz {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+.pf-viz-label {
+  font-size: 7.6px;
+  font-weight: 750;
+  letter-spacing: .14em;
+  color: #9aa7b8;
+}
+.pf-viz-foot {
+  font-size: 10px;
+  color: #9aa7b8;
+  padding-top: 10px;
+  border-top: 1px dashed #e2e9f2;
+}
+
+/* BA — branch graph */
+.pf-viz-split { display: flex; align-items: center; gap: 6px; }
+.pf-viz-node {
+  flex: none;
+  font-size: 8.6px;
+  font-weight: 650;
+  color: #3d5170;
+  background: #fff;
+  border: 1px solid #d5dfeb;
+  border-radius: 7px;
+  padding: 7px 8px;
+  text-align: center;
+  line-height: 1.25;
+}
+.pf-viz-node.is-start { background: #f4f7ff; border-color: #cfdcf6; }
+.pf-viz-node.is-end { background: #f2fbf9; border-color: #cbe4df; color: #1b6058; }
+.pf-viz-brace {
+  flex: 1;
+  height: 34px;
+  border: 1px solid #b9c9df;
+  border-left: 0;
+  border-right: 0;
+  position: relative;
+}
+.pf-viz-brace:before,
+.pf-viz-brace:after {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 5px;
+  height: 1px;
+  background: #b9c9df;
+}
+.pf-viz-brace:before { top: 0; }
+.pf-viz-brace:after { bottom: 0; }
+.pf-viz-stack { display: flex; flex-direction: column; gap: 5px; flex: 1; }
+.pf-viz-stack em {
+  font-style: normal;
+  font-size: 8.2px;
+  color: #4e5f78;
+  background: #fff;
+  border: 1px solid #d5dfeb;
+  border-radius: 6px;
+  padding: 6px 8px;
+  text-align: center;
+}
+
+/* Refinement — diff */
+.pf-viz-diff { display: flex; flex-direction: column; gap: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9.2px; }
+.pf-viz-diff span { border-radius: 6px; padding: 7px 9px; line-height: 1.4; }
+.pf-viz-diff .is-removed { background: #fdf4f4; border: 1px solid #eddcdc; color: #9a6a6a; text-decoration: line-through; }
+.pf-viz-diff .is-added { background: #f2fbf7; border: 1px solid #cbe4df; color: #1b6058; }
+
+/* Frappe — provision checks */
+.pf-viz-checks { display: flex; flex-direction: column; gap: 7px; }
+.pf-viz-checks span { display: flex; align-items: center; gap: 8px; font-size: 9.8px; color: #4e5f78; }
+.pf-viz-checks svg { color: #139184; flex: none; }
+
+/* Project — coverage bars */
+.pf-viz-bars { display: flex; flex-direction: column; gap: 9px; }
+.pf-viz-bar { display: grid; grid-template-columns: 84px minmax(0, 1fr) 34px; align-items: center; gap: 9px; }
+.pf-viz-bar > span:first-child { font-size: 9.2px; color: #6f7f95; }
+.pf-viz-track { display: block; height: 6px; border-radius: 4px; background: #e8eef6; overflow: hidden; }
+.pf-viz-track i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #3157d5, #139184); }
+.pf-viz-bar em { font-style: normal; font-size: 9px; font-weight: 700; color: #4e5f78; text-align: right; }
+
+/* Functional — feature tree */
+.pf-viz-tree { display: flex; flex-direction: column; gap: 4px; }
+.pf-viz-tree b {
+  font-size: 9.4px;
+  font-weight: 700;
+  color: #3157d5;
+  background: #f4f7ff;
+  border: 1px solid #cfdcf6;
+  border-radius: 6px;
+  padding: 6px 9px;
+}
+.pf-viz-tree span {
+  position: relative;
+  font-size: 9.2px;
+  color: #4e5f78;
+  padding: 5px 9px 5px 22px;
+}
+.pf-viz-tree span:before {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  width: 7px;
+  height: 1px;
+  background: #b9c9df;
+}
+.pf-viz-tree span:after {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: -6px;
+  bottom: 50%;
+  width: 1px;
+  background: #b9c9df;
+}
+.pf-viz-tree span:first-of-type:after { display: none; }
+
+/* Technical — schema */
+.pf-viz-schema { display: flex; flex-direction: column; border: 1px solid #e2e9f2; border-radius: 9px; background: #fff; overflow: hidden; }
+.pf-viz-schema > span {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 7px 10px;
+  border-bottom: 1px solid #f0f4f9;
+}
+.pf-viz-schema > span:last-child { border-bottom: 0; }
+.pf-viz-schema i {
+  font-style: normal;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9.4px;
+  color: #3d5170;
+}
+.pf-viz-schema em {
+  font-style: normal;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 8.6px;
+  color: #8694a7;
+  white-space: nowrap;
+}
+
+/* ---- handoff ---- */
+.pf-handoff {
+  margin-top: 56px;
+  max-width: 900px;
+}
+.pf-handoff h3 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: -.04em;
+  color: #0e1b36;
+}
+.pf-handoff p {
+  margin: 16px 0 0;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: #4e5f78;
+}
+.pf-handoff-chain {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid #dbe5f0;
+}
+.pf-handoff-chain span { display: inline-flex; align-items: center; gap: 10px; }
+.pf-handoff-chain b {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  color: #3d5170;
+}
+.pf-handoff-chain b:first-child { color: #3157d5; }
+.pf-handoff-chain svg { color: #c7d3e2; }
+
+@media (max-width: 1180px) {
+  .pf-stage { grid-template-columns: 340px minmax(0, 1fr); gap: 44px; padding-bottom: 118px; }
+  .pf-stage-pin { padding: 20px; }
+}
+@media (max-width: 980px) {
+  .pf-system-head { grid-template-columns: 1fr; gap: 14px; align-items: start; }
+  .pf-gap-grid { grid-template-columns: 1fr; }
+  .pf-gap-grid article,
+  .pf-gap-grid article:first-child {
+    border-left: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-top: 1px solid #dbe5f0;
+  }
+  .pf-gap-grid article:first-child { border-top: 0; }
+  .pf-gap-grid p { max-width: none; }
+
+  /* below this width the sticky viewport stops being useful — show the
+     artifact inline with its own stage instead. */
+  .pf-stage { grid-template-columns: 1fr; gap: 26px; padding-bottom: 76px; }
+  .pf-stage-pin { position: static; max-width: 460px; }
+  .pf-stage-main { padding-top: 0; }
+}
+@media (max-width: 720px) {
+  .pf-gap, .pf-how { padding: 68px clamp(18px, 5vw, 40px) 64px; }
+  .pf-gap { padding-bottom: 0; }
+  .pf-gap-grid b { font-size: 20px; margin-top: 12px; }
+  .pf-stage { padding-bottom: 56px; }
+  .pf-stage-pin { max-width: none; padding: 16px; }
+  .pf-stage-main dl > div { grid-template-columns: 1fr; gap: 5px; }
+  .pf-stage-main dt { padding-top: 10px; }
+  .pf-stage-main > header { flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .pf-stage-main header em { margin-left: 0; }
+  .pf-stage-main h3 { font-size: 20px; }
+  .pf-stage-main dd { font-size: 13px; }
+  .pf-handoff { margin-top: 40px; }
+}
+
+/* ============================================================
    PRODUCT PAGE — CAPABILITIES LEDGER
    ============================================================ */
 .pv-caps {
