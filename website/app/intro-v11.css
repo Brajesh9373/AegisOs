@@ -5,8 +5,40 @@
   height:100vh;
   min-height:680px;
   z-index:120;
-  background:#f7f9fc;
+  background:transparent;
   isolation:isolate;
+}
+/* The pulse grid replaces the old static __grid: same 48px hairlines and
+   radial falloff, plus cells that take colour under the pointer. */
+.aegis-intro-v11__pulse{
+  position:absolute;
+  inset:0;
+  overflow:hidden;
+  pointer-events:none;
+  opacity:.78;
+  --grid-pulse-line:rgba(86,113,155,.075);
+  background-image:
+    linear-gradient(to right,var(--grid-pulse-line) 1px,transparent 1px),
+    linear-gradient(to bottom,var(--grid-pulse-line) 1px,transparent 1px);
+  background-size:var(--grid-pulse-cell,48px) var(--grid-pulse-cell,48px);
+  -webkit-mask-image:radial-gradient(circle at 50% 48%,#000 0 34%,rgba(0,0,0,.65) 64%,transparent 92%);
+  mask-image:radial-gradient(circle at 50% 48%,#000 0 34%,rgba(0,0,0,.65) 64%,transparent 92%);
+}
+.aegis-intro-v11__pulse canvas{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+}
+/* Carried over from the old __grid:after bloom. */
+.aegis-intro-v11__pulse:after{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at 50% 46%,rgba(49,87,213,.10),transparent 29%),
+    radial-gradient(circle at 72% 38%,rgba(19,145,132,.07),transparent 20%);
 }
 .aegis-intro-v11__shell{
   position:relative;
@@ -20,26 +52,6 @@
   color:#0c1830;
   contain:paint;
   will-change:background-color;
-}
-.aegis-intro-v11__grid{
-  position:absolute;
-  inset:0;
-  pointer-events:none;
-  opacity:.78;
-  background-image:
-    linear-gradient(rgba(86,113,155,.075) 1px,transparent 1px),
-    linear-gradient(90deg,rgba(86,113,155,.075) 1px,transparent 1px);
-  background-size:48px 48px;
-  -webkit-mask-image:radial-gradient(circle at 50% 48%,#000 0 34%,rgba(0,0,0,.65) 64%,transparent 92%);
-  mask-image:radial-gradient(circle at 50% 48%,#000 0 34%,rgba(0,0,0,.65) 64%,transparent 92%);
-}
-.aegis-intro-v11__grid:after{
-  content:"";
-  position:absolute;
-  inset:0;
-  background:
-    radial-gradient(circle at 50% 46%,rgba(49,87,213,.10),transparent 29%),
-    radial-gradient(circle at 72% 38%,rgba(19,145,132,.07),transparent 20%);
 }
 .aegis-intro-v11__bloom{
   position:absolute;
@@ -152,13 +164,18 @@ html.lenis,html.lenis body{height:auto}
 
 @media(max-width:760px){
   .aegis-intro-v11,.aegis-intro-v11__shell{min-height:580px}
-  .aegis-intro-v11__word{font-size:clamp(72px,23vw,126px);letter-spacing:-.08em}
+  /* 23vw with a 72px floor made the wordmark wider than the screen — it was
+     being clipped at both ends. Match the desktop proportion (15.2vw) so it
+     always fits the frame. */
+  .aegis-intro-v11__word{font-size:clamp(46px,15vw,126px);letter-spacing:-.08em}
   .aegis-intro-v11__eyebrow{top:24px;left:18px;right:18px}
   .aegis-intro-v11__eyebrow b{display:none}
   .aegis-intro-v11__hint{left:18px;bottom:38px;transform:none}
   .aegis-intro-v11__index{right:18px;bottom:38px}
   .aegis-intro-v11__progress{left:18px;right:18px;bottom:18px}
-  .aegis-intro-v11__grid{background-size:34px 34px}
+  .aegis-intro-v11__pulse{
+    --grid-pulse-cell:18px;
+  }
 }
 
 @media(prefers-reduced-motion:reduce){

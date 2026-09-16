@@ -4,6 +4,7 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { ArrowDown } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef } from "react";
+import { GridPulse } from "./grid-pulse";
 
 /* GSAP pinning wraps the section in a `pin-spacer`, moving it out of the parent
    React believes it owns. Layout-effect cleanup runs BEFORE React removes nodes,
@@ -141,15 +142,15 @@ export function BrandZoomIntroV11() {
   return (
     <section ref={sectionRef} className="aegis-intro-v11" aria-label="Worksimplified introduction">
       <div ref={shellRef} className="aegis-intro-v11__shell">
-        <div className="aegis-intro-v11__grid" aria-hidden="true" />
+        <GridPulse className="aegis-intro-v11__pulse" cell={24} />
         <div ref={bloomRef} className="aegis-intro-v11__bloom" aria-hidden="true" />
 
-        <div className="aegis-intro-v11__eyebrow">
+        <div className="aegis-intro-v11__eyebrow" data-grid-avoid>
           <span><i /> Enterprise AI Operating System</span>
           <b>Business intent → governed execution</b>
         </div>
 
-        <div ref={wordRef} className="aegis-intro-v11__word" aria-label="Worksimplified">
+        <div ref={wordRef} className="aegis-intro-v11__word" aria-label="Worksimplified" data-grid-avoid>
           <span>Worksimplified</span>
         </div>
 

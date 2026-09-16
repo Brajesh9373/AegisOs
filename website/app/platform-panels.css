@@ -272,7 +272,10 @@
 }
 .pp-loop-icon svg { animation: ppSpin 4.4s linear infinite; }
 .pp-loop-core small { font-size: 6.6px; letter-spacing: .14em; color: #d5dfff; }
-.pp-loop-core b { font-size: 15px; margin-top: 4px; }
+/* The label sits below the circle's centre, where the usable width is much
+   less than the diameter — at 15px it ran past the round edge at every width
+   under 1440. Kept at 13px so it stays on one line inside the smallest core. */
+.pp-loop-core b { font-size: 13px; margin-top: 4px; }
 .pp-loop-core em {
   font-style: normal;
   font-size: 7px;
@@ -423,6 +426,9 @@
   gap: 3px;
   box-shadow: 0 8px 20px rgba(28, 50, 84, .055);
   z-index: 2;
+  /* The boxes are percentage widths, so on a narrow track a long word used to
+     spill out of the card. Break it instead of overflowing. */
+  overflow-wrap: anywhere;
 }
 .pp-event small { font-size: 6.2px; letter-spacing: .08em; color: #8694a7; }
 .pp-event b { font-size: 9.6px; color: #24354f; }
@@ -869,11 +875,22 @@
   .pp-ba { grid-template-columns: minmax(200px, .8fr) 84px minmax(0, 1.4fr); padding: 24px 26px; gap: 14px; }
   .pp-loop-node { width: 226px; padding: 10px 12px; }
   .pp-loop-core { width: 180px; height: 180px; }
-  .pp-project { grid-template-columns: minmax(160px, .7fr) 30px minmax(0, 1.4fr) 30px minmax(170px, .75fr); padding: 22px 24px; }
+  /* Five columns need ~400px of minimums and the canvas is only ~470px here,
+     so `minmax(0,1.4fr)` collapsed the scope tracker to ~60px and its rows
+     spilled into the progress panel. Drop the arrows and use three columns. */
+  .pp-project {
+    grid-template-columns: minmax(110px, .7fr) minmax(0, 1.3fr) minmax(120px, .8fr);
+    gap: 14px;
+    padding: 22px 24px;
+  }
+  .pp-arrow { display: none; }
+  .pp-scope-row { padding: 9px 10px; }
   .pp-req-stats b { font-size: 16px; }
   .pp-progress-ring { width: 108px; height: 108px; }
   .pp-progress-core b { font-size: 21px; }
   .pp-lanes { grid-template-columns: 150px 1fr; }
+  .pp-event { padding: 9px 8px; }
+  .pp-event b { font-size: 9px; }
   .pp-technical { padding: 22px 24px; gap: 14px; }
   .pp-kpi-row > div { padding: 9px 10px; grid-template-columns: 26px 1fr auto; gap: 8px; }
   .pp-trace-row { grid-template-columns: 108px 1fr 40px; gap: 10px; }
@@ -886,19 +903,111 @@
   .pp-project { grid-template-columns: 1fr 1fr; gap: 14px; }
   .pp-arrow { display: none; }
   .pp-scope { grid-column: 1 / 3; }
-  .pp-technical { grid-template-columns: 1fr; }
+  /* Keep two columns here: stacking them made the content taller than the
+     fixed canvas, so the layer list ran into the footer below it. */
   .pp-schema { display: none; }
 }
 @media (max-width: 620px) {
+  /* Below this width the diagram is locked to a fixed height that is shorter
+     than its stacked content, so panels spilled into one another (the feature
+     tree ran into the coverage panel, the layer list into the footer). Let the
+     visual take its height from its own content instead. */
+  .v3-panel-visual { height: auto !important; position: relative; }
+  .sys7-diagram { position: static; grid-template-rows: auto auto auto; }
+  .sys7-canvas { overflow: visible; }
+  .pp-ba,
+  .pp-frappe,
+  .pp-project,
+  .pp-functional,
+  .pp-technical,
+  .pp-loop { height: auto; }
+  .pp-functional > .pp-tree-panel,
+  .pp-functional > .pp-trace-panel,
+  .pp-feature-tree { flex: none; }
+  .pp-lanes { min-height: 320px; }
+  /* A swimlane needs horizontal room. In a ~127px track the percentage widths
+     left the event cards 33px wide with 28px of padding — five pixels of text.
+     Stack the lanes instead: label above, its events as full-width rows. */
+  .pp-lanes {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    min-height: 0;
+  }
+  .pp-lane { display: block; }
+  .pp-lane-label {
+    grid-template-columns: 24px 1fr;
+    padding: 11px 14px;
+    border-right: 0;
+    border-bottom: 1px solid #e6ecf4;
+    background: rgba(247, 250, 253, .92);
+  }
+  .pp-lane-track {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    background-image: none;
+  }
+  .pp-event {
+    position: static;
+    transform: none;
+    width: 100% !important;
+    padding: 10px 12px;
+  }
+  .pp-event b { font-size: 10px; }
   .pp-ba { display: flex; flex-direction: column; padding: 16px; }
   .pp-rail { height: 44px; flex-direction: row; padding: 0; }
   .pp-rail:before { left: 16px; right: 16px; top: 50%; bottom: auto; width: auto; height: 1px; }
   .pp-rail-scan { display: none; }
   .pp-loop-wires { display: none; }
-  .pp-loop-core { position: relative; left: auto; top: auto; transform: none; margin: 0 auto; width: 150px; height: 150px; }
+  .pp-loop-core { position: relative; left: auto; top: auto; transform: none; margin: 0 auto; width: 168px; height: 168px; }
   .pp-loop { display: flex; flex-direction: column; gap: 14px; padding: 16px; }
-  .pp-loop-node { position: relative; left: auto !important; top: auto !important; transform: none; width: 100%; }
+  .pp-loop-node,
+  .pp-loop-node.is-a,
+  .pp-loop-node.is-b {
+    position: relative;
+    left: auto !important;
+    top: auto !important;
+    transform: none;
+    width: 100%;
+  }
   .pp-loop-tag { position: relative; left: auto; bottom: auto; transform: none; }
+  /* The branch graph is percentage-positioned for a wide canvas. On a phone
+     the body collapses and every node lands on the same spot, so drop the
+     wires and lay the nodes out as a plain vertical flow instead. */
+  .pp-graph { padding: 14px; }
+  .pp-graph-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .pp-graph-wires { display: none; }
+  .pp-gnode {
+    position: static;
+    transform: none;
+    justify-content: center;
+    width: 100%;
+    max-width: 230px;
+  }
+  /* Same story for the feature tree: it is drawn by an absolutely-placed SVG
+     and percentage nodes, which collide once the panel narrows. */
+  .pp-feature-tree {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    margin-top: 12px;
+  }
+  .pp-feature-tree svg { display: none; }
+  .pp-fnode {
+    position: static;
+    transform: none;
+    width: 100%;
+    max-width: 230px;
+  }
   .pp-kpi-row { grid-template-columns: 1fr 1fr; }
   .pp-functional { padding: 16px; }
   .pp-trace-row { grid-template-columns: 84px 1fr 36px; gap: 8px; }

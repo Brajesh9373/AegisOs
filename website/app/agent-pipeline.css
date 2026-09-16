@@ -976,6 +976,11 @@
   .v9-footer-cols { grid-template-columns: 1fr; gap: 34px; }
   .v9-footer-note p { max-width: none; }
 }
+@media (max-width: 760px) {
+  /* The 58px floor on the watermark made it wider than the phone, so the
+     word was clipped left and right. Size it off the viewport instead. */
+  .v9-footer-wordmark { font-size: 11vw; }
+}
 
 /* ============================================================
    PLATFORM PAGE — SYSTEM EXPLAINER
@@ -1799,3 +1804,44 @@
 .pv-milestone.done small{color:#139184}
 .pv-milestone.live span{background:linear-gradient(135deg,#3157d5,#139184);color:#fff}
 .pv-milestone.live small{color:#3157d5}
+
+/* ============================================================
+   MOBILE — PRODUCT HERO DIAGRAMS
+   Placed last on purpose: these override the base .pv rules above and
+   equal-specificity rules are decided by source order.
+   ============================================================ */
+@media (max-width: 720px) {
+  /* The visual was a fixed-height frame with an absolutely-positioned diagram
+     inside it. Once the chat copy wrapped on a narrow screen it pushed the
+     diagram past the frame and the body collapsed to a few pixels, piling
+     every node on the same spot. Size the frame to its content instead. */
+  .v3-product-hero-visual { height: auto; }
+  .pv {
+    position: static;
+    inset: auto;
+    margin: 16px 18px 24px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  /* Percentage-positioned nodes collide at this width — stack them. */
+  .pv-diagram-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 16px 0;
+  }
+  .pv-wires { display: none; }
+  .pv-node,
+  .pv-fnode,
+  .pv-lnode {
+    position: static;
+    transform: none;
+  }
+  .pv-node { justify-content: center; width: 100%; max-width: 230px; }
+  .pv-fnode { width: 100%; max-width: 220px; }
+  .pv-lnode { width: 100%; max-width: 300px; }
+}
