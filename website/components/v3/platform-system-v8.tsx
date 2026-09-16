@@ -1,26 +1,24 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import {
-  Activity,
-  BadgeDollarSign,
   BrainCircuit,
-  CheckCircle2,
-  Clock3,
+  Check,
+  Code2,
   Database,
-  Eye,
   FileText,
   GitBranch,
-  Mail,
+  Key,
+  LockKeyhole,
   Network,
-  Play,
+  RefreshCcw,
+  ScanSearch,
   ShieldCheck,
-  Sparkles,
   Target,
   UserCheck,
-  UsersRound,
+  Wrench,
 } from "lucide-react";
 
 function SurfaceHeader({ label, status = "LIVE" }: { label: string; status?: string }) {
@@ -35,264 +33,381 @@ function SurfaceHeader({ label, status = "LIVE" }: { label: string; status?: str
   );
 }
 
-function MetaStrip({ left, middle, right, warn = false }: { left: string; middle: string; right: string; warn?: boolean }) {
+function MetaStrip({ left, middle, right }: { left: string; middle: string; right: string }) {
   return (
     <div className="sys7-meta-strip">
-      <span><i className={warn ? "warn" : ""} />{left}</span>
+      <span><i />{left}</span>
       <span>{middle}</span>
       <span>{right}</span>
     </div>
   );
 }
 
-function UnderstandDiagram() {
+/* ---------------- 01 · BA AGENT ---------------- */
+function BAAgentDiagram() {
   return (
     <div className="sys7-diagram sys7-understand">
-      <SurfaceHeader label="INTENT COMPILER" status="PLAN READY" />
-      <div className="sys7-canvas sys7-understand-canvas">
-        <div className="sys7-brief-panel">
-          <div className="sys7-panel-kicker"><FileText size={13} /> BUSINESS BRIEF</div>
+      <SurfaceHeader label="BUSINESS ANALYST AGENT" status="REQUIREMENTS GATHERING" />
+      <div className="sys7-canvas pp-ba">
+        <div className="pp-brief">
+          <div className="pp-kicker"><FileText size={13} />PROJECT DISCOVERY</div>
           <p>
-            “When a new vendor applies, <mark>verify documents</mark>, assess risk, and create the
-            vendor in <mark>ERP</mark>. Anything above <mark>$25K</mark> needs Finance approval.”
+            “Discuss the <mark>project scope</mark>, identify key <mark>stakeholders</mark>,
+            and generate a detailed <mark>Flow Diagram</mark> for the entire system lifecycle.”
           </p>
-          <div className="sys7-brief-foot"><span>Natural language</span><b>01</b></div>
+          <div className="pp-thread">
+            <span className="is-user"><b>User</b>Six approval steps, two systems.</span>
+            <span className="is-agent"><b>BA Agent</b>Mapped to 3 roles and 2 control gates.</span>
+          </div>
+          <div className="pp-panel-foot"><span>Interactive chat</span><b>01</b></div>
         </div>
 
-        <div className="sys7-parser-rail" aria-hidden="true">
-          <span className="sys7-parser-node is-active">INTENT</span>
-          <span className="sys7-parser-node">ENTITIES</span>
-          <span className="sys7-parser-node">CONTROLS</span>
-          <i className="sys7-parser-scan" />
+        <div className="pp-rail">
+          <span className="pp-rail-node is-active">CHAT</span>
+          <span className="pp-rail-node">ANALYZE</span>
+          <span className="pp-rail-node">FLOW DIAGRAM</span>
+          <i className="pp-rail-scan" />
         </div>
 
-        <div className="sys7-plan-panel">
-          <div className="sys7-plan-top">
+        <div className="pp-graph">
+          <div className="pp-graph-head">
             <div>
-              <small>COMPILED EXECUTION PLAN</small>
-              <b>Vendor onboarding</b>
+              <small>GENERATED ASSET</small>
+              <b>System Flow Diagram</b>
             </div>
-            <div className="sys7-confidence"><span>96</span><small>%</small></div>
+            <span className="pp-conf"><b>100</b><small>%</small></span>
           </div>
-
-          <div className="sys7-plan-map">
-            <div><span><Target size={12} /></span><p><small>OBJECTIVE</small><b>Verify + onboard</b></p><em>resolved</em></div>
-            <div><span><Database size={12} /></span><p><small>SYSTEMS</small><b>CRM · ERP · Email</b></p><em>3 mapped</em></div>
-            <div><span><UsersRound size={12} /></span><p><small>WORKFORCE</small><b>Compliance · Finance · Ops</b></p><em>3 roles</em></div>
-            <div><span><UserCheck size={12} /></span><p><small>CONTROL</small><b>Finance approval</b></p><em>1 gate</em></div>
-          </div>
-
-          <div className="sys7-plan-route">
-            <span>Brief</span><i /><span>Plan</span><i /><span>Workforce</span><i /><span>Run</span>
+          <div className="pp-graph-body">
+            <svg className="pp-graph-wires" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <path d="M50 12 V30" />
+              <path d="M25 30 H75" />
+              <path d="M25 30 V46" />
+              <path d="M75 30 V46" />
+              <path d="M25 58 V74" />
+              <path d="M75 58 V74" />
+              <path d="M25 74 H75" />
+              <path d="M50 74 V88" />
+            </svg>
+            <span className="pp-gnode is-start" style={{ left: "50%", top: "8%" }}><FileText size={11} />Brief</span>
+            <span className="pp-gnode" style={{ left: "25%", top: "52%" }}><ShieldCheck size={11} />Compliance</span>
+            <span className="pp-gnode" style={{ left: "75%", top: "52%" }}><Target size={11} />Finance</span>
+            <span className="pp-gnode is-end" style={{ left: "50%", top: "92%" }}><Database size={11} />ERP</span>
           </div>
         </div>
       </div>
-      <MetaStrip left="Requirement structured" middle="8 execution steps" right="4 constraints resolved" />
+      <MetaStrip left="Requirements captured" middle="3 roles · 4 systems" right="Flow diagram created" />
     </div>
   );
 }
 
-function OrchestrateDiagram() {
+/* ---------------- 02 · REFINEMENT LOOP ---------------- */
+function LoopDiagram() {
   return (
     <div className="sys7-diagram sys7-orchestrate">
-      <SurfaceHeader label="WORKFORCE TOPOLOGY" status="TEAM READY" />
-      <div className="sys7-canvas sys7-topology-canvas">
-        <svg className="sys7-topology-links" viewBox="0 0 1000 560" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M500 280 L220 145" />
-          <path d="M500 280 L785 145" />
-          <path d="M500 280 L235 430" />
-          <path d="M500 280 L770 430" />
-          <path className="soft" d="M220 145 Q500 40 785 145" />
-          <path className="soft" d="M235 430 Q500 535 770 430" />
+      <SurfaceHeader label="ITERATION LOOP" status="AWAITING USER APPROVAL" />
+      <div className="sys7-canvas pp-loop">
+        <svg className="pp-loop-wires" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M45 44 C 38 52, 26 60, 19 68" />
+          <path className="solid" d="M28 74 H 72" />
+          <path d="M81 68 C 74 60, 62 52, 55 44" />
         </svg>
 
-        <div className="sys7-shared-memory"><BrainCircuit size={12} /><span>Shared organizational memory</span><b>24 sources</b></div>
-
-        <div className="sys7-supervisor-core">
-          <span className="sys7-core-ring r1" />
-          <span className="sys7-core-ring r2" />
-          <span className="sys7-core-icon"><GitBranch size={19} /></span>
-          <small>SUPERVISOR</small>
-          <b>Aegis Runtime</b>
-          <em>team fit 94%</em>
+        <div className="pp-loop-core">
+          <span className="pp-loop-ring r1" />
+          <span className="pp-loop-ring r2" />
+          <span className="pp-loop-icon"><RefreshCcw size={19} /></span>
+          <small>FEEDBACK LOOP</small>
+          <b>Continuous Refinement</b>
+          <em>User in control</em>
         </div>
 
-        <div className="sys7-agent-node a1">
-          <span><ShieldCheck size={14} /></span><div><small>SPECIALIST 01</small><b>Compliance</b><p>Policy + evidence</p></div><em>ACTIVE</em>
-          <div className="sys7-agent-tools"><i>Policy DB</i><i>Docs</i></div>
+        <div className="pp-loop-node is-a" style={{ left: "19%", top: "74%" }}>
+          <span className="pp-loop-node-icon"><FileText size={13} /></span>
+          <div><small>INPUT</small><b>User Feedback</b></div>
+          <em className="is-live">ACTIVE</em>
         </div>
-        <div className="sys7-agent-node a2">
-          <span><Activity size={14} /></span><div><small>SPECIALIST 02</small><b>Finance</b><p>Risk + approval</p></div><em>ACTIVE</em>
-          <div className="sys7-agent-tools"><i>Risk API</i><i>Ledger</i></div>
+
+        <div className="pp-loop-node is-b" style={{ left: "81%", top: "74%" }}>
+          <span className="pp-loop-node-icon"><Code2 size={13} /></span>
+          <div><small>OUTPUT</small><b>Code &amp; Logic</b></div>
+          <em>REFINING</em>
         </div>
-        <div className="sys7-agent-node a3">
-          <span><Database size={14} /></span><div><small>SPECIALIST 03</small><b>Operations</b><p>System actions</p></div><em>READY</em>
-          <div className="sys7-agent-tools"><i>ERP</i><i>CRM</i></div>
-        </div>
-        <div className="sys7-agent-node a4 human">
-          <span><UserCheck size={14} /></span><div><small>HUMAN OWNER</small><b>Finance Ops</b><p>Escalation point</p></div><em>ON CALL</em>
-          <div className="sys7-agent-tools"><i>Approval</i><i>Override</i></div>
-        </div>
+
+        <div className="pp-loop-tag"><RefreshCcw size={11} />iteration 03 · refinements applied in place</div>
       </div>
-      <MetaStrip left="Supervisor coordinating" middle="3 specialists · 1 human" right="6 scoped tools" />
+      <MetaStrip left="Continuous updates" middle="Until perfect match" right="User gets exact code" />
     </div>
   );
 }
 
-function ExecuteDiagram() {
+/* ---------------- 03 · FRAPPE AGENT ---------------- */
+function FrappeAgentDiagram() {
   return (
     <div className="sys7-diagram sys7-execute">
-      <SurfaceHeader label="EXECUTION TIMELINE" status="RUN #2841 · LIVE" />
-      <div className="sys7-canvas sys7-timeline-canvas">
-        <div className="sys7-run-header">
-          <div><small>RUN</small><b>Vendor onboarding / ACME-482</b></div>
-          <span><i /> running · 67%</span>
+      <SurfaceHeader label="FRAPPE AGENT" status="CONNECTING BACKEND" />
+      <div className="sys7-canvas pp-frappe">
+        <div className="pp-frappe-head">
+          <div>
+            <small>INTEGRATION</small>
+            <b>Frappe Framework Setup</b>
+          </div>
+          <span className="pp-online"><i />online</span>
         </div>
 
-        <div className="sys7-time-axis"><span>00:00</span><span>00:12</span><span>00:24</span><span>00:36</span><span>00:48</span></div>
-
-        <div className="sys7-swimlanes">
-          <div className="sys7-lane-label"><span><BrainCircuit size={12} /></span><b>AEGIS</b><small>runtime</small></div>
-          <div className="sys7-lane-track">
-            <div className="sys7-event e1 done"><small>00:04</small><b>Plan compiled</b><em>DONE</em></div>
-            <div className="sys7-event e2 done"><small>00:11</small><b>Policy verified</b><em>DONE</em></div>
-            <div className="sys7-event e3 running"><small>00:31</small><b>Write transaction</b><em>RUNNING</em></div>
+        <div className="pp-lanes">
+          <div className="pp-lane">
+            <div className="pp-lane-label"><span><Key size={13} /></span><div><b>CREDENTIALS</b><small>secure</small></div></div>
+            <div className="pp-lane-track">
+              <div className="pp-event is-done" style={{ left: "3%", width: "26%" }}>
+                <small>INPUT</small><b>Get user credentials</b><em>SECURE</em>
+              </div>
+              <div className="pp-event is-done" style={{ left: "35%", width: "24%" }}>
+                <small>VERIFY</small><b>Authenticate instance</b><em>VERIFIED</em>
+              </div>
+            </div>
           </div>
 
-          <div className="sys7-lane-label"><span><Database size={12} /></span><b>SYSTEMS</b><small>tools</small></div>
-          <div className="sys7-lane-track">
-            <div className="sys7-event s1 done"><small>CRM</small><b>Read vendor</b><em>184ms</em></div>
-            <div className="sys7-event s2 running"><small>ERP</small><b>Create vendor</b><em>writing</em></div>
-            <div className="sys7-event s3 queued"><small>EMAIL</small><b>Send notice</b><em>queued</em></div>
+          <div className="pp-lane">
+            <div className="pp-lane-label"><span><Network size={13} /></span><div><b>PROVISION</b><small>frappe</small></div></div>
+            <div className="pp-lane-track">
+              <div className="pp-event is-done" style={{ left: "3%", width: "26%" }}>
+                <small>SETUP</small><b>Create project</b><em>DONE</em>
+              </div>
+              <div className="pp-event is-running" style={{ left: "35%", width: "26%" }}>
+                <small>CONNECT</small><b>Link backend</b><em>LIVE</em>
+              </div>
+            </div>
           </div>
 
-          <div className="sys7-lane-label"><span><UserCheck size={12} /></span><b>HUMAN</b><small>control</small></div>
-          <div className="sys7-lane-track">
-            <div className="sys7-event h1 done"><small>FIN OPS</small><b>Approval granted</b><em>+18s</em></div>
+          <div className="pp-lane">
+            <div className="pp-lane-label"><span><UserCheck size={13} /></span><div><b>INTERACT</b><small>portal</small></div></div>
+            <div className="pp-lane-track">
+              <div className="pp-event is-live" style={{ left: "35%", width: "28%" }}>
+                <small>USER</small><b>Interactive mode</b><em>READY</em>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="sys7-run-footer"><span>State checkpoint saved</span><span>Retries 0 / 1</span><span>Latency 184ms</span></div>
+        <div className="pp-frappe-foot">
+          <span><LockKeyhole size={11} />credentials never logged</span>
+          <span><Check size={11} />portal reachable</span>
+        </div>
       </div>
-      <MetaStrip left="State preserved" middle="5 events complete" right="1 action in progress" />
+      <MetaStrip left="Frappe connected" middle="Project created" right="Interactive portal live" />
     </div>
   );
 }
 
-function GovernDiagram() {
+/* ---------------- 04 · PROJECT AGENT ---------------- */
+function ProjectAgentDiagram() {
   return (
     <div className="sys7-diagram sys7-govern">
-      <SurfaceHeader label="POLICY ENVELOPE" status="HUMAN REVIEW" />
-      <div className="sys7-canvas sys7-govern-canvas">
-        <div className="sys7-request-card">
-          <span><FileText size={14} /></span><small>REQUEST</small><b>Create ERP vendor</b><p>ACME-482 · $31,400</p>
-        </div>
-
-        <div className="sys7-arrow-link l1"><i /><span>›</span></div>
-
-        <div className="sys7-policy-envelope">
-          <div className="sys7-envelope-head"><span><ShieldCheck size={14} /></span><div><small>POLICY PACK</small><b>Vendor write / AP-04</b></div><em>3 CHECKS</em></div>
-          <div className="sys7-policy-checks">
-            <div><span>01</span><p><small>ROLE PERMISSION</small><b>Finance Ops</b></p><em className="pass">PASSED</em></div>
-            <div><span>02</span><p><small>DATA CLASSIFICATION</small><b>Internal</b></p><em className="pass">PASSED</em></div>
-            <div><span>03</span><p><small>AMOUNT THRESHOLD</small><b>&gt; $25K</b></p><em className="review">REVIEW</em></div>
+      <SurfaceHeader label="PROJECT AGENT" status="MANAGING SCOPE" />
+      <div className="sys7-canvas pp-project">
+        <div className="pp-req">
+          <span className="pp-req-icon"><Target size={15} /></span>
+          <small>OVERVIEW</small>
+          <b>Project Management</b>
+          <p>End-to-end requirement tracking</p>
+          <div className="pp-req-stats">
+            <span><b>24</b><small>requirements</small></span>
+            <span><b>18</b><small>fulfilled</small></span>
           </div>
-          <div className="sys7-boundary-label">execution boundary</div>
         </div>
 
-        <div className="sys7-arrow-link l2"><i /><span>›</span></div>
+        <div className="pp-arrow"><i /><span>›</span></div>
 
-        <div className="sys7-decision-stack">
-          <div className="sys7-approval-card"><span><UserCheck size={14} /></span><div><small>HUMAN GATE</small><b>Finance Ops</b><p>Awaiting approval</p></div><em>REQUIRED</em></div>
-          <div className="sys7-action-card"><span><Play size={14} /></span><div><small>APPROVED PATH</small><b>Execute ERP write</b></div><em>LOCKED</em></div>
-          <div className="sys7-blocked-card"><span>×</span><div><small>BLOCKED PATH</small><b>No system action</b></div></div>
+        <div className="pp-scope">
+          <div className="pp-scope-head">
+            <span><ShieldCheck size={14} /></span>
+            <div><small>SCOPE CONTROL</small><b>Requirements Tracker</b></div>
+            <em>TRACKING</em>
+          </div>
+          <div className="pp-scope-rows">
+            {[
+              ["MILESTONES", "Tracking", "ON TIME", "done"],
+              ["DELIVERABLES", "Quality", "VERIFIED", "done"],
+              ["CHANGE REQUESTS", "Review", "1 OPEN", "warn"],
+              ["SIGNOFF", "Pending", "QUEUED", "idle"],
+            ].map(([k, v, s, st], i) => (
+              <div className={`pp-scope-row is-${st}`} key={k}>
+                <span>0{i + 1}</span>
+                <div><small>{k}</small><b>{v}</b></div>
+                <em>{s}</em>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="pp-arrow"><i /><span>›</span></div>
+
+        <div className="pp-progress">
+          <div className="pp-progress-head"><small>DELIVERY PROGRESS</small><b>75%</b></div>
+          <div className="pp-progress-ring">
+            <span className="pp-progress-core"><b>18</b><small>of 24</small></span>
+          </div>
+          <div className="pp-progress-legend">
+            <span><i className="is-done" />Complete</span>
+            <span><i className="is-live" />In progress</span>
+            <span><i />Queued</span>
+          </div>
         </div>
       </div>
-      <MetaStrip left="Human checkpoint active" middle="Audit trace immutable" right="RBAC enforced" warn />
+      <MetaStrip left="Project scope managed" middle="Milestones tracked" right="Quality verified" />
     </div>
   );
 }
 
-function ObserveDiagram() {
+/* ---------------- 05 · FUNCTIONAL AGENT ---------------- */
+function FunctionalAgentDiagram() {
   return (
     <div className="sys7-diagram sys7-observe">
-      <SurfaceHeader label="OPERATIONS CONSOLE" status="HEALTHY · 99.9%" />
-      <div className="sys7-canvas sys7-observe-canvas">
-        <div className="sys7-kpi-row">
-          <div><span><Activity size={12} /></span><p><small>RUNS TODAY</small><b>846</b></p><em>+18%</em></div>
-          <div><span><CheckCircle2 size={12} /></span><p><small>SUCCESS</small><b>97.8%</b></p><em>+1.4%</em></div>
-          <div><span><BadgeDollarSign size={12} /></span><p><small>COST / RUN</small><b>$0.43</b></p><em>-8%</em></div>
-          <div><span><Clock3 size={12} /></span><p><small>P95 LATENCY</small><b>2.4s</b></p><em>-11%</em></div>
+      <SurfaceHeader label="FUNCTIONAL AGENT" status="FEATURE DESIGN" />
+      <div className="sys7-canvas pp-functional">
+        <div className="pp-kpi-row">
+          <div><span><Wrench size={12} /></span><p><small>FEATURES</small><b>Defined</b></p><em>ALL</em></div>
+          <div><span><GitBranch size={12} /></span><p><small>DIAGRAM</small><b>Generated</b></p><em>READY</em></div>
+          <div><span><ScanSearch size={12} /></span><p><small>EDGE CASES</small><b>Covered</b></p><em>86%</em></div>
+          <div><span><Check size={12} /></span><p><small>REVIEW</small><b>Approved</b></p><em>V1.0</em></div>
         </div>
 
-        <div className="sys7-observe-grid">
-          <div className="sys7-reliability-panel">
-            <div className="sys7-panel-title"><div><small>RELIABILITY</small><b>Execution success</b></div><span>12H</span></div>
-            <svg viewBox="0 0 700 235" preserveAspectRatio="none" aria-hidden="true">
-              <defs>
-                <linearGradient id="sys7Area" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3157d5" stopOpacity=".20" />
-                  <stop offset="100%" stopColor="#3157d5" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              <path className="sys7-grid-line" d="M0 45 H700 M0 105 H700 M0 165 H700 M0 225 H700" />
-              <path className="sys7-area" d="M0 188 C58 178 84 151 127 160 S199 117 246 129 S326 91 372 105 S451 62 505 78 S596 41 640 51 S678 37 700 31 L700 235 L0 235 Z" />
-              <path className="sys7-line" d="M0 188 C58 178 84 151 127 160 S199 117 246 129 S326 91 372 105 S451 62 505 78 S596 41 640 51 S678 37 700 31" />
-              <circle cx="700" cy="31" r="5" className="sys7-point" />
+        <div className="pp-tree-panel">
+          <div className="pp-panel-title">
+            <div><small>ASSET</small><b>Functional Diagram</b></div>
+            <span>V1.0</span>
+          </div>
+          <div className="pp-feature-tree">
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <path d="M50 6 V26" />
+              <path d="M50 26 H16 V46" />
+              <path d="M50 26 H50 V46" />
+              <path d="M50 26 H84 V46" />
+              <path d="M50 64 V84" />
             </svg>
-            <div className="sys7-chart-axis"><span>08:00</span><span>12:00</span><span>16:00</span><span>20:00</span></div>
-          </div>
-
-          <div className="sys7-trace-waterfall">
-            <div className="sys7-panel-title"><div><small>TRACE</small><b>Run #2841</b></div><span>42.8s</span></div>
-            <div className="sys7-trace-row"><span>PLAN</span><i style={{ left: "4%", width: "18%" }} /><em>4.1s</em></div>
-            <div className="sys7-trace-row"><span>COMPLIANCE</span><i style={{ left: "18%", width: "29%" }} /><em>11.2s</em></div>
-            <div className="sys7-trace-row"><span>FINANCE</span><i style={{ left: "39%", width: "34%" }} /><em>14.5s</em></div>
-            <div className="sys7-trace-row"><span>ERP WRITE</span><i className="running" style={{ left: "68%", width: "22%" }} /><em>9.4s</em></div>
-            <div className="sys7-trace-row"><span>NOTICE</span><i className="queued" style={{ left: "88%", width: "8%" }} /><em>3.6s</em></div>
-            <div className="sys7-trace-scale"><span>0s</span><span>20s</span><span>40s</span></div>
+            <span className="pp-fnode is-root" style={{ left: "50%", top: "4%" }}><Wrench size={10} />Feature set</span>
+            <span className="pp-fnode" style={{ left: "16%", top: "50%" }}>Inputs</span>
+            <span className="pp-fnode" style={{ left: "50%", top: "50%" }}>Actions</span>
+            <span className="pp-fnode" style={{ left: "84%", top: "50%" }}>Outputs</span>
+            <span className="pp-fnode is-end" style={{ left: "50%", top: "90%" }}>Validated flow</span>
           </div>
         </div>
 
-        <div className="sys7-live-runs">
-          <div><span className="ok"><CheckCircle2 size={11} /></span><p><b>Vendor onboarding</b><small>completed · 42s</small></p><em>$0.82</em></div>
-          <div><span className="review"><Clock3 size={11} /></span><p><b>Contract review</b><small>human review · 3m</small></p><em>$0.46</em></div>
-          <div><span className="ok"><CheckCircle2 size={11} /></span><p><b>Invoice triage</b><small>completed · 18s</small></p><em>$0.19</em></div>
+        <div className="pp-trace-panel">
+          <div className="pp-panel-title">
+            <div><small>COVERAGE</small><b>Logic mapped</b></div>
+            <span>3 branches</span>
+          </div>
+          <div className="pp-trace-rows">
+            {[["CORE LOGIC", 92, "10%"], ["USER ACTIONS", 78, "24%"], ["EDGE CASES", 86, "16%"]].map(([k, p, l]) => (
+              <div className="pp-trace-row" key={k as string}>
+                <span>{k}</span>
+                <span className="pp-trace-bar"><i style={{ width: `${p}%`, marginLeft: `${l}` }} /></span>
+                <em>{p}%</em>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-      <MetaStrip left="97.8% reliability" middle="13 human reviews" right="Complete trace retained" />
+      <MetaStrip left="Functionalities built" middle="Logic mapped" right="Functional diagram ready" />
+    </div>
+  );
+}
+
+/* ---------------- 06 · TECHNICAL AGENT ---------------- */
+function TechnicalAgentDiagram() {
+  return (
+    <div className="sys7-diagram sys7-understand">
+      <SurfaceHeader label="TECHNICAL AGENT" status="ARCHITECTURE & CODE" />
+      <div className="sys7-canvas pp-technical">
+        <div className="pp-tech-left">
+          <div className="pp-panel-title">
+            <div><small>ARCHITECTURE</small><b>System layers</b></div>
+            <span className="pp-conf small"><b>100</b><small>%</small></span>
+          </div>
+          <div className="pp-layers">
+            {[
+              { t: "Application", s: "UI + workflows", icon: BrainCircuit, meta: "12 modules" },
+              { t: "API", s: "Endpoints mapped", icon: Network, meta: "24 routes" },
+              { t: "Database", s: "Schema designed", icon: Database, meta: "12 tables" },
+              { t: "Codebase", s: "Implementation", icon: Code2, meta: "deployed" },
+            ].map(({ t, s, icon: Icon, meta }, i) => (
+              <div className="pp-layer" key={t} style={{ animationDelay: `${i * 0.13}s` }}>
+                <span className="pp-layer-icon"><Icon size={14} /></span>
+                <div className="pp-layer-copy"><small>{s.toUpperCase()}</small><b>{t}</b></div>
+                <em>{meta}</em>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="pp-tech-right">
+          <div className="pp-panel-title">
+            <div><small>DELIVERABLE</small><b>Technical Diagram</b></div>
+            <span>ready</span>
+          </div>
+          <div className="pp-schema">
+            <div className="pp-schema-table">
+              <b>vendor</b>
+              {["id · uuid", "name · text", "risk_score · int", "status · enum"].map((f) => (
+                <span key={f}>{f}</span>
+              ))}
+            </div>
+            <div className="pp-schema-table">
+              <b>approval</b>
+              {["id · uuid", "vendor_id · fk", "approver · user", "decision · enum"].map((f) => (
+                <span key={f}>{f}</span>
+              ))}
+            </div>
+          </div>
+          <div className="pp-tech-foot">
+            <span><GitBranch size={11} />dependencies resolved</span>
+            <span className="ok"><Check size={11} />implementation ready</span>
+          </div>
+        </div>
+      </div>
+      <MetaStrip left="Technical architecture" middle="Database schema" right="Technical diagram ready" />
     </div>
   );
 }
 
 const layers = [
   {
-    n: "01", name: "UNDERSTAND", title: "Begin with the business problem.", text: "The AI Business Analyst turns natural-language intent into a structured objective, systems map, dependencies, workforce plan, and risk-aware checkpoints.", icon: BrainCircuit,
-    visual: <UnderstandDiagram />,
+    n: "01", name: "BA AGENT", title: "Begin with the business intent.", text: "The BA Agent discusses the project with you, gathers requirements, and builds the foundational Flow Diagram for the system.", icon: BrainCircuit,
+    visual: <BAAgentDiagram />,
   },
   {
-    n: "02", name: "ORCHESTRATE", title: "Compose the workforce around the work.", text: "AegisOS assigns specialist digital employees with role-specific memory, tools, permissions, supervisors, and escalation rules.", icon: GitBranch,
-    visual: <OrchestrateDiagram />,
+    n: "02", name: "REFINEMENT LOOP", title: "Iterate until it's perfect.", text: "Everything goes into a continuous feedback loop. The system updates code and logic until you get exactly the project you envisioned.", icon: RefreshCcw,
+    visual: <LoopDiagram />,
   },
   {
-    n: "03", name: "EXECUTE", title: "Move through systems, not just prompts.", text: "The workflow runtime coordinates long-running state, branches, retries, tools, enterprise actions, and humans as one continuous run.", icon: Play,
-    visual: <ExecuteDiagram />,
+    n: "03", name: "FRAPPE AGENT", title: "Connect the backend operations.", text: "This agent securely gets your Frappe credentials, provisions the project, and links it so you can interact with your new system directly.", icon: Key,
+    visual: <FrappeAgentDiagram />,
   },
   {
-    n: "04", name: "GOVERN", title: "Put autonomy inside real boundaries.", text: "Policies, RBAC, human approvals, execution limits, scoped data, and audit trails sit inside the runtime rather than around it as an afterthought.", icon: ShieldCheck,
-    visual: <GovernDiagram />,
+    n: "04", name: "PROJECT AGENT", title: "End-to-end requirement tracking.", text: "The Project Agent looks entirely after the project's overall requirements, ensuring scope and milestones are strictly managed.", icon: Target,
+    visual: <ProjectAgentDiagram />,
   },
   {
-    n: "05", name: "OBSERVE", title: "Operate AI like a real business system.", text: "Every run exposes reliability, cost, approvals, latency, worker activity, outcomes, and the complete execution trace.", icon: Eye,
-    visual: <ObserveDiagram />,
+    n: "05", name: "FUNCTIONAL AGENT", title: "Define the core functionalities.", text: "Works purely on the functional logic of the project, mapping out user actions and creating the comprehensive Functional Diagram.", icon: Wrench,
+    visual: <FunctionalAgentDiagram />,
+  },
+  {
+    n: "06", name: "TECHNICAL AGENT", title: "Build the robust architecture.", text: "Translates functional requirements into the Technical Diagram, designing the database schemas, APIs, and looking after all technical aspects.", icon: Code2,
+    visual: <TechnicalAgentDiagram />,
   },
 ];
+
+/* GSAP pinning wraps the section in a `pin-spacer`, moving it out of the parent
+   React believes it owns. Layout-effect cleanup runs BEFORE React removes nodes,
+   so ctx.revert() restores the DOM first and removeChild() stays valid. */
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 export function PlatformSystemV8() {
   const section = useRef<HTMLElement>(null);
   const track = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     gsap.registerPlugin(ScrollTrigger);
     const ctx = gsap.context(() => {
       const panels = gsap.utils.toArray<HTMLElement>(".v3-platform-panel");
@@ -330,8 +445,10 @@ export function PlatformSystemV8() {
   return (
     <section className="v3-platform-horizontal" id="architecture" data-system-ui="v8" ref={section}>
       <div className="v3-platform-topbar v9-platform-topbar">
-        <span>02 / THE AEGISOS SYSTEM</span>
-        <div className="v9-system-nav" aria-hidden="true"><b>Understand</b><i/><b>Orchestrate</b><i/><b>Execute</b><i/><b>Govern</b><i/><b>Observe</b></div>
+        <span>02 / THE WORKSIMPLIFIED SYSTEM</span>
+        <div className="v9-system-nav" aria-hidden="true" style={{ gridTemplateColumns: "repeat(6, 1fr)" }}>
+          <b>BA Agent</b><i /><b>Refinement</b><i /><b>Frappe</b><i /><b>Project</b><i /><b>Functional</b><i /><b>Technical</b>
+        </div>
         <small>SCROLL TO EXPLORE</small>
         <div className="v9-system-progress"><i /></div>
       </div>
@@ -339,7 +456,11 @@ export function PlatformSystemV8() {
         {layers.map(({ n, name, title, text, icon: Icon, visual }) => (
           <article className="v3-platform-panel" key={name}>
             <div className="v3-panel-number">{n}</div>
-            <div className="v3-panel-copy"><span><Icon size={16}/> {name}</span><h3>{title}</h3><p>{text}</p><a href={`/product/${name === "UNDERSTAND" ? "business-analyst" : name === "ORCHESTRATE" ? "workforce" : name === "EXECUTE" ? "workflows" : name === "GOVERN" ? "governance" : "observability"}`}>Explore {name.toLowerCase()} ↗</a></div>
+            <div className="v3-panel-copy">
+              <span><Icon size={16} /> {name}</span>
+              <h3>{title}</h3>
+              <p>{text}</p>
+            </div>
             <div className="v3-panel-visual">{visual}</div>
           </article>
         ))}

@@ -3,22 +3,22 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
-import { ArrowDown, ArrowUpRight, Database, FileCheck2, Network, ShieldCheck, Sparkles, UsersRound } from "lucide-react";
+import { ArrowDown, ArrowUpRight, BrainCircuit, Code2, FileCheck2, Key, RefreshCcw, Target, Wrench } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 
 const HeroCoreCanvas = dynamic(() => import("./hero-core-canvas").then(m => m.HeroCoreCanvas), { ssr: false });
 
 const satellites = [
-  { label: "Business brief", meta: "Natural language", icon: Sparkles, cls: "satellite-a", detail: "Intent normalized into objectives, constraints and success criteria." },
-  { label: "Workforce", meta: "3 roles assigned", icon: UsersRound, cls: "satellite-b", detail: "Specialists are assigned with scoped tools, memory and autonomy." },
-  { label: "Execution graph", meta: "8 live steps", icon: Network, cls: "satellite-c", detail: "State, branches and dependencies stay coordinated inside one run." },
-  { label: "ERP write", meta: "Approval required", icon: Database, cls: "satellite-d", detail: "High-impact system actions pause at the exact control boundary." },
-  { label: "Policy engine", meta: "12 rules active", icon: ShieldCheck, cls: "satellite-e", detail: "Permissions and policy are evaluated continuously during execution." },
-  { label: "Outcome", meta: "Auditable", icon: FileCheck2, cls: "satellite-f", detail: "The completed outcome, decisions and trace become reusable context." },
+  { label: "BA Agent", meta: "Requirements", icon: BrainCircuit, cls: "satellite-a", detail: "Discuss your project and generate the system flow diagram through interactive conversation." },
+  { label: "Refinement", meta: "Iterate", icon: RefreshCcw, cls: "satellite-b", detail: "Continuous feedback loop that refines code and logic until it's exactly right." },
+  { label: "Frappe", meta: "Connect", icon: Key, cls: "satellite-c", detail: "Securely link your Frappe backend and provision the live project." },
+  { label: "Project", meta: "Manage", icon: Target, cls: "satellite-d", detail: "End-to-end oversight of requirements, milestones, and deliverables." },
+  { label: "Functional", meta: "Build", icon: Wrench, cls: "satellite-e", detail: "Design functionalities and generate the comprehensive functional diagram." },
+  { label: "Technical", meta: "Architect", icon: Code2, cls: "satellite-f", detail: "Create the technical diagram — database, APIs, and system architecture." },
 ];
 
 export function HeroV3() {
-  const [activeSatellite, setActiveSatellite] = useState(2);
+  const [activeSatellite, setActiveSatellite] = useState(0);
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const sx = useSpring(x, { stiffness: 55, damping: 22, mass: 0.55 });
@@ -43,24 +43,24 @@ export function HeroV3() {
       </div>
       <div className="v3-hero-copy">
         <motion.div className="v3-hero-kicker" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .6 }}>
-          <i /> Enterprise AI Operating System
+          <i /> Agent-Driven Development Platform
         </motion.div>
         <motion.h1 initial={{ opacity: 0, y: 34 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .8, delay: .04, ease: [0.16, 1, 0.3, 1] }}>
-          Business intent,<br /><span>executed.</span>
+          From idea to code,<br /><span>through specialist agents.</span>
         </motion.h1>
         <motion.div className="v3-hero-subrow" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .75, delay: .15 }}>
-          <p>AegisOS turns a business requirement into coordinated, governed work across AI workers, humans, and enterprise systems.</p>
-          <div><a href="/login" className="v3-hero-primary">Get started <ArrowUpRight size={16} /></a><Link href="/platform" className="v3-hero-secondary">Explore platform</Link></div>
+          <p>Discuss your project with the BA Agent, iterate through the refinement loop, connect Frappe, and get production code — all through six coordinated agents.</p>
+          <div><a href="/login" className="v3-hero-primary">Get started <ArrowUpRight size={16} /></a><Link href="/platform" className="v3-hero-secondary">Explore agents</Link></div>
         </motion.div>
       </div>
 
       <motion.div className="v3-hero-stage" style={{ x: moveX, y: moveY }} transition={{ type: "spring", stiffness: 55, damping: 24 }}>
         <div className="v3-stage-grid" />
         <div className="v4-scanline" aria-hidden="true" />
-        <div className="v4-stage-badge"><i /> latency 184ms · policy checks 12/12</div>
-        <div className="v3-stage-topline"><span>AEGIS / LIVE EXECUTION FABRIC</span><span><i /> RUNNING</span></div>
+        <div className="v4-stage-badge"><i /> 6 agents · pipeline ready</div>
+        <div className="v3-stage-topline"><span>WORKSIMPLIFIED / AGENT PIPELINE</span><span><i /> READY</span></div>
         <div className="v3-core-canvas"><HeroCoreCanvas /></div>
-        <div className="v3-core-caption"><span>AEGIS CORE</span><strong>Policy-aware orchestration</strong><small>Run #2841 · Vendor onboarding</small></div>
+        <div className="v3-core-caption"><span>AGENT SYSTEM</span><span>Six specialist agents</span><small>BA → Refine → Frappe → Project → Functional → Technical</small></div>
         <svg className="v3-stage-wires" viewBox="0 0 1440 720" preserveAspectRatio="none" aria-hidden="true">
           <path d="M180 168 C330 165 432 250 596 318" />
           <path d="M1260 160 C1110 165 1010 250 844 318" />
@@ -75,17 +75,16 @@ export function HeroV3() {
           </motion.button>
         ))}
         <motion.div className="v4-stage-insight" key={activeSatellite} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .28, ease: [0.16,1,0.3,1] }}>
-          <span>LIVE LAYER · 0{activeSatellite + 1}</span><b>{satellites[activeSatellite].label}</b><p>{satellites[activeSatellite].detail}</p>
+          <span>AGENT · 0{activeSatellite + 1}</span><b>{satellites[activeSatellite].label}</b><p>{satellites[activeSatellite].detail}</p>
         </motion.div>
         <div className="v3-live-strip">
-          <span><b>01</b> Requirement understood</span><i />
-          <span><b>02</b> Specialists assigned</span><i />
-          <span className="active"><b>03</b> Executing systems</span><i />
-          <span><b>04</b> Awaiting approval</span>
-        </div>
+          <span><b>01</b> BA Agent ready</span><i />
+          <span><b>02</b> Refinement loop</span><i />
+          <span className="active"><b>03</b> Pipeline connected</span><i />
+          <span><b>04</b> Output delivery</span></div>
       </motion.div>
 
-      <a className="v3-scroll-cue" href="#architecture"><span>SEE THE SYSTEM</span><ArrowDown size={15} /></a>
+      <a className="v3-scroll-cue" href="#architecture"><span>SEE THE AGENTS</span><ArrowDown size={15} /></a>
     </section>
   );
 }

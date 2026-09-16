@@ -18,7 +18,7 @@ export function IntegrationFieldV3() {
       <div className="v3-integration-copy">
         <span>05 / ENTERPRISE CONNECTIONS</span>
         <h2>AI becomes useful when it can safely <em>touch the business.</em></h2>
-        <p>Connect the systems you already run. AegisOS exposes only approved data and actions, then applies role, workflow, and policy boundaries at execution time.</p>
+        <p>Connect the systems you already run. Worksimplified exposes only approved data and actions, then applies role, workflow, and policy boundaries at execution time.</p>
         <div className="v3-connection-stats"><div><b>Scoped</b><small>data access</small></div><div><b>Governed</b><small>system actions</small></div><div><b>Audited</b><small>every run</small></div></div>
       </div>
       <div className="v3-system-field">
@@ -30,7 +30,7 @@ export function IntegrationFieldV3() {
           <line x1="450" y1="340" x2="780" y2="370" /><line x1="450" y1="340" x2="690" y2="580" />
           <line x1="450" y1="340" x2="205" y2="585" /><line x1="450" y1="340" x2="115" y2="370" />
         </svg>
-        <div className="v3-aegis-hub"><span className="v3-brand-glyph"><i/><i/><i/></span><strong>AegisOS</strong><small>Execution layer</small><em><ShieldCheck size={12}/> Policy enforced</em></div>
+        <div className="v3-aegis-hub"><span className="v3-brand-glyph"><i/><i/><i/></span><strong>Worksimplified</strong><small>Execution layer</small><em><ShieldCheck size={12}/> Policy enforced</em></div>
         {systems.map(({label,icon:Icon,cls,meta},i)=><motion.div className={`v3-system-node ${cls}`} key={label} animate={{y:[0,i%2?-5:5,0]}} transition={{duration:6+i*.42,repeat:Infinity,ease:[.45,0,.55,1]}} whileHover={{scale:1.05}}><span><Icon size={17}/></span><div><b>{label}</b><small>{meta}</small></div></motion.div>)}
       </div>
     </section>

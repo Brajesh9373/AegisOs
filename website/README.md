@@ -1,6 +1,6 @@
-# AegisOS V8 — System UI refresh
+# Worksimplified V8 — System UI refresh
 
-This build fixes the stale `02 / THE AEGISOS SYSTEM` implementation that could keep showing the older V3 diagrams.
+This build fixes the stale `02 / THE WORKSIMPLIFIED SYSTEM` implementation that could keep showing the older V3 diagrams.
 
 ## What changed
 
@@ -46,9 +46,9 @@ This is intentionally non-visible and can be inspected in DevTools if needed.
 
 The global blue playhead line in **03 / Execute** has been removed entirely. Current execution is now communicated locally on the running event cards with compact `CURRENT` / `AUTHORIZED` state chips, so no vertical line crosses the timeline or extends into empty space.
 
-## V11 — Lenis + AegisOS scroll entry
+## V11 — Lenis + Worksimplified scroll entry
 
-The homepage now starts with a pinned AegisOS brand sequence. As the user scrolls, `AegisOS` scales through the viewport and releases into the existing hero. Global smooth scrolling is powered by Lenis and synchronized to GSAP ScrollTrigger through GSAP's ticker.
+The homepage now starts with a pinned Worksimplified brand sequence. As the user scrolls, `Worksimplified` scales through the viewport and releases into the existing hero. Global smooth scrolling is powered by Lenis and synchronized to GSAP ScrollTrigger through GSAP's ticker.
 
 Key files:
 - `components/v3/smooth-scroll-runtime-v11.tsx`

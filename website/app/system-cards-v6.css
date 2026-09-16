@@ -1,4 +1,4 @@
-/* AEGISOS V6 — System section visual language */
+/* WORKSIMPLIFIED V6 — System section visual language */
 .v3-panel-visual{background:linear-gradient(145deg,#ffffff 0%,#f8fbff 100%);border-color:#cad7e8;box-shadow:0 30px 80px rgba(27,52,88,.105);border-radius:24px}
 .v3-panel-visual:before{content:"";display:none}
 .v3-panel-visual:after{content:"";position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(rgba(72,102,151,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(72,102,151,.045) 1px,transparent 1px);background-size:30px 30px;mask-image:linear-gradient(to bottom,#000 0,rgba(0,0,0,.54) 72%,transparent 100%)}

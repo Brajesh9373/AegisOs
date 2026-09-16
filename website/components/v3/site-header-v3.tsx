@@ -7,25 +7,23 @@ import { useEffect, useState } from "react";
 
 const productColumns = [
   {
-    title: "INTELLIGENCE",
+    title: "UNDERSTAND",
     items: [
-      ["Business Analyst", "/product/business-analyst", "Turn a business brief into a governed plan."],
-      ["Organizational Memory", "/product/memory", "Carry business context into every run."],
+      ["BA Agent", "/product/ba-agent", "Discuss the project and generate the flow diagram."],
     ],
   },
   {
-    title: "EXECUTION",
+    title: "DELIVER",
     items: [
-      ["AI Workforce", "/product/workforce", "Specialist digital employees with real roles."],
-      ["Workflow Engine", "/product/workflows", "Coordinate people, agents, systems, and state."],
-      ["Integrations", "/product/integrations", "Connect governed actions to enterprise systems."],
+      ["Frappe Agent", "/product/frappe-agent", "Connect the backend and go live in Frappe."],
+      ["Project Agent", "/product/project-agent", "Track scope, milestones, and deliverables."],
     ],
   },
   {
-    title: "CONTROL",
+    title: "BUILD",
     items: [
-      ["Governance", "/product/governance", "Policies, approvals, access, and audit."],
-      ["Observability", "/product/observability", "Runs, reliability, spend, and outcomes."],
+      ["Functional Agent", "/product/functional-agent", "Map functionalities and user actions."],
+      ["Technical Agent", "/product/technical-agent", "Design schemas, APIs, and architecture."],
     ],
   },
 ];
@@ -48,9 +46,9 @@ export function SiteHeaderV3() {
   return (
     <header className={`v3-header ${scrolled ? "is-scrolled" : ""}`}>
       <div className="v3-nav-shell">
-        <Link href="/" className="v3-brand" aria-label="AegisOS home">
+        <Link href="/" className="v3-brand" aria-label="Worksimplified home">
           <span className="v3-brand-glyph"><i /><i /><i /></span>
-          <strong>AegisOS</strong>
+          <strong>Worksimplified</strong>
         </Link>
 
         <nav className="v3-nav" aria-label="Primary navigation">
@@ -68,12 +66,12 @@ export function SiteHeaderV3() {
                   transition={{ type: "spring", stiffness: 340, damping: 31, mass: .55 }}
                 >
                   <div className="v3-mega-feature">
-                    <span>AEGISOS PLATFORM</span>
-                    <h3>One system between business intent and execution.</h3>
-                    <p>Understand the work, compose the workforce, act across systems, and keep humans and policy in control.</p>
+                    <span>THE AGENT PIPELINE</span>
+                    <h3>Six specialist agents, from requirement to running system.</h3>
+                    <p>Discuss the project, refine the output, connect the backend, and carry it through functional and technical design.</p>
                     <Link href="/platform" onClick={() => setOpen(false)}>Platform overview <ArrowUpRight size={14} /></Link>
                     <div className="v3-mini-runtime" aria-hidden="true">
-                      <div>Intent</div><i /><div>Plan</div><i /><div>Run</div><i /><div>Outcome</div>
+                      <div>Discover</div><i /><div>Refine</div><i /><div>Connect</div><i /><div>Build</div>
                     </div>
                   </div>
                   <div className="v3-mega-columns">

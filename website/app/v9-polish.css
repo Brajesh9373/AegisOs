@@ -1,4 +1,4 @@
-/* AegisOS V9 — visual refinement layer */
+/* Worksimplified V9 — visual refinement layer */
 :root {
   --v9-ink: #0e1b36;
   --v9-copy: #61718a;
@@ -1916,7 +1916,7 @@
 /* 3. High-contrast premium dashed connection lines for all 6 Enterprise nodes */
 .v3-system-field svg line {
   stroke: #4d46e5 !important;
-  /* AegisOS primary blue */
+  /* Worksimplified primary blue */
   stroke-width: 1.5px !important;
   stroke-dasharray: 4 6 !important;
   opacity: 0.48 !important;

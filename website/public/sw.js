@@ -1,4 +1,4 @@
-/* AegisOS V8: service-worker page caching intentionally disabled.
+/* Worksimplified V8: service-worker page caching intentionally disabled.
    Next.js immutable hashed assets + route prefetching provide safe caching
    without allowing stale interface bundles to mask new deployments. */
 self.addEventListener("install", () => self.skipWaiting());

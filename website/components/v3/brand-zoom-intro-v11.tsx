@@ -3,7 +3,12 @@
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { ArrowDown } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
+
+/* GSAP pinning wraps the section in a `pin-spacer`, moving it out of the parent
+   React believes it owns. Layout-effect cleanup runs BEFORE React removes nodes,
+   so ctx.revert() restores the DOM first and removeChild() stays valid. */
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 export function BrandZoomIntroV11() {
   const sectionRef = useRef<HTMLElement>(null);
@@ -12,7 +17,7 @@ export function BrandZoomIntroV11() {
   const progressRef = useRef<HTMLSpanElement>(null);
   const bloomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const section = sectionRef.current;
     const word = wordRef.current;
     const shell = shellRef.current;
@@ -40,7 +45,7 @@ export function BrandZoomIntroV11() {
         const rect = word.getBoundingClientRect();
         const byWidth = window.innerWidth / Math.max(rect.width, 1);
         const byHeight = window.innerHeight / Math.max(rect.height, 1);
-        return Math.max(byWidth, byHeight) * 12.5;
+        return Math.max(byWidth, byHeight) * 35;
       };
 
       const tl = gsap.timeline({
@@ -48,59 +53,68 @@ export function BrandZoomIntroV11() {
         scrollTrigger: {
           trigger: section,
           start: "top top",
-          end: () => `+=${Math.max(window.innerHeight * 1.55, 980)}`,
-          pin: shell,
-          pinSpacing: true,
-          scrub: 0.58,
+          end: "bottom top",
+          pin: section,
+          pinSpacing: false,
+          scrub: 0.45,
           anticipatePin: 1,
           invalidateOnRefresh: true,
-          fastScrollEnd: false,
+          fastScrollEnd: true,
+          snap: {
+            snapTo: (val) => (val > 0.18 ? 1 : 0),
+            duration: { min: 0.25, max: 0.5 },
+            ease: "power2.out",
+          },
         },
       });
 
       tl.to(".aegis-intro-v11__eyebrow, .aegis-intro-v11__hint, .aegis-intro-v11__index", {
         opacity: 0,
-        y: -10,
-        duration: 0.16,
-      }, 0.06)
+        y: -12,
+        duration: 0.12,
+      }, 0.04)
         .to(word, {
           scale: zoomScale,
-          yPercent: -4,
-          letterSpacing: "-0.075em",
-          duration: 0.72,
+          letterSpacing: "-0.08em",
+          duration: 0.76,
           force3D: true,
           transformOrigin: "50% 50%",
-        }, 0.08)
+        }, 0.04)
         .to(bloom, {
-          scale: 2.5,
+          scale: 3,
           opacity: 0.95,
-          duration: 0.46,
-        }, 0.34)
+          duration: 0.44,
+        }, 0.22)
         .to(word, {
           opacity: 0,
-          duration: 0.18,
-        }, 0.75)
+          duration: 0.2,
+        }, 0.65)
         .to(shell, {
           backgroundColor: "rgba(247,249,252,0)",
-          duration: 0.2,
-        }, 0.78)
+          duration: 0.22,
+        }, 0.65)
         .to(progress, {
           scaleX: 1,
-          duration: 0.9,
-        }, 0);
+          duration: 0.85,
+        }, 0)
+        .to(section, {
+          autoAlpha: 0,
+          pointerEvents: "none",
+          duration: 0.12,
+        }, 0.88);
 
       if (header) {
         tl.to(header, {
           autoAlpha: 1,
           y: 0,
-          duration: 0.16,
-        }, 0.84);
+          duration: 0.18,
+        }, 0.80);
       }
       if (scrollProgress) {
         tl.to(scrollProgress, {
           autoAlpha: 1,
-          duration: 0.12,
-        }, 0.88);
+          duration: 0.14,
+        }, 0.82);
       }
     }, section);
 
@@ -111,8 +125,21 @@ export function BrandZoomIntroV11() {
     };
   }, []);
 
+  const handleEnterClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const hero = document.getElementById("main-hero");
+    if (hero) {
+      const lenis = (window as unknown as { __aegisLenis?: { scrollTo: (target: HTMLElement, opts?: unknown) => void } }).__aegisLenis;
+      if (lenis) {
+        lenis.scrollTo(hero, { offset: 0, duration: 1.1 });
+      } else {
+        hero.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+  };
+
   return (
-    <section ref={sectionRef} className="aegis-intro-v11" aria-label="AegisOS introduction">
+    <section ref={sectionRef} className="aegis-intro-v11" aria-label="Worksimplified introduction">
       <div ref={shellRef} className="aegis-intro-v11__shell">
         <div className="aegis-intro-v11__grid" aria-hidden="true" />
         <div ref={bloomRef} className="aegis-intro-v11__bloom" aria-hidden="true" />
@@ -122,15 +149,15 @@ export function BrandZoomIntroV11() {
           <b>Business intent → governed execution</b>
         </div>
 
-        <div ref={wordRef} className="aegis-intro-v11__word" aria-label="AegisOS">
-          <span>Aegis</span><strong>OS</strong>
+        <div ref={wordRef} className="aegis-intro-v11__word" aria-label="Worksimplified">
+          <span>Worksimplified</span>
         </div>
 
         <div className="aegis-intro-v11__index" aria-hidden="true">
           <span>01</span><i /><span>ENTER</span>
         </div>
 
-        <a className="aegis-intro-v11__hint" href="#main-hero">
+        <a className="aegis-intro-v11__hint" href="#main-hero" onClick={handleEnterClick}>
           <span>Scroll to enter</span><ArrowDown size={15} />
         </a>
 

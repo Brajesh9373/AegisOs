@@ -7,12 +7,12 @@ Passes performed on the requested areas:
    - Repositioned Outcome to the lower-right execution path and rewired its connector.
    - Verified no long Execute timeline playhead/dependency line remains in source.
 
-2. Assistant vs AegisOS comparison
+2. Assistant vs Worksimplified comparison
    - Rebuilt as a response-system vs governed-runtime comparison.
-   - AegisOS now presents Intent → Plan → Workforce → Execution → Outcome on one continuous execution rail.
+   - Worksimplified now presents Intent → Plan → Workforce → Execution → Outcome on one continuous execution rail.
    - Added governance/memory/human-control runtime band.
 
-3. AegisOS system horizontal experience
+3. Worksimplified system horizontal experience
    - GPU-promoted panel transforms.
    - Slower scrub interpolation and eased snap.
    - Dynamic progress strip and clearer five-stage top navigation.

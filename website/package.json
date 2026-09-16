@@ -3,11 +3,11 @@
   "version": "0.11.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "NODE_ENV=development next dev",
     "build": "next build",
     "start": "next start",
     "clean": "node scripts/clean.mjs",
-    "dev:clean": "npm run clean && next dev",
+    "dev:clean": "npm run clean && npm run dev",
     "build:clean": "npm run clean && next build"
   },
   "dependencies": {

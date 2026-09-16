@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import "@xyflow/react/dist/style.css";
 import "lenis/dist/lenis.css";
 import "./globals.css";
 import "./light-theme.css";
@@ -8,6 +7,8 @@ import "./system-cards-v8.css";
 import "./v9-polish.css";
 import "./workforce-v10.css";
 import "./intro-v11.css";
+import "./agent-pipeline.css";
+import "./platform-panels.css";
 import { SiteHeaderV3 } from "@/components/v3/site-header-v3";
 import { SiteFooterV3 } from "@/components/v3/site-footer-v3";
 import { ExperienceRuntimeV4 } from "@/components/v3/experience-runtime-v4";
@@ -15,11 +16,11 @@ import { SmoothScrollRuntimeV11 } from "@/components/v3/smooth-scroll-runtime-v1
 
 export const metadata: Metadata = {
   title: {
-    default: "AegisOS — Business intent, executed.",
-    template: "%s | AegisOS",
+    default: "Worksimplified — From idea to code, through specialist agents.",
+    template: "%s | Worksimplified",
   },
   description:
-    "AegisOS is an enterprise AI operating system that turns business intent into governed execution across people, AI workers, and enterprise systems.",
+    "Worksimplified is an agent-driven development platform. Discuss your project with the BA Agent, iterate through the refinement loop, connect Frappe, and get production code.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

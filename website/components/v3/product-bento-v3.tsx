@@ -64,7 +64,7 @@ function GovernanceVisual() {
 function IntegrationsVisual() {
   return <div className="v9-mini-integrations">
     <svg viewBox="0 0 300 180" preserveAspectRatio="none" aria-hidden="true"><path d="M150 90 L42 38M150 90 L258 38M150 90 L42 145M150 90 L258 145"/></svg>
-    <div className="v9-integration-core"><DatabaseZap size={14}/><b>AegisOS</b></div>
+    <div className="v9-integration-core"><DatabaseZap size={14}/><b>Worksimplified</b></div>
     <span className="i1">CRM<small>Read</small></span><span className="i2">ERP<small>Write</small></span><span className="i3">DB<small>Scoped</small></span><span className="i4">API<small>Action</small></span>
   </div>;
 }

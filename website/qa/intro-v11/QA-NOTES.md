@@ -2,7 +2,7 @@
 
 Checked static states at 1536×864 and 390×844:
 
-- Entry: AegisOS centered with sufficient safe area on all sides.
+- Entry: Worksimplified centered with sufficient safe area on all sides.
 - Zoom: wordmark fills the viewport without exposing unintended scrollbars.
 - Pass-through: typography is scaled beyond the viewport before opacity/background release.
 - Mobile: wordmark remains centered and the scroll affordance/index remain within safe areas.

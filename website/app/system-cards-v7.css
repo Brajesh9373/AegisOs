@@ -1,4 +1,4 @@
-/* AEGISOS V7 — architecture-grade system surfaces */
+/* WORKSIMPLIFIED V7 — architecture-grade system surfaces */
 .v3-panel-visual{background:linear-gradient(145deg,#fff 0%,#f8fbff 100%);border:1px solid #cbd8e8;box-shadow:0 34px 90px rgba(28,50,84,.115);border-radius:26px;isolation:isolate}
 .v3-panel-visual:before{display:none!important}.v3-panel-visual:after{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(rgba(79,107,151,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(79,107,151,.04) 1px,transparent 1px);background-size:32px 32px;mask-image:linear-gradient(to bottom,#000 0,rgba(0,0,0,.5) 72%,transparent 100%)}
 .sys7-diagram{position:absolute;inset:0;z-index:1;display:grid;grid-template-rows:50px minmax(0,1fr) 46px;color:#13213a;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}

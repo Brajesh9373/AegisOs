@@ -5,10 +5,11 @@ const linkColumns = [
     title: "PRODUCT",
     links: [
       ["Platform", "/platform"],
-      ["Business Analyst", "/product/business-analyst"],
-      ["AI Workforce", "/product/workforce"],
-      ["Workflow Engine", "/product/workflows"],
-      ["Governance", "/product/governance"],
+      ["BA Agent", "/product/ba-agent"],
+      ["Frappe Agent", "/product/frappe-agent"],
+      ["Project Agent", "/product/project-agent"],
+      ["Functional Agent", "/product/functional-agent"],
+      ["Technical Agent", "/product/technical-agent"],
     ],
   },
   {
@@ -37,7 +38,7 @@ export function SiteFooterV3() {
       <div className="v9-footer-glow" aria-hidden="true" />
 
       <div className="v3-footer-top v9-footer-top">
-        <Link href="/" className="v9-footer-wordmark" aria-label="AegisOS home">AegisOS</Link>
+        <Link href="/" className="v9-footer-wordmark" aria-label="Worksimplified home">Worksimplified</Link>
         <nav className="v3-footer-links" aria-label="Footer navigation">
           {linkColumns.map(({ title, links }) => (
             <div key={title}>
@@ -48,7 +49,7 @@ export function SiteFooterV3() {
         </nav>
       </div>
 
-      <div className="v3-footer-bottom"><span>© 2026 AegisOS. All rights reserved.</span><span>Business intent → governed execution.</span><span>Privacy · Terms · Security</span></div>
+      <div className="v3-footer-bottom"><span>© 2026 Worksimplified. All rights reserved.</span><span>Business intent → governed execution.</span><span>Privacy · Terms · Security</span></div>
     </footer>
   );
 }

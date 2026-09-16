@@ -17,9 +17,9 @@ export function ManifestoV3() {
       <div className="v3-manifesto-grid">
         <div className="v3-manifesto-index">01 / CATEGORY</div>
         <motion.h2 initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: .3 }} transition={{ duration: .7 }}>
-          AI assistants stop at an answer.<br /><span>AegisOS continues until the work is done.</span>
+          AI assistants stop at an answer.<br /><span>Worksimplified continues until the work is done.</span>
         </motion.h2>
-        <div className="v3-manifesto-copy">AegisOS is the execution layer between a business request and the systems, AI workers, approvals, and people required to complete it.</div>
+        <div className="v3-manifesto-copy">Worksimplified is the execution layer between a business request and the systems, AI workers, approvals, and people required to complete it.</div>
       </div>
 
       <div className="v9-compare-shell">
@@ -35,7 +35,7 @@ export function ManifestoV3() {
         </div>
 
         <div className="v9-compare-row aegis-row">
-          <div className="v9-compare-label"><span><Workflow size={17} /></span><div><b>AEGISOS</b><small>Execution runtime</small></div></div>
+          <div className="v9-compare-label"><span><Workflow size={17} /></span><div><b>WORKSIMPLIFIED</b><small>Execution runtime</small></div></div>
           <div className="v9-aegis-flow">
             <div className="v9-aegis-track" aria-hidden="true"><motion.i animate={{ x: [0, 520] }} transition={{ repeat: Infinity, duration: 6.5, ease: "linear" }} /></div>
             {aegisSteps.map(({ label, meta, icon: Icon }, index) => (

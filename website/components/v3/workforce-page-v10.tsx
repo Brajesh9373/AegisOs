@@ -144,7 +144,7 @@ const anatomy: Record<AnatomyKey, { title: string; eyebrow: string; copy: string
     title: "Every worker has an escalation path.",
     eyebrow: "SUPERVISOR",
     copy: "Supervisors coordinate assignments, resolve ambiguity, and route high-impact decisions to the right human owner.",
-    detail: "Aegis Runtime → Finance Ops",
+    detail: "Worksimplified Runtime → Finance Ops",
     items: ["Task delegation", "Exception routing", "Human escalation"],
     icon: GitBranch,
   },
@@ -182,7 +182,7 @@ function WorkforceHeroVisual() {
   return (
     <div className="wf10-hero-console">
       <div className="wf10-console-head">
-        <span><i /> AEGIS / WORKFORCE RUNTIME</span>
+        <span><i /> WORKSIMPLIFIED / WORKFORCE RUNTIME</span>
         <em>5 MEMBERS · LIVE</em>
       </div>
       <div className="wf10-topology">
@@ -195,7 +195,7 @@ function WorkforceHeroVisual() {
         <div className="wf10-supervisor">
           <span className="ring r1"/><span className="ring r2"/>
           <span className="icon"><GitBranch size={20}/></span>
-          <small>SUPERVISOR</small><b>Aegis Runtime</b><em>team fit 94%</em>
+          <small>SUPERVISOR</small><b>Worksimplified Runtime</b><em>team fit 94%</em>
         </div>
 
         <WorkerNode id="compliance" active={active === "compliance"} onClick={setActive} className="n1"/>
@@ -237,7 +237,7 @@ function AnatomyStudio() {
             <div className="wf10-profile-head"><span className="wf10-avatar">CO</span><div><small>DIGITAL EMPLOYEE</small><b>Compliance Specialist</b></div><em><i/> ACTIVE</em></div>
             <div className="wf10-profile-highlight"><small>{current.eyebrow}</small><b>{current.detail}</b></div>
             <div className="wf10-profile-list">{current.items.map((item, idx) => <div key={item}><span>0{idx + 1}</span><b>{item}</b><CheckCircle2 size={14}/></div>)}</div>
-            <div className="wf10-profile-context"><span><small>MEMORY</small><b>Vendor policy + precedents</b></span><span><small>TOOLS</small><b>Policy DB · Docs · Risk API</b></span><span><small>SUPERVISOR</small><b>Aegis Runtime</b></span></div>
+            <div className="wf10-profile-context"><span><small>MEMORY</small><b>Vendor policy + precedents</b></span><span><small>TOOLS</small><b>Policy DB · Docs · Risk API</b></span><span><small>SUPERVISOR</small><b>Worksimplified Runtime</b></span></div>
             <div className="wf10-profile-foot"><span>Role ID · WORKER-CO-04</span><b>Bounded by policy</b></div>
           </div>
         </motion.div>
@@ -323,7 +323,7 @@ export function WorkforcePageV10() {
         <div className="wf10-hero-copy">
           <div className="wf10-eyebrow"><UsersRound size={15}/><span>ORCHESTRATE / AI WORKFORCE</span></div>
           <motion.h1 initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .8, ease: [0.16, 1, 0.3, 1] }}>Build a workforce.<br/><span>Not a pile of agents.</span></motion.h1>
-          <motion.p initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .7, delay: .12 }}>AegisOS turns specialist AI workers into an operating team — each with a job, context, tools, permissions, policies, a supervisor, and a clear path to human judgment.</motion.p>
+          <motion.p initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .7, delay: .12 }}>Worksimplified turns specialist AI workers into an operating team — each with a job, context, tools, permissions, policies, a supervisor, and a clear path to human judgment.</motion.p>
           <motion.div className="wf10-actions" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: .25 }}><a href="#workforce-demo" className="v3-solid-button">Book a workforce demo <ArrowUpRight size={14}/></a><Link href="#anatomy">Explore the system <ArrowRight size={14}/></Link></motion.div>
           <div className="wf10-hero-proof"><span><i/> Role-based</span><span><i/> Policy-bounded</span><span><i/> Reusable</span></div>
         </div>
@@ -333,24 +333,24 @@ export function WorkforcePageV10() {
       <section className="wf10-positioning">
         <div className="wf10-section-kicker"><span>01 / THE SHIFT</span><p>Move from disposable agents to durable operating roles.</p></div>
         <div className="wf10-position-grid">
-          <div className="wf10-position-copy"><h2>Agents complete tasks.<br/><span>A workforce owns work.</span></h2><p>AegisOS gives AI workers the operating structure normally missing from agent deployments: role clarity, supervision, permissions, memory, and repeatable responsibility.</p></div>
-          <div className="wf10-compare-card"><div className="assistant"><span>GENERIC AGENT</span><div><small>Prompt</small><ArrowRight/><small>Tool call</small><ArrowRight/><small>Response</small></div><p>Context and responsibility end with the task.</p></div><div className="workforce"><span>AEGISOS WORKER</span><div><small>Role</small><ArrowRight/><small>Context</small><ArrowRight/><small>Execution</small><ArrowRight/><small>Outcome</small></div><p><i/> Persistent role · governed capabilities · supervised execution</p></div></div>
+          <div className="wf10-position-copy"><h2>Agents complete tasks.<br/><span>A workforce owns work.</span></h2><p>Worksimplified gives AI workers the operating structure normally missing from agent deployments: role clarity, supervision, permissions, memory, and repeatable responsibility.</p></div>
+          <div className="wf10-compare-card"><div className="assistant"><span>GENERIC AGENT</span><div><small>Prompt</small><ArrowRight/><small>Tool call</small><ArrowRight/><small>Response</small></div><p>Context and responsibility end with the task.</p></div><div className="workforce"><span>WORKSIMPLIFIED WORKER</span><div><small>Role</small><ArrowRight/><small>Context</small><ArrowRight/><small>Execution</small><ArrowRight/><small>Outcome</small></div><p><i/> Persistent role · governed capabilities · supervised execution</p></div></div>
         </div>
       </section>
 
       <section className="wf10-anatomy" id="anatomy">
-        <div className="wf10-section-head"><span>02 / DIGITAL EMPLOYEE ANATOMY</span><h2>Everything a real role needs to operate.</h2><p>A worker is more than a model and a system prompt. Select each layer to inspect how AegisOS defines the role.</p></div>
+        <div className="wf10-section-head"><span>02 / DIGITAL EMPLOYEE ANATOMY</span><h2>Everything a real role needs to operate.</h2><p>A worker is more than a model and a system prompt. Select each layer to inspect how Worksimplified defines the role.</p></div>
         <AnatomyStudio/>
       </section>
 
       <section className="wf10-compose-section">
-        <div className="wf10-section-kicker"><span>03 / COMPOSE A TEAM</span><p>Start with the work. AegisOS determines the workforce around it.</p></div>
+        <div className="wf10-section-kicker"><span>03 / COMPOSE A TEAM</span><p>Start with the work. Worksimplified determines the workforce around it.</p></div>
         <div className="wf10-compose-title"><h2>The team forms around the requirement.</h2><p>Business context determines which specialists are needed, what each role can access, and where human authority belongs.</p></div>
         <TeamComposer/>
       </section>
 
       <section className="wf10-runtime-section">
-        <div className="wf10-runtime-copy"><span>04 / COORDINATED EXECUTION</span><h2>Specialists become one continuous run.</h2><p>Workers do not operate as isolated chatbots. AegisOS coordinates state, dependencies, system actions, policy checks, and human decisions as one execution runtime.</p><Link href="/product/workflows">Explore Workflow Engine <ArrowRight size={14}/></Link></div>
+        <div className="wf10-runtime-copy"><span>04 / COORDINATED EXECUTION</span><h2>Specialists become one continuous run.</h2><p>Workers do not operate as isolated chatbots. Worksimplified coordinates state, dependencies, system actions, policy checks, and human decisions as one execution runtime.</p><Link href="/product/workflows">Explore Workflow Engine <ArrowRight size={14}/></Link></div>
         <RuntimeChoreography/>
       </section>
 
@@ -370,8 +370,8 @@ export function WorkforcePageV10() {
       </section>
 
       <section className="wf10-final" id="workforce-demo">
-        <div><span>AEGISOS / AI WORKFORCE</span><h2>Build the operating team behind your AI workflows.</h2><p>Bring the business role. AegisOS handles the context, capabilities, supervision, control, and runtime around it.</p></div>
-        <div className="wf10-final-actions"><a href="mailto:hello@aegisos.ai">Book a demo <ArrowUpRight size={15}/></a><Link href="/platform">Explore AegisOS <ArrowRight size={15}/></Link></div>
+        <div><span>WORKSIMPLIFIED / AI WORKFORCE</span><h2>Build the operating team behind your AI workflows.</h2><p>Bring the business role. Worksimplified handles the context, capabilities, supervision, control, and runtime around it.</p></div>
+        <div className="wf10-final-actions"><a href="mailto:hello@aegisos.ai">Book a demo <ArrowUpRight size={15}/></a><Link href="/platform">Explore Worksimplified <ArrowRight size={15}/></Link></div>
         <div className="wf10-final-orbit" aria-hidden="true"><span className="o1"/><span className="o2"/><span className="core"><UsersRound size={23}/></span></div>
       </section>
     </div>

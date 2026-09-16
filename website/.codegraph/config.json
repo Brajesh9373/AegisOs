@@ -1,0 +1,95 @@
+{
+  "name": "aegisos-website",
+  "version": "0.11.0",
+  "description": "Worksimplified marketing website — Next.js 16, React 19, Lenis smooth scroll, Framer Motion",
+  "framework": "next",
+  "frameworkVersion": "16.3.0",
+  "reactVersion": "19.2.1",
+  "language": "typescript",
+  "styling": "css",
+  "paths": {
+    "root": ".",
+    "app": "app",
+    "components": "components/v3",
+    "lib": "lib",
+    "styles": "app/*.css",
+    "public": "public",
+    "scripts": "scripts",
+    "qa": "qa"
+  },
+  "routes": [
+    {
+      "path": "/",
+      "file": "app/page.tsx",
+      "description": "Home page — composes hero, product bento, integration field, operations, workbench, manifesto, workforce, CTA"
+    },
+    {
+      "path": "/platform",
+      "file": "app/platform/page.tsx",
+      "description": "Platform page — system cards and horizontal platform overview"
+    },
+    {
+      "path": "/enterprise",
+      "file": "app/enterprise/page.tsx",
+      "description": "Enterprise page"
+    },
+    {
+      "path": "/product/[slug]",
+      "file": "app/product/[slug]/page.tsx",
+      "description": "Dynamic product pages — 7 products defined in lib/products.ts"
+    }
+  ],
+  "components": {
+    "layout": {
+      "site-header-v3": "components/v3/site-header-v3.tsx",
+      "site-footer-v3": "components/v3/site-footer-v3.tsx"
+    },
+    "home-sections": {
+      "home-v4": "components/v3/home-v4.tsx — page composition entry point",
+      "hero-v3": "components/v3/hero-v3.tsx — hero with 3D canvas background",
+      "hero-core-canvas": "components/v3/hero-core-canvas.tsx — Three.js/React Three Fiber hero canvas",
+      "product-bento-v3": "components/v3/product-bento-v3.tsx — product grid with bento layout",
+      "integration-field-v3": "components/v3/integration-field-v3.tsx — integrations showcase",
+      "operations-v3": "components/v3/operations-v3.tsx — operations section",
+      "workbench-v3": "components/v3/workbench-v3.tsx — workbench demo",
+      "manifesto-v3": "components/v3/manifesto-v3.tsx — brand manifesto",
+      "workforce-page-v10": "components/v3/workforce-page-v10.tsx — workforce orchestration section",
+      "final-cta-v3": "components/v3/final-cta-v3.tsx — call-to-action section"
+    },
+    "platform": {
+      "platform-system-v8": "components/v3/platform-system-v8.tsx — system cards v8",
+      "platform-horizontal": "components/v3/platform-horizontal.tsx — horizontal platform layout"
+    },
+    "product": {
+      "product-page-v3": "components/v3/product-page-v3.tsx — dynamic product detail renderer"
+    },
+    "runtime": {
+      "experience-runtime-v4": "components/v3/experience-runtime-v4.tsx — scroll/experience orchestration",
+      "smooth-scroll-runtime-v11": "components/v3/smooth-scroll-runtime-v11.tsx — Lenis smooth scroll v11",
+      "brand-zoom-intro-v11": "components/v3/brand-zoom-intro-v11.tsx — intro animation v11"
+    }
+  },
+  "dataSources": {
+    "products": "lib/products.ts — 7 products: business-analyst, memory, workforce, workflows, governance, integrations, observability"
+  },
+  "styles": {
+    "global": "app/globals.css",
+    "theme": "app/light-theme.css",
+    "scroll-app": "app/perfection.css",
+    "system-cards": ["app/system-cards-v6.css", "app/system-cards-v7.css", "app/system-cards-v8.css"],
+    "polish": "app/v9-polish.css",
+    "workforce": "app/workforce-v10.css",
+    "intro": "app/intro-v11.css"
+  },
+  "libraries": {
+    "animation": ["framer-motion", "gsap", "lenis"],
+    "3d": ["three", "@react-three/fiber", "@react-three/drei"],
+    "ui": ["lucide-react", "@xyflow/react", "recharts"]
+  },
+  "headers": {
+    "cache": "Static assets: 1 year immutable. Routes: no-cache. SW: no-cache"
+  },
+  "qaAssets": {
+    "qa/": "QA reference HTML files (hero, bento, operations, etc.) and screenshot directories per version"
+  }
+}

@@ -1,4 +1,4 @@
-/* AegisOS V5 — visual QA / finishing layer
+/* Worksimplified V5 — visual QA / finishing layer
    Loaded after the V4 theme so it can refine geometry without destabilising components. */
 :root {
   /* Full-bleed layout: --max always spans the viewport minus two 24px gutters,
