@@ -43,10 +43,32 @@ export function BrandZoomIntroV11() {
       if (header) gsap.set(header, { autoAlpha: 0, y: -12 });
       if (scrollProgress) gsap.set(scrollProgress, { autoAlpha: 0 });
 
+      // The zoom peaks near 200000px wide (35x viewport fill). Past a certain
+      // size Chromium keeps serving stale compositor tiles on the way back:
+      // the timeline state returns to a perfect identity matrix, yet the word
+      // paints as fragments. Dropping the box for one synchronous reflow
+      // forces a fresh raster at the current transform — verified to restore
+      // pixel-perfect rendering (a filter toggle was tried: it does NOT bust
+      // the stale tiles). No paint happens mid-task, so there is no flash.
+      const healWordLayer = () => {
+        word.style.display = "none";
+        void word.offsetHeight;
+        word.style.display = "";
+      };
+      let healedAtZero = false;
+      let lastReverseHeal = 0;
+
       const zoomScale = () => {
-        const rect = word.getBoundingClientRect();
-        const byWidth = window.innerWidth / Math.max(rect.width, 1);
-        const byHeight = window.innerHeight / Math.max(rect.height, 1);
+        // Derive from font-size, never the live rect: the rect includes the
+        // tween's own transform, so on invalidateOnRefresh (resize or
+        // orientation change mid-zoom) the end value would be recomputed from
+        // an already-scaled box and the zoom would jump to a wrong value.
+        // Ink box is 12137x1920 units on a 2048 upem, i.e. 5.926em wide.
+        const fs = parseFloat(getComputedStyle(word).fontSize) || 16;
+        const w = 5.926 * fs;
+        const h = (w * 1920) / 12137;
+        const byWidth = window.innerWidth / Math.max(w, 1);
+        const byHeight = window.innerHeight / Math.max(h, 1);
         return Math.max(byWidth, byHeight) * 35;
       };
 
@@ -58,7 +80,7 @@ export function BrandZoomIntroV11() {
           end: "bottom top",
           pin: section,
           pinSpacing: false,
-          scrub: 0.45,
+          scrub: 1,
           anticipatePin: 1,
           invalidateOnRefresh: true,
           fastScrollEnd: true,
@@ -66,6 +88,32 @@ export function BrandZoomIntroV11() {
             snapTo: (val) => (val > 0.18 ? 1 : 0),
             duration: { min: 0.25, max: 0.5 },
             ease: "power2.out",
+          },
+          // Note: onLeaveBack can never fire here — the pin start IS scroll 0,
+          // so there is no "above the start" to cross. Both paths below are
+          // the revisit handling (scrub settles near ~1e-9, never exactly 0).
+          //
+          // The throttled heal while direction === -1 is the one that keeps
+          // the reverse SMOOTH: without it only the rest state is repaired
+          // and every mid-reverse frame paints stale giant-scale tiles
+          // (fragments), snapping clean only at the end. Each heal is one
+          // synchronous reflow — no paint happens mid-task, so no flash.
+          onUpdate: (self) => {
+            if (self.progress < 0.002) {
+              if (!healedAtZero) {
+                healedAtZero = true;
+                healWordLayer();
+              }
+            } else {
+              healedAtZero = false;
+              if (self.direction === -1) {
+                const now = performance.now();
+                if (now - lastReverseHeal > 120) {
+                  lastReverseHeal = now;
+                  healWordLayer();
+                }
+              }
+            }
           },
         },
       });
@@ -78,6 +126,10 @@ export function BrandZoomIntroV11() {
         .to(word, {
           scale: zoomScale,
           duration: 0.76,
+          // Gentle start: a linear 1→153x reads as an instant explosion
+          // (17x after ~100px of scroll). power1.in keeps the same endpoint
+          // and dive character but eases out of rest smoothly.
+          ease: "power1.in",
           force3D: true,
           transformOrigin: "50% 50%",
         }, 0.04)
