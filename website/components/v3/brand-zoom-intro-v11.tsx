@@ -5,6 +5,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { ArrowDown } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { GridPulse } from "./grid-pulse";
+import { Wordmark } from "./wordmark";
 
 /* GSAP pinning wraps the section in a `pin-spacer`, moving it out of the parent
    React believes it owns. Layout-effect cleanup runs BEFORE React removes nodes,
@@ -76,7 +77,6 @@ export function BrandZoomIntroV11() {
       }, 0.04)
         .to(word, {
           scale: zoomScale,
-          letterSpacing: "-0.08em",
           duration: 0.76,
           force3D: true,
           transformOrigin: "50% 50%",
@@ -150,8 +150,8 @@ export function BrandZoomIntroV11() {
           <b>Business intent → governed execution</b>
         </div>
 
-        <div ref={wordRef} className="aegis-intro-v11__word" aria-label="Worksimplified" data-grid-avoid>
-          <span>Worksimplified</span>
+        <div ref={wordRef} className="aegis-intro-v11__word" data-grid-avoid>
+          <Wordmark className="aegis-intro-v11__wordmark" />
         </div>
 
         <div className="aegis-intro-v11__index" aria-hidden="true">

@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Build & type artifacts
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*
+!.env.example
+
+# Local agent / editor state
+.commandcode/
+.claude/
+.codex/
+
+# OS
+.DS_Store

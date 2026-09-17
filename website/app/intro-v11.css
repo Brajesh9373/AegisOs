@@ -80,8 +80,14 @@
   will-change:transform,opacity,letter-spacing;
   user-select:none;
 }
-.aegis-intro-v11__word span{font-weight:680;color:#0c1830}
-.aegis-intro-v11__word strong{font:inherit;color:#3157d5;font-weight:680}
+/* Vector outlines, so the size is driven by the same font-size steps the text
+   used: the ink box is 12137 units wide on a 2048 upem, i.e. 5.926em. */
+.aegis-intro-v11__wordmark{
+  width:5.926em;
+  height:auto;
+  display:block;
+  color:#0c1830;
+}
 .aegis-intro-v11__eyebrow{
   position:absolute;
   z-index:3;

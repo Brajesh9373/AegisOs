@@ -469,7 +469,12 @@
 /* ---------------- 04 · PROJECT AGENT ---------------- */
 .pp-project {
   display: grid;
-  grid-template-columns: minmax(190px, .78fr) 46px minmax(0, 1.5fr) 46px minmax(200px, .82fr);
+  /* The scope column is the most content-heavy one, but `minmax(0, 1.5fr)`
+     let it shrink to nothing while the other two kept hard 190/200px floors —
+     at 1440 the tracker ended up the narrowest column at ~170px and its rows
+     clipped ("ON TIM", "VERIFIE") past the panel edge. Give it a floor and
+     lower the other two. */
+  grid-template-columns: minmax(150px, .72fr) 40px minmax(215px, 1.5fr) 40px minmax(175px, .78fr);
   align-items: stretch;
   gap: 0;
   padding: 28px 34px;
@@ -575,6 +580,7 @@
 .pp-scope-rows {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 8px;
   padding: 14px 6px 4px;
   position: relative;
@@ -885,6 +891,13 @@
   }
   .pp-arrow { display: none; }
   .pp-scope-row { padding: 9px 10px; }
+  /* Four KPI columns only fit on a wide panel; at this size each cell was
+     ~112px and the row spilled past the canvas. */
+  .pp-kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* Keep the loop nodes inside a narrower canvas. */
+  .pp-loop-node { width: 200px; }
+  .pp-loop-node.is-a { left: 21% !important; }
+  .pp-loop-node.is-b { left: 79% !important; }
   .pp-req-stats b { font-size: 16px; }
   .pp-progress-ring { width: 108px; height: 108px; }
   .pp-progress-core b { font-size: 21px; }
@@ -902,7 +915,13 @@
   .pp-loop-node.is-b { left: 76% !important; }
   .pp-project { grid-template-columns: 1fr 1fr; gap: 14px; }
   .pp-arrow { display: none; }
-  .pp-scope { grid-column: 1 / 3; }
+  /* The canvas is only ~380px tall here and the summary card plus the scope
+     tracker stacked to ~430px, pushing scope 161px past the bottom. The
+     tracker and progress ring are the substance; drop the summary. */
+  .pp-req { display: none; }
+  .pp-scope { grid-column: auto; }
+  .pp-scope-row { padding: 8px 10px; }
+  .pp-progress { padding: 14px; }
   /* Keep two columns here: stacking them made the content taller than the
      fixed canvas, so the layer list ran into the footer below it. */
   .pp-schema { display: none; }
@@ -921,6 +940,18 @@
   .pp-functional,
   .pp-technical,
   .pp-loop { height: auto; }
+  /* Two columns here left each layer ~140px wide, and the icon plus the
+     right-hand meta squeezed the label column to zero. One column instead. */
+  .pp-technical { grid-template-columns: 1fr; padding: 18px; gap: 16px; }
+  .pp-tech-left,
+  .pp-tech-right { padding: 14px; }
+  .pp-layer { grid-template-columns: 30px minmax(0, 1fr) auto; gap: 9px; padding: 9px 10px; }
+  .pp-layer em { font-size: 7px; }
+  .pp-tech-foot { flex-wrap: wrap; gap: 8px 16px; }
+  /* Two columns gave the tracker only ~142px here, which collapsed its labels
+     to nothing. One column, full width. */
+  .pp-project { grid-template-columns: 1fr; gap: 14px; }
+  .pp-scope-head { grid-template-columns: 30px minmax(0, 1fr) auto; column-gap: 8px; }
   .pp-functional > .pp-tree-panel,
   .pp-functional > .pp-trace-panel,
   .pp-feature-tree { flex: none; }
@@ -1012,3 +1043,18 @@
   .pp-functional { padding: 16px; }
   .pp-trace-row { grid-template-columns: 84px 1fr 36px; gap: 8px; }
 }
+
+/* Long labels in the narrow summary/layer cards wrap instead of spilling. */
+.pp-req b,
+.pp-req p,
+.pp-layer-copy b,
+.pp-layer-copy small { overflow-wrap: anywhere; }
+
+/* Scope rows: let the text wrap rather than push the row past the panel. */
+.pp-scope-head { grid-template-columns: 30px minmax(0, 1fr) auto; column-gap: 8px; }
+.pp-scope-head b,
+.pp-scope-head small,
+.pp-scope-row b,
+.pp-scope-row small { overflow-wrap: anywhere; }
+.pp-scope-row { grid-template-columns: 24px minmax(0, 1fr) auto; column-gap: 9px; }
+.pp-scope-row em { white-space: normal; }

@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { ArrowDown, ArrowUpRight, BrainCircuit, Code2, FileCheck2, Key, RefreshCcw, Target, Wrench } from "lucide-react";
-import { useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 
 const HeroCoreCanvas = dynamic(() => import("./hero-core-canvas").then(m => m.HeroCoreCanvas), { ssr: false });
 
@@ -19,12 +19,53 @@ const satellites = [
 
 export function HeroV3() {
   const [activeSatellite, setActiveSatellite] = useState(0);
+  const sectionRef = useRef<HTMLElement>(null);
+  const [coreReady, setCoreReady] = useState(false);
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const sx = useSpring(x, { stiffness: 55, damping: 22, mass: 0.55 });
   const sy = useSpring(y, { stiffness: 55, damping: 22, mass: 0.55 });
   const moveX = useTransform(sx, [-.5, .5], [-10, 10]);
   const moveY = useTransform(sy, [-.5, .5], [-7, 7]);
+
+  // three.js + R3F + drei are ~850KB — over half the home page's JS — for the
+  // decorative core behind this hero. The brand intro fills the first screen,
+  // so none of it is visible on arrival and none of it needs to be there.
+  //
+  // Wait for the first scroll instead of an IntersectionObserver: the intro is
+  // pinned, so the hero sits at exactly one viewport height while the whole
+  // intro plays — it only comes into view once the pin is done, which is far
+  // too late to start an 850KB download. Any observer margin large enough to
+  // fire early would also fire at page load. A scroll check is both earlier
+  // and immune to the jump case, where a single large scroll can carry an
+  // element past the viewport without the observer ever seeing it intersect.
+  useEffect(() => {
+    if (coreReady) return;
+    const el = sectionRef.current;
+    if (!el) return;
+
+    let frame = 0;
+    const check = () => {
+      frame = 0;
+      // A restored scroll position lands here on mount; otherwise the first
+      // scroll event is the cue.
+      if (window.scrollY > 0 || el.getBoundingClientRect().top < window.innerHeight) {
+        setCoreReady(true);
+      }
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(check);
+    };
+
+    check();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => {
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      cancelAnimationFrame(frame);
+    };
+  }, [coreReady]);
 
   function onMove(event: MouseEvent<HTMLDivElement>) {
     const r = event.currentTarget.getBoundingClientRect();
@@ -33,7 +74,7 @@ export function HeroV3() {
   }
 
   return (
-    <section id="main-hero" className="v3-hero" onMouseMove={onMove} onMouseLeave={() => { x.set(0); y.set(0); }}>
+    <section id="main-hero" className="v3-hero" ref={sectionRef} onMouseMove={onMove} onMouseLeave={() => { x.set(0); y.set(0); }}>
       <div className="v3-hero-noise" />
       <div className="v3-hero-radial" />
       <div className="v4-hero-aurora" aria-hidden="true">
@@ -59,7 +100,7 @@ export function HeroV3() {
         <div className="v4-scanline" aria-hidden="true" />
         <div className="v4-stage-badge"><i /> 6 agents · pipeline ready</div>
         <div className="v3-stage-topline"><span>WORKSIMPLIFIED / AGENT PIPELINE</span><span><i /> READY</span></div>
-        <div className="v3-core-canvas"><HeroCoreCanvas /></div>
+        <div className="v3-core-canvas">{coreReady ? <HeroCoreCanvas /> : null}</div>
         <div className="v3-core-caption"><span>AGENT SYSTEM</span><span>Six specialist agents</span><small>BA → Refine → Frappe → Project → Functional → Technical</small></div>
         <svg className="v3-stage-wires" viewBox="0 0 1440 720" preserveAspectRatio="none" aria-hidden="true">
           <path d="M180 168 C330 165 432 250 596 318" />
